@@ -1,24 +1,38 @@
-# README
+# Bridgarr
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Jackett-backed Torznab proxy and indexer manager for the *arr stack.
 
-Things you may want to cover:
+Bridgarr lets you configure Jackett once, import Jackett indexers once, assign
+them to Sonarr, Radarr, Lidarr, Whisparr, and compatible apps, and sync those
+assignments as managed Generic Torznab indexers.
 
-* Ruby version
+## Status
 
-* System dependencies
+Bridgarr is public alpha software. Core CRUD, Jackett discovery, app connection
+tests, managed indexer sync, and the first Torznab proxy path exist. Background
+jobs, authentication, and production hardening are still future work.
 
-* Configuration
+## Development
 
-* Database creation
+```bash
+bin/setup
+bin/dev
+```
 
-* Database initialization
+Run the test suite:
 
-* How to run the test suite
+```bash
+bundle exec rspec
+```
 
-* Services (job queues, cache servers, search engines, etc.)
+Run local CI checks:
 
-* Deployment instructions
+```bash
+bin/ci
+```
 
-* ...
+## Container Images
+
+GitHub Actions builds the Docker image on pull requests without publishing it.
+Pushes to `main` publish `ghcr.io/clajiness/bridgarr` with `latest`, `main`, and
+`sha-*` tags. Version tags like `v0.1.0` publish matching semver image tags.
