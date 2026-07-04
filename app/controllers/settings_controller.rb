@@ -4,6 +4,7 @@ class SettingsController < ApplicationController
   end
 
   def update
+    Setting.write_value(Setting::BRIDGARR_BASE_URL_KEY, settings_params[:bridgarr_base_url])
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, settings_params[:jackett_base_url])
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, settings_params[:jackett_api_key])
 
@@ -28,6 +29,7 @@ class SettingsController < ApplicationController
   private
 
     def load_settings
+      @bridgarr_base_url = Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY)
       @jackett_base_url = Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY)
       @jackett_api_key = Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)
       @jackett_last_status = Setting.fetch_value(Setting::JACKETT_LAST_STATUS_KEY)
@@ -36,6 +38,6 @@ class SettingsController < ApplicationController
     end
 
     def settings_params
-      params.expect(settings: [ :jackett_base_url, :jackett_api_key ])
+      params.expect(settings: [ :bridgarr_base_url, :jackett_base_url, :jackett_api_key ])
     end
 end

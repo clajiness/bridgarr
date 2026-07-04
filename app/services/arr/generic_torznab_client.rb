@@ -16,14 +16,16 @@ module Arr
     REQUEST_TIMEOUT_SECONDS = 15
     TIMEOUT_ADOPTION_ATTEMPTS = 4
     TIMEOUT_ADOPTION_INTERVAL_SECONDS = 0.75
+    PROXY_API_KEY = "bridgarr"
 
-    def self.call(arr_app:, name:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id: nil, connection: nil, caps_client: Jackett::TorznabCaps)
-      new(arr_app:, name:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id:, connection:, caps_client:).call
+    def self.call(arr_app:, name:, bridgarr_base_url:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id: nil, connection: nil, caps_client: Jackett::TorznabCaps)
+      new(arr_app:, name:, bridgarr_base_url:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id:, connection:, caps_client:).call
     end
 
-    def initialize(arr_app:, name:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id: nil, connection: nil, caps_client: Jackett::TorznabCaps)
+    def initialize(arr_app:, name:, bridgarr_base_url:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id: nil, connection: nil, caps_client: Jackett::TorznabCaps)
       @arr_app = arr_app
       @name = name
+      @bridgarr_base_url = bridgarr_base_url.to_s.strip.delete_suffix("/")
       @jackett_base_url = jackett_base_url.to_s.strip.delete_suffix("/")
       @jackett_api_key = jackett_api_key.to_s.strip
       @jackett_id = jackett_id
@@ -33,6 +35,7 @@ module Arr
     end
 
     def call
+      return failure("Bridgarr URL is missing.") if bridgarr_base_url.blank?
       return failure("Jackett URL is missing.") if jackett_base_url.blank?
       return failure("Jackett API key is missing.") if jackett_api_key.blank?
 
@@ -69,7 +72,7 @@ module Arr
 
     private
 
-      attr_reader :arr_app, :name, :jackett_base_url, :jackett_api_key, :jackett_id, :remote_indexer_id, :connection, :caps_client
+      attr_reader :arr_app, :name, :bridgarr_base_url, :jackett_base_url, :jackett_api_key, :jackett_id, :remote_indexer_id, :connection, :caps_client
 
       def http
         @http ||= connection || Faraday.new(url: arr_app.base_url, headers: { "X-Api-Key" => arr_app.api_key }) do |faraday|
@@ -102,11 +105,11 @@ module Arr
       def field_value(field)
         case field["name"]
         when "baseUrl"
-          "#{jackett_base_url}/api/v2.0/indexers/#{jackett_id}/results/torznab"
+          "#{bridgarr_base_url}/torznab/#{jackett_id}"
         when "apiPath"
           "/api"
         when "apiKey"
-          jackett_api_key
+          PROXY_API_KEY
         when "categories"
           category_ids.presence || field["value"]
         when "animeCategories"

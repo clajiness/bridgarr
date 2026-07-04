@@ -20,6 +20,7 @@ module Sync
       result = client.call(
         arr_app:,
         name: remote_indexer_name,
+        bridgarr_base_url: Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY),
         jackett_base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
         jackett_api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
         jackett_id: indexer.jackett_id,

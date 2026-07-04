@@ -5,18 +5,21 @@ RSpec.describe "Settings", type: :request do
     get settings_path
 
     expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Bridgarr URL")
     expect(response.body).to include("Jackett URL")
   end
 
-  it "updates Jackett settings" do
+  it "updates connection settings" do
     patch settings_path, params: {
       settings: {
+        bridgarr_base_url: "http://localhost:3000",
         jackett_base_url: "http://localhost:9117",
         jackett_api_key: "jackett-api-key"
       }
     }
 
     expect(response).to redirect_to(settings_path)
+    expect(Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY)).to eq("http://localhost:3000")
     expect(Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY)).to eq("http://localhost:9117")
     expect(Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)).to eq("jackett-api-key")
   end

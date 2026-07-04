@@ -106,6 +106,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000/",
       jackett_base_url: "http://localhost:9117/",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -127,9 +128,9 @@ RSpec.describe Arr::GenericTorznabClient do
       "enableAutomaticSearch" => true,
       "enableInteractiveSearch" => true
     )
-    expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:9117/api/v2.0/indexers/eztv/results/torznab")
+    expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:3000/torznab/eztv")
     expect(fields.fetch("apiPath").fetch("value")).to eq("/api")
-    expect(fields.fetch("apiKey").fetch("value")).to eq("jackett-api-key")
+    expect(fields.fetch("apiKey").fetch("value")).to eq("bridgarr")
     expect(fields.fetch("categories").fetch("value")).to eq([ 5000, 5030, 5040, 5070 ])
     expect(fields.fetch("animeCategories").fetch("value")).to eq([ 5070 ])
     expect(FakeTorznabCapsClient.calls).to contain_exactly(
@@ -150,6 +151,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -171,6 +173,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -194,6 +197,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -218,6 +222,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -242,6 +247,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -272,6 +278,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -299,6 +306,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
@@ -329,6 +337,7 @@ RSpec.describe Arr::GenericTorznabClient do
     result = described_class.call(
       arr_app:,
       name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",

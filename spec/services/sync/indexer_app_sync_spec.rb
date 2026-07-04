@@ -36,6 +36,7 @@ RSpec.describe Sync::IndexerAppSync do
   end
 
   before do
+    Setting.write_value(Setting::BRIDGARR_BASE_URL_KEY, "http://localhost:3000")
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
   end
@@ -60,6 +61,7 @@ RSpec.describe Sync::IndexerAppSync do
     expect(client.calls.first).to include(
       arr_app:,
       name: "EZTV (Bridgarr)",
+      bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",

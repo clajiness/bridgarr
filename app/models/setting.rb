@@ -1,4 +1,5 @@
 class Setting < ApplicationRecord
+  BRIDGARR_BASE_URL_KEY = "bridgarr.base_url"
   JACKETT_BASE_URL_KEY = "jackett.base_url"
   JACKETT_API_KEY_KEY = "jackett.api_key"
   JACKETT_LAST_STATUS_KEY = "jackett.last_status"
