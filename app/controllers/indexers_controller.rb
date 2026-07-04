@@ -6,6 +6,34 @@ class IndexersController < ApplicationController
     @indexers = Indexer.includes(:arr_apps).order(:name)
   end
 
+  def discover
+    result = Jackett::IndexerDiscovery.call(
+      base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
+      api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)
+    )
+
+    if result.success?
+      @jackett_indexers = result.indexers
+      @existing_jackett_ids = Indexer.where(jackett_id: @jackett_indexers.map(&:jackett_id)).pluck(:jackett_id)
+    else
+      redirect_to indexers_path, alert: result.message
+    end
+  end
+
+  def import_from_jackett
+    result = Jackett::IndexerImport.call(
+      base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
+      api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
+      jackett_ids: selected_jackett_ids
+    )
+
+    if result.success?
+      redirect_to indexers_path, notice: result.message
+    else
+      redirect_to indexers_path, alert: result.message
+    end
+  end
+
   def show
   end
 
@@ -52,5 +80,9 @@ class IndexersController < ApplicationController
 
     def indexer_params
       params.expect(indexer: [ :name, :jackett_id, :enabled, { arr_app_ids: [] } ])
+    end
+
+    def selected_jackett_ids
+      params.fetch(:jackett_ids, [])
     end
 end

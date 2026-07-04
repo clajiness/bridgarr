@@ -21,6 +21,7 @@ RSpec.describe "Indexers", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("First Indexer")
+    expect(response.body).to include("Discover from Jackett")
   end
 
   it "renders the empty indexers state" do
@@ -28,6 +29,91 @@ RSpec.describe "Indexers", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Add your first Jackett indexer and let Bridgarr tie the stack together.")
+    expect(response.body).to include("Discover from Jackett")
+  end
+
+  it "previews configured Jackett indexers for import" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
+    Indexer.create!(name: "Existing Indexer", jackett_id: "existing-indexer")
+
+    result = Jackett::IndexerDiscovery::Result.new(
+      success?: true,
+      indexers: [
+        Jackett::IndexerDiscovery::IndexerRecord.new(name: "Existing Indexer", jackett_id: "existing-indexer", configured: true),
+        Jackett::IndexerDiscovery::IndexerRecord.new(name: "New Indexer", jackett_id: "new-indexer", configured: true)
+      ],
+      message: "Found 2 configured Jackett indexers.",
+      error: nil,
+      http_status: 200
+    )
+    allow(Jackett::IndexerDiscovery).to receive(:call).and_return(result)
+
+    get discover_indexers_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Existing Indexer")
+    expect(response.body).to include("Already imported")
+    expect(response.body).to include("New Indexer")
+    expect(response.body).to include("Ready to import")
+    expect(response.body).to include("Import selected indexers")
+    expect(response.body).to include("jackett_ids[]")
+  end
+
+  it "redirects when Jackett indexer discovery fails" do
+    result = Jackett::IndexerDiscovery::Result.new(
+      success?: false,
+      indexers: [],
+      message: "Add a Jackett URL before discovering indexers.",
+      error: "Add a Jackett URL before discovering indexers.",
+      http_status: nil
+    )
+    allow(Jackett::IndexerDiscovery).to receive(:call).and_return(result)
+
+    get discover_indexers_path
+
+    expect(response).to redirect_to(indexers_path)
+    expect(flash[:alert]).to eq("Add a Jackett URL before discovering indexers.")
+  end
+
+  it "imports missing Jackett indexers" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
+
+    result = Jackett::IndexerImport::Result.new(
+      success?: true,
+      imported_count: 2,
+      skipped_count: 1,
+      message: "2 indexers imported, 1 already present.",
+      error: nil
+    )
+    allow(Jackett::IndexerImport).to receive(:call).and_return(result)
+
+    post import_from_jackett_indexers_path, params: { jackett_ids: [ "first-indexer", "second-indexer" ] }
+
+    expect(response).to redirect_to(indexers_path)
+    expect(Jackett::IndexerImport).to have_received(:call).with(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_ids: [ "first-indexer", "second-indexer" ]
+    )
+    expect(flash[:notice]).to eq("2 indexers imported, 1 already present.")
+  end
+
+  it "redirects when Jackett indexer import fails" do
+    result = Jackett::IndexerImport::Result.new(
+      success?: false,
+      imported_count: 0,
+      skipped_count: 0,
+      message: "Add a Jackett URL before discovering indexers.",
+      error: "Add a Jackett URL before discovering indexers."
+    )
+    allow(Jackett::IndexerImport).to receive(:call).and_return(result)
+
+    post import_from_jackett_indexers_path
+
+    expect(response).to redirect_to(indexers_path)
+    expect(flash[:alert]).to eq("Add a Jackett URL before discovering indexers.")
   end
 
   it "renders the new indexer page" do

@@ -4,7 +4,12 @@ Rails.application.routes.draw do
   resource :settings, only: %i[ show update ] do
     post :test_jackett
   end
-  resources :indexers
+  resources :indexers do
+    collection do
+      get :discover
+      post :import_from_jackett
+    end
+  end
   resources :arr_apps
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

@@ -7,7 +7,10 @@
       <p class="mt-2 text-sm leading-6 text-slate-600">Jackett indexer records and their app assignments.</p>
     </div>
 
-    <%= link_to "New indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "Discover from Jackett", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+      <%= link_to "New indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    </div>
   </div>
 
   <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
@@ -43,7 +46,10 @@
     <% else %>
       <div class="px-6 py-12 text-center">
         <p class="text-sm font-medium text-slate-700">Add your first Jackett indexer and let Bridgarr tie the stack together.</p>
-        <%= link_to "Add your first indexer", new_indexer_path, class: "mt-4 inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+        <div class="mt-4 flex flex-wrap justify-center gap-3">
+          <%= link_to "Discover from Jackett", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+          <%= link_to "Add manually", new_indexer_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+        </div>
       </div>
     <% end %>
   </div>

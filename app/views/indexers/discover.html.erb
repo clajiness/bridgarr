@@ -1,0 +1,58 @@
+<% content_for :title, "Discover indexers" %>
+
+<div class="space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-slate-950">Discover indexers</h1>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+        Review configured Jackett indexers before importing missing records into Bridgarr.
+      </p>
+    </div>
+
+    <%= link_to "Back", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+  </div>
+
+  <% if @jackett_indexers.any? %>
+    <%= form_with url: import_from_jackett_indexers_path, class: "overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm" do %>
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+          <tr>
+            <th class="px-4 py-3">Import</th>
+            <th class="px-4 py-3">Name</th>
+            <th class="px-4 py-3">Jackett ID</th>
+            <th class="px-4 py-3">Import status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          <% @jackett_indexers.each do |jackett_indexer| %>
+            <% already_present = @existing_jackett_ids.include?(jackett_indexer.jackett_id) %>
+            <tr>
+              <td class="px-4 py-3">
+                <%= check_box_tag "jackett_ids[]", jackett_indexer.jackett_id, !already_present, disabled: already_present, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+              </td>
+              <td class="px-4 py-3 font-medium text-slate-950"><%= jackett_indexer.name %></td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= jackett_indexer.jackett_id %></td>
+              <td class="px-4 py-3">
+                <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", already_present ? "border-slate-200 bg-slate-100 text-slate-600" : "border-amber-200 bg-amber-50 text-amber-900") %>">
+                  <%= already_present ? "Already imported" : "Ready to import" %>
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <div class="flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-end">
+        <%= link_to "Cancel", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+        <%= submit_tag "Import selected indexers", class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+      <div class="px-6 py-12 text-center">
+        <p class="text-sm font-medium text-slate-700">Jackett did not return any configured indexers.</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Configure at least one indexer in Jackett, then discover again.</p>
+      </div>
+    </div>
+  <% end %>
+</div>
