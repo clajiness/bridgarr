@@ -184,6 +184,78 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(connection.post_path).to be_nil
   end
 
+  it "treats an existing saved remote indexer ID as already synced" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ { id: 42, name: "EZTV" } ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(result.remote_indexer_id).to eq(42)
+    expect(result.message).to eq("Generic Torznab indexer is already synced.")
+    expect(connection.post_path).to be_nil
+  end
+
+  it "adopts a matching managed indexer when the saved remote ID is stale" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ { id: 43, name: "EZTV" } ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 44 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(result.remote_indexer_id).to eq(43)
+    expect(result.message).to eq("Generic Torznab indexer already exists.")
+    expect(connection.post_path).to be_nil
+  end
+
+  it "recreates a managed indexer when the saved remote ID is missing" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 44 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(result.remote_indexer_id).to eq(44)
+    expect(result.message).to eq("Generic Torznab indexer created.")
+    expect(connection.post_path).to eq("/api/v3/indexer")
+  end
+
   it "adopts an indexer created before a timeout response" do
     indexers_response = ArrIndexerResponse.new(status: 200, body: [].to_json)
     connection = FakeArrIndexerConnection.new(

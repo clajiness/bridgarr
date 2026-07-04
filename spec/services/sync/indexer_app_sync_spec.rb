@@ -62,7 +62,8 @@ RSpec.describe Sync::IndexerAppSync do
       name: "EZTV (Bridgarr)",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
-      jackett_id: "eztv"
+      jackett_id: "eztv",
+      remote_indexer_id: nil
     )
   end
 
@@ -118,15 +119,56 @@ RSpec.describe Sync::IndexerAppSync do
     expect(client.calls.first).to include(name: "EZTV (Bridgarr)")
   end
 
-  it "does not create another remote indexer for an already synced assignment" do
+  it "reconciles an already synced assignment" do
     assignment.update!(remote_indexer_id: 42, last_status: "ok")
-    client = FakeGenericTorznabClient.new(nil)
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer is already synced.",
+        error: nil
+      )
+    )
 
     result = described_class.call(indexer_app: assignment, client:)
 
-    expect(result).not_to be_success
-    expect(result.message).to eq("This assignment is already synced. Updating remote indexers is not implemented yet.")
+    expect(result).to be_success
+    expect(result.message).to eq("EZTV is already synced to Main Sonarr.")
     expect(assignment.reload.last_status).to eq("ok")
-    expect(client.calls).to be_empty
+    expect(client.calls.first).to include(remote_indexer_id: 42)
+  end
+
+  it "reports when Bridgarr adopts an existing managed indexer" do
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer already exists.",
+        error: nil
+      )
+    )
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result).to be_success
+    expect(result.message).to eq("EZTV was already present in Main Sonarr; Bridgarr adopted it.")
+    expect(assignment.reload.remote_indexer_id).to eq(42)
+  end
+
+  it "reports when Bridgarr recovers a sync after an Arr timeout" do
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer exists after Main Sonarr timed out.",
+        error: nil
+      )
+    )
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result).to be_success
+    expect(result.message).to eq("EZTV synced to Main Sonarr after Main Sonarr timed out.")
+    expect(assignment.reload.remote_indexer_id).to eq(42)
   end
 end
