@@ -16,6 +16,65 @@
 
   <%= render @arr_app %>
 
+  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-base font-semibold text-slate-950">Assigned indexers</h2>
+        <p class="mt-1 text-sm text-slate-500">Indexers Bridgarr is managing for this app.</p>
+      </div>
+
+      <%= link_to "Manage assignments", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
+    </div>
+
+    <% if @arr_app.indexer_apps.any? %>
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+          <tr>
+            <th class="px-4 py-3">Indexer</th>
+            <th class="px-4 py-3">Jackett ID</th>
+            <th class="px-4 py-3">Remote ID</th>
+            <th class="px-4 py-3">Sync status</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          <% @arr_app.indexer_apps.includes(:indexer).order("indexers.name").each do |assignment| %>
+            <tr>
+              <td class="px-4 py-3 font-medium text-slate-950"><%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %></td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.indexer.jackett_id %></td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.remote_indexer_id.presence || "None" %></td>
+              <td class="px-4 py-3">
+                <% if assignment.last_status.present? %>
+                  <div class="min-w-40 space-y-2">
+                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment.last_status == "ok" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800") %>">
+                      <%= assignment.last_status == "ok" ? "Synced" : "Failed" %>
+                    </span>
+                    <% if assignment.last_synced_at.present? %>
+                      <p class="text-xs leading-5 text-slate-500"><%= format_utc_timestamp(assignment.last_synced_at) %></p>
+                    <% end %>
+                    <% if assignment.last_error.present? %>
+                      <p class="text-xs leading-5 text-red-800"><%= assignment.last_error %></p>
+                    <% end %>
+                  </div>
+                <% else %>
+                  <span class="text-sm text-slate-500">Not synced</span>
+                <% end %>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <%= button_to "Sync", sync_indexer_app_path(assignment), params: { return_to: "arr_app" }, class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-sm font-medium text-slate-700">No indexers assigned to this app yet.</p>
+        <p class="mt-2 text-sm text-slate-500">Assign indexers from an indexer edit page when this app is ready to receive them.</p>
+      </div>
+    <% end %>
+  </section>
+
   <div class="border-t border-slate-200 pt-6">
     <%= button_to "Remove app", @arr_app, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", data: { turbo_confirm: "Remove this app?" } %>
   </div>

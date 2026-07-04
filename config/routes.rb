@@ -10,6 +10,9 @@ Rails.application.routes.draw do
       post :import_from_jackett
     end
   end
+  resources :indexer_apps, only: [] do
+    post :sync, on: :member
+  end
   resources :arr_apps do
     post :test_connections, on: :collection
     post :test_connection, on: :member

@@ -160,6 +160,43 @@ RSpec.describe "Indexers", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Main Sonarr")
+    expect(response.body).to include("App assignments")
+    expect(response.body).to include("Sync")
+  end
+
+  it "syncs one app assignment" do
+    indexer
+    assignment = indexer.indexer_apps.first
+    result = Sync::IndexerAppSync::Result.new(
+      success?: true,
+      remote_indexer_id: 42,
+      message: "First Indexer synced to Main Sonarr.",
+      error: nil
+    )
+    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+
+    post sync_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(Sync::IndexerAppSync).to have_received(:call).with(indexer_app: assignment)
+    expect(flash[:notice]).to eq("First Indexer synced to Main Sonarr.")
+  end
+
+  it "shows sync failures" do
+    indexer
+    assignment = indexer.indexer_apps.first
+    result = Sync::IndexerAppSync::Result.new(
+      success?: false,
+      remote_indexer_id: nil,
+      message: "Jackett URL is missing.",
+      error: "Jackett URL is missing."
+    )
+    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+
+    post sync_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(flash[:alert]).to eq("Jackett URL is missing.")
   end
 
   it "renders the edit indexer page" do
@@ -190,11 +227,31 @@ RSpec.describe "Indexers", type: :request do
 
   it "destroys an indexer" do
     indexer
+    result = Sync::IndexerDestroyer::Result.new(success?: true, message: "Indexer removed.", error: nil)
+    allow(Sync::IndexerDestroyer).to receive(:call).and_return(result)
 
     expect {
       delete indexer_path(indexer)
-    }.to change(Indexer, :count).by(-1)
+    }.not_to change(Indexer, :count)
 
     expect(response).to redirect_to(indexers_path)
+    expect(Sync::IndexerDestroyer).to have_received(:call).with(indexer:)
+  end
+
+  it "does not destroy an indexer when remote cleanup fails" do
+    indexer
+    result = Sync::IndexerDestroyer::Result.new(
+      success?: false,
+      message: "Main Sonarr returned HTTP 500 while trying to remove managed indexer.",
+      error: "Main Sonarr returned HTTP 500 while trying to remove managed indexer."
+    )
+    allow(Sync::IndexerDestroyer).to receive(:call).and_return(result)
+
+    expect {
+      delete indexer_path(indexer)
+    }.not_to change(Indexer, :count)
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(flash[:alert]).to eq("Main Sonarr returned HTTP 500 while trying to remove managed indexer.")
   end
 end

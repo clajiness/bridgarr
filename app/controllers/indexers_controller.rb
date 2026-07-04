@@ -55,17 +55,24 @@ class IndexersController < ApplicationController
   end
 
   def update
-    if @indexer.update(indexer_params)
-      redirect_to @indexer, notice: "Indexer updated.", status: :see_other
+    result = Sync::IndexerAssignmentUpdater.call(indexer: @indexer, attributes: indexer_params)
+
+    if result.success?
+      redirect_to @indexer, notice: result.message, status: :see_other
     else
+      @indexer.errors.add(:base, result.error)
       render :edit, status: :unprocessable_content
     end
   end
 
   def destroy
-    @indexer.destroy!
+    result = Sync::IndexerDestroyer.call(indexer: @indexer)
 
-    redirect_to indexers_path, notice: "Indexer removed.", status: :see_other
+    if result.success?
+      redirect_to indexers_path, notice: result.message, status: :see_other
+    else
+      redirect_to @indexer, alert: result.message, status: :see_other
+    end
   end
 
   private

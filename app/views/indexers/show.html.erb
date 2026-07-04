@@ -15,7 +15,58 @@
 
   <%= render @indexer %>
 
+  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+    <div class="border-b border-slate-200 px-4 py-3">
+      <h2 class="text-base font-semibold text-slate-950">App assignments</h2>
+    </div>
+
+    <% if @indexer.indexer_apps.any? %>
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+          <tr>
+            <th class="px-4 py-3">App</th>
+            <th class="px-4 py-3">Remote ID</th>
+            <th class="px-4 py-3">Sync status</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          <% @indexer.indexer_apps.includes(:arr_app).order("arr_apps.name").each do |assignment| %>
+            <tr>
+              <td class="px-4 py-3 font-medium text-slate-950"><%= link_to assignment.arr_app.name, assignment.arr_app, class: "hover:underline" %></td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.remote_indexer_id.presence || "None" %></td>
+              <td class="px-4 py-3">
+                <% if assignment.last_status.present? %>
+                  <div class="min-w-40 space-y-2">
+                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment.last_status == "ok" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800") %>">
+                      <%= assignment.last_status == "ok" ? "Synced" : "Failed" %>
+                    </span>
+                    <% if assignment.last_synced_at.present? %>
+                      <p class="text-xs leading-5 text-slate-500"><%= format_utc_timestamp(assignment.last_synced_at) %></p>
+                    <% end %>
+                    <% if assignment.last_error.present? %>
+                      <p class="text-xs leading-5 text-red-800"><%= assignment.last_error %></p>
+                    <% end %>
+                  </div>
+                <% else %>
+                  <span class="text-sm text-slate-500">Not synced</span>
+                <% end %>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <%= button_to "Sync", sync_indexer_app_path(assignment), class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-sm font-medium text-slate-700">Assign this indexer to an app before syncing.</p>
+      </div>
+    <% end %>
+  </section>
+
   <div class="border-t border-slate-200 pt-6">
-    <%= button_to "Remove indexer", @indexer, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", data: { turbo_confirm: "Remove this indexer?" } %>
+    <%= button_to "Remove indexer", @indexer, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", data: { turbo_confirm: "Remove this Bridgarr indexer? Any synced copies in assigned apps will be removed too." } %>
   </div>
 </div>

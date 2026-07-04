@@ -31,6 +31,9 @@
 
   <fieldset class="space-y-3">
     <legend class="text-sm font-medium text-slate-700">Assigned apps</legend>
+    <p class="text-xs leading-5 text-slate-500">
+      Unchecking a synced app removes Bridgarr's managed indexer from that app before removing the local assignment.
+    </p>
     <% if @arr_apps.any? %>
       <div class="grid gap-3 sm:grid-cols-2">
         <%= form.collection_check_boxes :arr_app_ids, @arr_apps, :id, :name do |builder| %>

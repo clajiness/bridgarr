@@ -59,6 +59,47 @@ RSpec.describe "Arr apps", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Main Sonarr")
     expect(response.body).to include("Test connection")
+    expect(response.body).to include("Assigned indexers")
+    expect(response.body).to include("No indexers assigned to this app yet.")
+  end
+
+  it "shows assigned indexers on the app page" do
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      last_status: "ok",
+      last_synced_at: Time.zone.parse("2026-07-04 14:10:10")
+    )
+
+    get arr_app_path(arr_app)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("EZTV")
+    expect(response.body).to include("eztv")
+    expect(response.body).to include("42")
+    expect(response.body).to include("Synced")
+    expect(response.body).to include(sync_indexer_app_path(assignment))
+    expect(response.body).to include("return_to")
+    expect(response.body).to include("arr_app")
+  end
+
+  it "syncs an indexer assignment from the app page" do
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:)
+    result = Sync::IndexerAppSync::Result.new(
+      success?: true,
+      remote_indexer_id: 42,
+      message: "EZTV synced to Main Sonarr.",
+      error: nil
+    )
+    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+
+    post sync_indexer_app_path(assignment), params: { return_to: "arr_app" }
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(flash[:notice]).to eq("EZTV synced to Main Sonarr.")
   end
 
   it "tests an app connection" do
