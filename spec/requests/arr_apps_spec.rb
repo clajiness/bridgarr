@@ -17,6 +17,8 @@ RSpec.describe "Arr apps", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Main Sonarr")
+    expect(response.body).to include("Not tested")
+    expect(response.body).to include("Test all")
   end
 
   it "renders the empty apps state" do
@@ -56,6 +58,105 @@ RSpec.describe "Arr apps", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Main Sonarr")
+    expect(response.body).to include("Test connection")
+  end
+
+  it "tests an app connection" do
+    arr_app
+    result = Arr::ConnectionTest::Result.new(
+      success?: true,
+      message: "Sonarr connection works.",
+      error: nil,
+      http_status: 200,
+      app_name: "Sonarr",
+      version: "4.0.0"
+    )
+    allow(Arr::ConnectionTest).to receive(:call).and_return(result)
+
+    post test_connection_arr_app_path(arr_app)
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(Arr::ConnectionTest).to have_received(:call).with(
+      base_url: "http://localhost:8989",
+      api_key: "sonarr-api-key"
+    )
+    expect(flash[:notice]).to eq("Main Sonarr connection works.")
+    expect(arr_app.reload.last_status).to eq("ok")
+    expect(arr_app.last_error).to be_nil
+    expect(arr_app.last_tested_at).to be_present
+  end
+
+  it "tests an app connection from the apps table" do
+    arr_app
+    result = Arr::ConnectionTest::Result.new(
+      success?: true,
+      message: "Sonarr connection works.",
+      error: nil,
+      http_status: 200,
+      app_name: "Sonarr",
+      version: "4.0.0"
+    )
+    allow(Arr::ConnectionTest).to receive(:call).and_return(result)
+
+    post test_connection_arr_app_path(arr_app), params: { return_to: "index" }
+
+    expect(response).to redirect_to(arr_apps_path)
+    expect(flash[:notice]).to eq("Main Sonarr connection works.")
+    expect(arr_app.reload.last_status).to eq("ok")
+  end
+
+  it "tests all app connections" do
+    arr_app
+    radarr = ArrApp.create!(
+      name: "Main Radarr",
+      app_type: "radarr",
+      base_url: "http://localhost:7878",
+      api_key: "radarr-api-key"
+    )
+    success = Arr::ConnectionTest::Result.new(
+      success?: true,
+      message: "Sonarr connection works.",
+      error: nil,
+      http_status: 200,
+      app_name: "Sonarr",
+      version: "4.0.0"
+    )
+    failure = Arr::ConnectionTest::Result.new(
+      success?: false,
+      message: "App returned HTTP 401. Check the URL and API key.",
+      error: "App returned HTTP 401. Check the URL and API key.",
+      http_status: 401,
+      app_name: nil,
+      version: nil
+    )
+    allow(Arr::ConnectionTest).to receive(:call).and_return(success, failure)
+
+    post test_connections_arr_apps_path
+
+    expect(response).to redirect_to(arr_apps_path)
+    expect(flash[:notice]).to eq("1 app connected, 1 failed.")
+    expect(radarr.reload.last_status).to eq("ok")
+    expect(arr_app.reload.last_status).to eq("error")
+  end
+
+  it "shows failed app connection tests" do
+    arr_app
+    result = Arr::ConnectionTest::Result.new(
+      success?: false,
+      message: "App returned HTTP 401. Check the URL and API key.",
+      error: "App returned HTTP 401. Check the URL and API key.",
+      http_status: 401,
+      app_name: nil,
+      version: nil
+    )
+    allow(Arr::ConnectionTest).to receive(:call).and_return(result)
+
+    post test_connection_arr_app_path(arr_app)
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(flash[:alert]).to eq("App returned HTTP 401. Check the URL and API key.")
+    expect(arr_app.reload.last_status).to eq("error")
+    expect(arr_app.last_error).to eq("App returned HTTP 401. Check the URL and API key.")
   end
 
   it "renders the edit app page" do

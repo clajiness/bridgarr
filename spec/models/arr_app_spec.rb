@@ -28,4 +28,23 @@ RSpec.describe ArrApp, type: :model do
     expect(arr_app).not_to be_valid
     expect(arr_app.errors[:app_type]).to include("is not included in the list")
   end
+
+  it "records connection test results" do
+    arr_app.save!
+    tested_at = Time.zone.local(2026, 7, 4, 12, 0, 0)
+    result = Arr::ConnectionTest::Result.new(
+      success?: false,
+      message: "Connection failed",
+      error: "Connection failed",
+      http_status: nil,
+      app_name: nil,
+      version: nil
+    )
+
+    arr_app.record_connection_test_result(result, tested_at:)
+
+    expect(arr_app.last_status).to eq("error")
+    expect(arr_app.last_error).to eq("Connection failed")
+    expect(arr_app.last_tested_at).to eq(tested_at)
+  end
 end

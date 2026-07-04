@@ -14,7 +14,19 @@
     </div>
     <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
       <dt class="font-medium text-slate-500">Last status</dt>
-      <dd class="sm:col-span-2"><%= arr_app.last_status.presence || "Not tested" %></dd>
+      <dd class="sm:col-span-2">
+        <% if arr_app.last_status.present? %>
+          <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", arr_app.last_status == "ok" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800") %>">
+            <%= arr_app.last_status == "ok" ? "Connected" : "Failed" %>
+          </span>
+        <% else %>
+          Not tested
+        <% end %>
+      </dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Last tested</dt>
+      <dd class="sm:col-span-2"><%= arr_app.last_tested_at.present? ? format_utc_timestamp(arr_app.last_tested_at) : "Never" %></dd>
     </div>
     <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
       <dt class="font-medium text-slate-500">Last error</dt>

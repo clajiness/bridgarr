@@ -8,6 +8,7 @@
     </div>
 
     <div class="flex flex-wrap gap-3">
+      <%= button_to "Test connection", test_connection_arr_app_path(@arr_app), class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
       <%= link_to "Edit", edit_arr_app_path(@arr_app), class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
       <%= link_to "Back", arr_apps_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
     </div>

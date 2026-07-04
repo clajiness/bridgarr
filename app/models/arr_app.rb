@@ -8,4 +8,12 @@ class ArrApp < ApplicationRecord
   validates :app_type, inclusion: { in: APP_TYPES }
 
   normalizes :base_url, with: ->(base_url) { base_url.to_s.strip.delete_suffix("/") }
+
+  def record_connection_test_result(result, tested_at: Time.current)
+    update!(
+      last_status: result.success? ? "ok" : "error",
+      last_error: result.error,
+      last_tested_at: tested_at
+    )
+  end
 end

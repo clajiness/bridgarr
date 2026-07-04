@@ -7,7 +7,12 @@
       <p class="mt-2 text-sm leading-6 text-slate-600">Sonarr, Radarr, Lidarr, Whisparr, and compatible app records.</p>
     </div>
 
-    <%= link_to "New app", new_arr_app_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    <div class="flex flex-wrap gap-3">
+      <% if @arr_apps.any? %>
+        <%= button_to "Test all", test_connections_arr_apps_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+      <% end %>
+      <%= link_to "New app", new_arr_app_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    </div>
   </div>
 
   <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
@@ -19,6 +24,7 @@
             <th class="px-4 py-3">Application</th>
             <th class="px-4 py-3">Base URL</th>
             <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Connection</th>
             <th class="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
@@ -33,8 +39,25 @@
                   <%= arr_app.enabled? ? "Enabled" : "Disabled" %>
                 </span>
               </td>
-              <td class="px-4 py-3 text-right">
-                <%= link_to "Edit", edit_arr_app_path(arr_app), class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
+              <td class="px-4 py-3">
+                <% if arr_app.last_status.present? %>
+                  <div class="min-w-40 space-y-2">
+                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", arr_app.last_status == "ok" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800") %>">
+                      <%= arr_app.last_status == "ok" ? "Connected" : "Failed" %>
+                    </span>
+                    <% if arr_app.last_tested_at.present? %>
+                      <p class="text-xs leading-5 text-slate-500"><%= format_utc_timestamp(arr_app.last_tested_at) %></p>
+                    <% end %>
+                  </div>
+                <% else %>
+                  <span class="text-sm text-slate-500">Not tested</span>
+                <% end %>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap justify-end gap-2">
+                  <%= button_to "Test", test_connection_arr_app_path(arr_app), params: { return_to: "index" }, class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
+                  <%= link_to "Edit", edit_arr_app_path(arr_app), class: "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50 hover:text-slate-950" %>
+                </div>
               </td>
             </tr>
           <% end %>
