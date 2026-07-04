@@ -23,6 +23,13 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("First Indexer")
   end
 
+  it "renders the empty indexers state" do
+    get indexers_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Add your first Jackett indexer and let Bridgarr tie the stack together.")
+  end
+
   it "renders the new indexer page" do
     arr_app
 

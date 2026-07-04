@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="glass-clip">
+      <path d="M146 150C152 132 360 132 366 150L344 392C340 418 172 418 168 392L146 150Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="#1c1917"/>
+  <rect x="24" y="24" width="464" height="464" rx="76" stroke="#d39a35" stroke-width="18" stroke-opacity="0.28"/>
+
+  <g clip-path="url(#glass-clip)">
+    <path d="M142 208H370V424H142V208Z" fill="#ead0a0"/>
+    <path d="M142 306C186 280 216 328 256 306C296 284 326 314 370 286V424H142V306Z" fill="#7a3518"/>
+    <path d="M142 208C182 184 218 222 256 202C294 182 328 210 370 190V268H142V208Z" fill="#fff4d8"/>
+  </g>
+
+  <path d="M188 214L232 196L258 238L214 262L188 214Z" fill="#fff8e8" fill-opacity="0.78"/>
+  <path d="M268 184L318 198L302 250L252 234L268 184Z" fill="#fff8e8" fill-opacity="0.68"/>
+
+  <path d="M146 150C152 132 360 132 366 150L344 392C340 418 172 418 168 392L146 150Z" stroke="#fff4d8" stroke-width="20" stroke-linejoin="round"/>
+  <path d="M146 150C158 128 354 128 366 150C354 172 158 172 146 150Z" stroke="#fff4d8" stroke-width="18" stroke-linejoin="round"/>
+</svg>

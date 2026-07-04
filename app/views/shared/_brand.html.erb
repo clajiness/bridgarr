@@ -1,0 +1,14 @@
+<% show_tagline = local_assigns.fetch(:show_tagline, true) %>
+
+<%= link_to root_path, class: "group flex items-center gap-3" do %>
+  <span class="flex h-11 w-11 items-center justify-center" aria-hidden="true">
+    <%= image_tag "bridgarr-mark.svg", alt: "", class: "h-10 w-10" %>
+  </span>
+
+  <span class="min-w-0">
+    <span class="block text-xl font-semibold tracking-normal text-stone-50 group-hover:text-amber-100">Bridgarr</span>
+    <% if show_tagline %>
+      <span class="hidden text-xs leading-5 text-stone-300 md:block"><%= bridgarr_tagline %></span>
+    <% end %>
+  </span>
+<% end %>

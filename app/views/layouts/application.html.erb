@@ -15,7 +15,7 @@
     <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
 
     <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="icon" href="<%= asset_path("bridgarr-mark.svg") %>" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
     <%# Includes all stylesheet files in app/assets/stylesheets %>
@@ -23,12 +23,10 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="bg-slate-50 text-slate-950">
-    <header class="border-b border-slate-200 bg-white">
+  <body class="min-h-screen bg-stone-100 text-slate-950">
+    <header class="border-b border-amber-300/20 bg-stone-950">
       <div class="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <%= link_to root_path, class: "text-xl font-semibold tracking-normal text-slate-950" do %>
-          Bridgarr
-        <% end %>
+        <%= render "shared/brand" %>
 
         <nav class="flex flex-wrap gap-2 text-sm font-medium">
           <% [
@@ -38,8 +36,8 @@
             [ "Indexers", indexers_path ]
           ].each do |label, path| %>
             <%= link_to label, path, class: class_names(
-              "rounded-md px-3 py-2",
-              current_page?(path) ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+              "rounded-md px-3 py-2 transition",
+              current_page?(path) ? "bg-amber-300 text-stone-950" : "text-stone-300 hover:bg-stone-800 hover:text-amber-100"
             ) %>
           <% end %>
         </nav>
@@ -48,7 +46,7 @@
 
     <main class="mx-auto max-w-6xl px-5 py-8">
       <% if notice.present? %>
-        <p class="mb-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" id="notice"><%= notice %></p>
+        <p class="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900" id="notice"><%= notice %></p>
       <% end %>
 
       <%= yield %>

@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Arr apps", type: :request do
-  let!(:arr_app) do
+  let(:arr_app) do
     ArrApp.create!(
       name: "Main Sonarr",
       app_type: "sonarr",
@@ -11,10 +11,19 @@ RSpec.describe "Arr apps", type: :request do
   end
 
   it "renders the apps index" do
+    arr_app
+
     get arr_apps_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Main Sonarr")
+  end
+
+  it "renders the empty apps state" do
+    get arr_apps_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Add Sonarr, Radarr, or friends so Bridgarr knows where to send indexers.")
   end
 
   it "renders the new app page" do
@@ -41,6 +50,8 @@ RSpec.describe "Arr apps", type: :request do
   end
 
   it "shows an app" do
+    arr_app
+
     get arr_app_path(arr_app)
 
     expect(response).to have_http_status(:ok)
@@ -48,6 +59,8 @@ RSpec.describe "Arr apps", type: :request do
   end
 
   it "renders the edit app page" do
+    arr_app
+
     get edit_arr_app_path(arr_app)
 
     expect(response).to have_http_status(:ok)
@@ -55,6 +68,8 @@ RSpec.describe "Arr apps", type: :request do
   end
 
   it "updates an app" do
+    arr_app
+
     patch arr_app_path(arr_app), params: {
       arr_app: {
         name: "Updated Sonarr",
@@ -70,6 +85,8 @@ RSpec.describe "Arr apps", type: :request do
   end
 
   it "destroys an app" do
+    arr_app
+
     expect {
       delete arr_app_path(arr_app)
     }.to change(ArrApp, :count).by(-1)
