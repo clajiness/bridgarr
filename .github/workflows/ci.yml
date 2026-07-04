@@ -8,8 +8,6 @@ on:
 jobs:
   security:
     runs-on: ubuntu-latest
-    env:
-      HOME: ${{ github.workspace }}/tmp/home
 
     steps:
       - name: Checkout code
@@ -24,6 +22,8 @@ jobs:
         run: bin/brakeman --no-pager
       
       - name: Scan for known security vulnerabilities in gems used
+        env:
+          HOME: ${{ github.workspace }}/tmp/home
         run: bin/bundler-audit
 
       - name: Scan for security vulnerabilities in JavaScript dependencies
