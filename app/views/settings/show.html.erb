@@ -1,0 +1,26 @@
+<% content_for :title, "Settings" %>
+
+<div class="max-w-3xl space-y-8">
+  <div>
+    <h1 class="text-3xl font-semibold text-slate-950">Settings</h1>
+    <p class="mt-2 text-sm leading-6 text-slate-600">
+      Connect Bridgarr to the Jackett instance that owns your indexer configuration. Bridgarr uses these settings to track whether Jackett is configured and to share one Jackett connection across future indexer discovery, Torznab proxying, and app sync work.
+    </p>
+  </div>
+
+  <%= form_with url: settings_path, method: :patch, scope: :settings, class: "space-y-6 rounded-md border border-slate-200 bg-white p-6" do |form| %>
+    <div>
+      <%= form.label :jackett_base_url, "Jackett URL", class: "block text-sm font-medium text-slate-700" %>
+      <%= form.url_field :jackett_base_url, value: @jackett_base_url, placeholder: "http://localhost:9117", class: "mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" %>
+    </div>
+
+    <div>
+      <%= form.label :jackett_api_key, "Jackett API key", class: "block text-sm font-medium text-slate-700" %>
+      <%= form.password_field :jackett_api_key, value: @jackett_api_key, class: "mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" %>
+    </div>
+
+    <div class="flex justify-end">
+      <%= form.submit "Save settings", class: "rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+    </div>
+  <% end %>
+</div>

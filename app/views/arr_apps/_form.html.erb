@@ -1,0 +1,43 @@
+<%= form_with(model: arr_app, class: "space-y-6 rounded-md border border-slate-200 bg-white p-6") do |form| %>
+  <% if arr_app.errors.any? %>
+    <div id="error_explanation" class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+      <p class="font-semibold"><%= pluralize(arr_app.errors.count, "error") %> blocked this app from being saved.</p>
+
+      <ul class="mt-2 list-disc pl-5">
+        <% arr_app.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :name, class: "block text-sm font-medium text-slate-700" %>
+    <%= form.text_field :name, placeholder: "Main Sonarr", class: "mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" %>
+  </div>
+
+  <div>
+    <%= form.label :app_type, "Application", class: "block text-sm font-medium text-slate-700" %>
+    <%= form.select :app_type, ArrApp::APP_TYPES.map { |type| [ type.titleize, type ] }, { include_blank: "Choose an application" }, class: "mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" %>
+  </div>
+
+  <div>
+    <%= form.label :base_url, "Base URL", class: "block text-sm font-medium text-slate-700" %>
+    <%= form.url_field :base_url, placeholder: "http://localhost:8989", class: "mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" %>
+  </div>
+
+  <div>
+    <%= form.label :api_key, "API key", class: "block text-sm font-medium text-slate-700" %>
+    <%= form.password_field :api_key, value: arr_app.api_key, class: "mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" %>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <%= form.checkbox :enabled, class: "h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-500" %>
+    <%= form.label :enabled, class: "text-sm font-medium text-slate-700" %>
+  </div>
+
+  <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
+    <%= link_to "Cancel", arr_apps_path, class: "inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
+    <%= form.submit "Save app", class: "inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+  </div>
+<% end %>

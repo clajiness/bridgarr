@@ -1,0 +1,21 @@
+<% content_for :title, "Showing arr app" %>
+
+<div class="max-w-4xl space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="text-sm font-medium text-slate-500"><%= @arr_app.app_type.titleize %></p>
+      <h1 class="mt-1 text-3xl font-semibold text-slate-950"><%= @arr_app.name %></h1>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "Edit", edit_arr_app_path(@arr_app), class: "inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+      <%= link_to "Back", arr_apps_path, class: "inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
+    </div>
+  </div>
+
+  <%= render @arr_app %>
+
+  <div class="border-t border-slate-200 pt-6">
+    <%= button_to "Remove app", @arr_app, method: :delete, class: "rounded-md bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-500", data: { turbo_confirm: "Remove this app?" } %>
+  </div>
+</div>

@@ -1,0 +1,10 @@
+<% content_for :title, "Editing indexer" %>
+
+<div class="max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-3xl font-semibold text-slate-950">Edit indexer</h1>
+    <p class="mt-2 text-sm leading-6 text-slate-600"><%= @indexer.name %></p>
+  </div>
+
+  <%= render "form", indexer: @indexer %>
+</div>

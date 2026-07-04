@@ -1,0 +1,50 @@
+<% content_for :title, "Arr apps" %>
+
+<div class="space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-slate-950">Apps</h1>
+      <p class="mt-2 text-sm leading-6 text-slate-600">Sonarr, Radarr, Lidarr, Whisparr, and compatible app records.</p>
+    </div>
+
+    <%= link_to "New app", new_arr_app_path, class: "inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+  </div>
+
+  <div class="overflow-hidden rounded-md border border-slate-200 bg-white">
+    <% if @arr_apps.any? %>
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+          <tr>
+            <th class="px-4 py-3">Name</th>
+            <th class="px-4 py-3">Application</th>
+            <th class="px-4 py-3">Base URL</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          <% @arr_apps.each do |arr_app| %>
+            <tr>
+              <td class="px-4 py-3 font-medium text-slate-950"><%= link_to arr_app.name, arr_app, class: "hover:underline" %></td>
+              <td class="px-4 py-3 text-slate-700"><%= arr_app.app_type.titleize %></td>
+              <td class="px-4 py-3 text-slate-700"><%= arr_app.base_url %></td>
+              <td class="px-4 py-3">
+                <span class="<%= class_names("rounded-md px-2 py-1 text-xs font-semibold", arr_app.enabled? ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600") %>">
+                  <%= arr_app.enabled? ? "Enabled" : "Disabled" %>
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <%= link_to "Edit", edit_arr_app_path(arr_app), class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-sm font-medium text-slate-700">No apps yet.</p>
+        <%= link_to "Add your first app", new_arr_app_path, class: "mt-4 inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+      </div>
+    <% end %>
+  </div>
+</div>

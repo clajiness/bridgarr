@@ -1,0 +1,53 @@
+<% content_for :title, "Dashboard" %>
+
+<div class="space-y-8">
+  <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-slate-950">Dashboard</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+        Save your Jackett connection details, define your apps and indexers, then assign indexers where they belong.
+      </p>
+    </div>
+
+    <%= link_to "Add indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+  </section>
+
+  <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="rounded-md border border-slate-200 bg-white p-5">
+      <p class="text-sm font-medium text-slate-500">Jackett</p>
+      <p class="mt-3 text-2xl font-semibold"><%= @jackett_configured ? "Configured" : "Missing" %></p>
+    </div>
+
+    <div class="rounded-md border border-slate-200 bg-white p-5">
+      <p class="text-sm font-medium text-slate-500">Apps</p>
+      <p class="mt-3 text-2xl font-semibold"><%= @arr_apps_count %></p>
+    </div>
+
+    <div class="rounded-md border border-slate-200 bg-white p-5">
+      <p class="text-sm font-medium text-slate-500">Indexers</p>
+      <p class="mt-3 text-2xl font-semibold"><%= @indexers_count %></p>
+    </div>
+
+    <div class="rounded-md border border-slate-200 bg-white p-5">
+      <p class="text-sm font-medium text-slate-500">Assignments</p>
+      <p class="mt-3 text-2xl font-semibold"><%= @assignments_count %></p>
+    </div>
+  </section>
+
+  <section class="grid gap-4 lg:grid-cols-3">
+    <%= link_to settings_path, class: "rounded-md border border-slate-200 bg-white p-5 hover:border-slate-300" do %>
+      <h2 class="text-base font-semibold">Settings</h2>
+      <p class="mt-2 text-sm leading-6 text-slate-600">Store the Jackett URL and API key for the integration work that comes next.</p>
+    <% end %>
+
+    <%= link_to arr_apps_path, class: "rounded-md border border-slate-200 bg-white p-5 hover:border-slate-300" do %>
+      <h2 class="text-base font-semibold">Apps</h2>
+      <p class="mt-2 text-sm leading-6 text-slate-600">Add Sonarr, Radarr, Lidarr, Whisparr, and compatible app records.</p>
+    <% end %>
+
+    <%= link_to indexers_path, class: "rounded-md border border-slate-200 bg-white p-5 hover:border-slate-300" do %>
+      <h2 class="text-base font-semibold">Indexers</h2>
+      <p class="mt-2 text-sm leading-6 text-slate-600">Track Jackett indexer records and assign them to one or more apps.</p>
+    <% end %>
+  </section>
+</div>

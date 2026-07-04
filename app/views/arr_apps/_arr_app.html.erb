@@ -1,0 +1,24 @@
+<div id="<%= dom_id arr_app %>" class="rounded-md border border-slate-200 bg-white">
+  <dl class="divide-y divide-slate-200 text-sm">
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Base URL</dt>
+      <dd class="sm:col-span-2"><%= arr_app.base_url %></dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">API key</dt>
+      <dd class="sm:col-span-2"><%= arr_app.api_key.present? ? "Configured" : "Missing" %></dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Enabled</dt>
+      <dd class="sm:col-span-2"><%= arr_app.enabled? ? "Yes" : "No" %></dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Last status</dt>
+      <dd class="sm:col-span-2"><%= arr_app.last_status.presence || "Not tested" %></dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Last error</dt>
+      <dd class="sm:col-span-2"><%= arr_app.last_error.presence || "None" %></dd>
+    </div>
+  </dl>
+</div>

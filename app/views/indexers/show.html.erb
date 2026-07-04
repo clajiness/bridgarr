@@ -1,0 +1,21 @@
+<% content_for :title, "Showing indexer" %>
+
+<div class="max-w-4xl space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="font-mono text-sm text-slate-500"><%= @indexer.jackett_id %></p>
+      <h1 class="mt-1 text-3xl font-semibold text-slate-950"><%= @indexer.name %></h1>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "Edit", edit_indexer_path(@indexer), class: "inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" %>
+      <%= link_to "Back", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" %>
+    </div>
+  </div>
+
+  <%= render @indexer %>
+
+  <div class="border-t border-slate-200 pt-6">
+    <%= button_to "Remove indexer", @indexer, method: :delete, class: "rounded-md bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-500", data: { turbo_confirm: "Remove this indexer?" } %>
+  </div>
+</div>

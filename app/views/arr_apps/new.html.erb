@@ -1,0 +1,10 @@
+<% content_for :title, "New arr app" %>
+
+<div class="max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-3xl font-semibold text-slate-950">New app</h1>
+    <p class="mt-2 text-sm leading-6 text-slate-600">Add an app endpoint so indexers can be assigned to it.</p>
+  </div>
+
+  <%= render "form", arr_app: @arr_app %>
+</div>
