@@ -15,4 +15,15 @@ RSpec.describe Setting, type: :model do
 
     expect(described_class).to be_jackett_configured
   end
+
+  it "records Jackett connection test results" do
+    tested_at = Time.zone.local(2026, 7, 4, 12, 0, 0)
+    result = Jackett::ConnectionTest::Result.new(success?: false, message: "Nope", error: "Connection failed", http_status: nil)
+
+    described_class.record_jackett_test_result(result, tested_at:)
+
+    expect(described_class.fetch_value(described_class::JACKETT_LAST_STATUS_KEY)).to eq("error")
+    expect(described_class.fetch_value(described_class::JACKETT_LAST_ERROR_KEY)).to eq("Connection failed")
+    expect(described_class.fetch_value(described_class::JACKETT_LAST_TESTED_AT_KEY)).to eq("2026-07-04T12:00:00Z")
+  end
 end

@@ -49,6 +49,10 @@
         <p class="mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900" id="notice"><%= notice %></p>
       <% end %>
 
+      <% if alert.present? %>
+        <p class="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800" id="alert"><%= alert %></p>
+      <% end %>
+
       <%= yield %>
     </main>
   </body>

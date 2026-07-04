@@ -1,7 +1,9 @@
 Rails.application.routes.draw do
   root "dashboard#index"
 
-  resource :settings, only: %i[ show update ]
+  resource :settings, only: %i[ show update ] do
+    post :test_jackett
+  end
   resources :indexers
   resources :arr_apps
 
