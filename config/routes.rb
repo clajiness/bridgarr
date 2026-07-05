@@ -16,6 +16,7 @@ Rails.application.routes.draw do
   resources :sync_runs, only: %i[ index show create ] do
     post :abandon, on: :member
   end
+  resource :proxy_activity, only: :show
   resources :arr_apps do
     post :test_connections, on: :collection
     post :test_connection, on: :member

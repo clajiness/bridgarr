@@ -43,7 +43,7 @@
   <section class="<%= class_names("overflow-hidden rounded-md border bg-white shadow-sm", @dashboard.needs_attention? ? "border-red-200" : "border-amber-200/70") %>">
     <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 class="text-base font-semibold text-slate-950">Needs attention</h2>
+        <h2 class="text-base font-semibold text-slate-950">Health summary</h2>
         <p class="mt-1 text-sm leading-6 text-slate-600"><%= dashboard_attention_summary(@dashboard) %></p>
       </div>
       <% if @dashboard.needs_attention? %>
@@ -79,7 +79,7 @@
         <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.unsynced_assignments_count %></p>
       <% end %>
 
-      <%= link_to indexers_path, class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
+      <%= link_to proxy_activity_path(status: "failed"), class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
         <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Proxy failures</p>
         <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.proxy_failures_count %></p>
       <% end %>
@@ -168,12 +168,15 @@
     </div>
 
     <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-5 py-4">
-        <h2 class="text-base font-semibold text-slate-950">Proxy activity</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600">
-          Torznab traffic Bridgarr has handled in the last 24 hours.
-          <%= @dashboard.showing_proxy_failures? ? "Recent failures are shown for context." : "Showing recent requests." %>
-        </p>
+      <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-slate-950">Proxy activity</h2>
+          <p class="mt-1 text-sm leading-6 text-slate-600">
+            Torznab traffic Bridgarr has handled in the last 24 hours.
+            <%= @dashboard.showing_proxy_failures? ? "Recent failures are shown for context." : "Showing recent requests." %>
+          </p>
+        </div>
+        <%= link_to "View all activity", proxy_activity_path, class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
       </div>
 
       <div class="grid gap-px bg-slate-200 sm:grid-cols-4">
@@ -202,7 +205,7 @@
               <div>
                 <p class="font-medium text-slate-950">
                   <% if proxy_request.indexer.present? %>
-                    <% proxy_request_path = proxy_request.failed? ? indexer_path(proxy_request.indexer, proxy_activity: "failed") : indexer_path(proxy_request.indexer) %>
+                    <% proxy_request_path = proxy_request.failed? ? proxy_activity_path(status: "failed", indexer_id: proxy_request.indexer_id) : indexer_path(proxy_request.indexer) %>
                     <%= link_to proxy_request.indexer.name, proxy_request_path, class: "hover:underline" %>
                   <% else %>
                     <%= proxy_request.jackett_id %>
@@ -217,7 +220,7 @@
                   HTTP <%= proxy_request.http_status.presence || "n/a" %>
                   · <%= proxy_request_item_count(proxy_request) %>
                   <% if proxy_request.error.present? && proxy_request.indexer.present? %>
-                    · <%= link_to "Open failure details.", indexer_path(proxy_request.indexer, proxy_activity: "failed"), class: "font-medium text-red-800 hover:underline" %>
+                    · <%= link_to "Open failure details.", proxy_activity_path(status: "failed", indexer_id: proxy_request.indexer_id), class: "font-medium text-red-800 hover:underline" %>
                   <% elsif proxy_request.error.present? %>
                     · Error details are available on the indexer page.
                   <% end %>
