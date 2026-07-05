@@ -37,6 +37,13 @@ RSpec.describe "Dashboard", type: :request do
       indexer: Indexer.create!(name: "EZTV", jackett_id: "eztv", enabled: true),
       enabled: true
     )
+    IndexerApp.create!(
+      arr_app: sonarr,
+      indexer: Indexer.create!(name: "ExtraTorrent.st", jackett_id: "extratorrent-st", enabled: true),
+      enabled: false,
+      remote_indexer_id: 42,
+      last_status: "ok"
+    )
     SyncRun.create!(
       status: "partial",
       total_count: 2,
@@ -72,15 +79,20 @@ RSpec.describe "Dashboard", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Monitor Bridgarr health")
-    expect(response.body).to include("Needs attention")
+    expect(response.body).to include("3 total assignments")
+    expect(response.body).to include("Health summary")
     expect(response.body).to include("latest sync run, 1 failed assignment, and 1 unsynced assignment need attention")
     expect(response.body).to include("Partial")
     expect(response.body).to include("Could not sync categories")
     expect(response.body).to include("Not synced")
     expect(response.body).to include("Proxy activity")
     expect(response.body).to include("Recent failures are shown for context")
-    expect(response.body).to include("Error details are available on the indexer page")
+    expect(response.body).to include("View all activity")
+    expect(response.body).to include("Open failure details.")
     expect(response.body).not_to include("Jackett timed out")
+    expect(response.body).to include(proxy_activity_path(status: "failed"))
+    expect(response.body).to include("status=failed")
+    expect(response.body).to include("indexer_id=#{indexer.id}")
     expect(response.body).to include("12.5 s")
     expect(response.body).to include(indexer_path(failed_assignment.indexer))
     expect(response.body).to include(arr_app_path(failed_assignment.arr_app))

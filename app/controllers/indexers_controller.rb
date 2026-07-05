@@ -36,7 +36,10 @@ class IndexersController < ApplicationController
 
   def show
     @proxy_activity_stats = @indexer.proxy_activity_stats
-    @proxy_requests = @indexer.proxy_requests.recent.limit(10)
+    @proxy_activity_filter = params[:proxy_activity] == "failed" ? "failed" : "recent"
+    @proxy_requests = @indexer.proxy_requests
+    @proxy_requests = @proxy_requests.failed if @proxy_activity_filter == "failed"
+    @proxy_requests = @proxy_requests.recent.limit(10)
   end
 
   def new
