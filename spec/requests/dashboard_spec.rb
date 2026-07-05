@@ -9,6 +9,13 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include(BrandingHelper::TAGLINE)
   end
 
+  it "orders navigation and dashboard links by daily workflow" do
+    get root_path
+
+    expect(response.body).to match(/Dashboard.*Apps.*Indexers.*Settings.*Sync/m)
+    expect(response.body).to match(/<h2 class="text-base font-semibold">Apps<\/h2>.*<h2 class="text-base font-semibold">Indexers<\/h2>.*<h2 class="text-base font-semibold">Settings<\/h2>/m)
+  end
+
   it "shows sync, assignment, and proxy health" do
     sonarr = ArrApp.create!(
       name: "Sonarr",
