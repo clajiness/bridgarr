@@ -42,7 +42,7 @@ module Dashboard
     end
 
     def unsynced_assignments_count
-      active_assignments.where(remote_indexer_id: nil).count
+      unsynced_assignment_scope.count
     end
 
     def latest_sync_run
@@ -61,9 +61,8 @@ module Dashboard
     end
 
     def unsynced_assignments
-      @unsynced_assignments ||= active_assignments
+      @unsynced_assignments ||= unsynced_assignment_scope
         .includes(:indexer, :arr_app)
-        .where(remote_indexer_id: nil)
         .order(updated_at: :desc)
         .limit(RECENT_LIMIT)
     end
@@ -102,8 +101,16 @@ module Dashboard
       @recent_proxy_requests ||= ProxyRequest.includes(:indexer).recent.limit(RECENT_LIMIT)
     end
 
+    def visible_proxy_requests
+      @visible_proxy_requests ||= showing_proxy_failures? ? failed_proxy_requests : recent_proxy_requests
+    end
+
+    def showing_proxy_failures?
+      failed_proxy_requests.any?
+    end
+
     def attention_count
-      failed_assignments_count + unsynced_assignments_count + proxy_failures_count + (latest_sync_run_needs_attention? ? 1 : 0)
+      failed_assignments_count + unsynced_assignments_count + (latest_sync_run_needs_attention? ? 1 : 0)
     end
 
     def needs_attention?
@@ -119,6 +126,12 @@ module Dashboard
 
       def recent_proxy_scope
         ProxyRequest.where(created_at: PROXY_ACTIVITY_WINDOW.ago(now)..now)
+      end
+
+      def unsynced_assignment_scope
+        active_assignments
+          .where(remote_indexer_id: nil)
+          .where("indexer_apps.last_status IS NULL OR indexer_apps.last_status != ?", "error")
       end
   end
 end
