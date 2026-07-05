@@ -212,9 +212,13 @@
                   · <%= proxy_request.query.presence || "No query" %>
                   · <%= proxy_duration(proxy_request.duration_ms) %>
                 </p>
-                <% if proxy_request.error.present? %>
-                  <p class="mt-1 text-xs leading-5 text-red-800"><%= proxy_request.error %></p>
-                <% end %>
+                <p class="mt-1 text-xs leading-5 text-slate-500">
+                  HTTP <%= proxy_request.http_status.presence || "n/a" %>
+                  · <%= proxy_request_item_count(proxy_request) %>
+                  <% if proxy_request.error.present? %>
+                    · Error details are available on the indexer page.
+                  <% end %>
+                </p>
               </div>
               <span class="<%= class_names("inline-flex w-fit rounded-md border px-2 py-1 text-xs font-semibold", proxy_request_status_classes(proxy_request)) %>">
                 <%= proxy_request_status_label(proxy_request) %>
