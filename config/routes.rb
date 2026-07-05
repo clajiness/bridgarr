@@ -18,6 +18,7 @@ Rails.application.routes.draw do
     post :test_connection, on: :member
   end
   get "torznab/:jackett_id/api", to: "torznab_proxy#show", as: :torznab_proxy
+  get "torznab/:jackett_id/download", to: "torznab_proxy#download", as: :torznab_download_proxy
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
