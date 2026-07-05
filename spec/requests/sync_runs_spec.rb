@@ -12,13 +12,23 @@ RSpec.describe "Sync runs", type: :request do
   end
 
   it "queues a bulk sync run" do
-    sync_run = SyncRun.create!(total_count: 0)
+    sync_run = SyncRun.create!(total_count: 1)
     allow(Sync::BulkSync).to receive(:call).and_return(sync_run)
 
     post sync_runs_path
 
     expect(response).to redirect_to(sync_run_path(sync_run))
     expect(flash[:notice]).to eq("Bulk sync queued.")
+  end
+
+  it "explains when no assignments are ready to sync" do
+    sync_run = SyncRun.create!(total_count: 0)
+    allow(Sync::BulkSync).to receive(:call).and_return(sync_run)
+
+    post sync_runs_path
+
+    expect(response).to redirect_to(sync_run_path(sync_run))
+    expect(flash[:notice]).to eq("No enabled indexer assignments are ready to sync.")
   end
 
   it "renders a sync run detail page" do

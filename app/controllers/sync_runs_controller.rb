@@ -11,6 +11,8 @@ class SyncRunsController < ApplicationController
   def create
     sync_run = Sync::BulkSync.call
 
-    redirect_to sync_run_path(sync_run), notice: "Bulk sync queued."
+    message = sync_run.total_count.positive? ? "Bulk sync queued." : "No enabled indexer assignments are ready to sync."
+
+    redirect_to sync_run_path(sync_run), notice: message
   end
 end
