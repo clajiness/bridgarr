@@ -202,7 +202,8 @@
               <div>
                 <p class="font-medium text-slate-950">
                   <% if proxy_request.indexer.present? %>
-                    <%= link_to proxy_request.indexer.name, proxy_request.indexer, class: "hover:underline" %>
+                    <% proxy_request_path = proxy_request.failed? ? indexer_path(proxy_request.indexer, proxy_activity: "failed") : indexer_path(proxy_request.indexer) %>
+                    <%= link_to proxy_request.indexer.name, proxy_request_path, class: "hover:underline" %>
                   <% else %>
                     <%= proxy_request.jackett_id %>
                   <% end %>
@@ -215,7 +216,9 @@
                 <p class="mt-1 text-xs leading-5 text-slate-500">
                   HTTP <%= proxy_request.http_status.presence || "n/a" %>
                   · <%= proxy_request_item_count(proxy_request) %>
-                  <% if proxy_request.error.present? %>
+                  <% if proxy_request.error.present? && proxy_request.indexer.present? %>
+                    · <%= link_to "Open failure details.", indexer_path(proxy_request.indexer, proxy_activity: "failed"), class: "font-medium text-red-800 hover:underline" %>
+                  <% elsif proxy_request.error.present? %>
                     · Error details are available on the indexer page.
                   <% end %>
                 </p>

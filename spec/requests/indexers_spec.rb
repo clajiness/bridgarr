@@ -164,6 +164,42 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("Sync")
   end
 
+  it "filters proxy activity to failed requests" do
+    indexer
+    failed_request = indexer.proxy_requests.create!(
+      jackett_id: indexer.jackett_id,
+      request_type: "tvsearch",
+      http_status: 400,
+      item_count: 0,
+      duration_ms: 55_000,
+      error: "FlareSolverr timed out",
+      created_at: 20.minutes.ago
+    )
+
+    11.times do |request_index|
+      indexer.proxy_requests.create!(
+        jackett_id: indexer.jackett_id,
+        request_type: "tvsearch",
+        http_status: 200,
+        item_count: 19,
+        duration_ms: 100,
+        created_at: request_index.minutes.ago
+      )
+    end
+
+    get indexer_path(indexer)
+
+    expect(response.body).to include(indexer_path(indexer, proxy_activity: "failed"))
+    expect(response.body).not_to include(failed_request.error)
+
+    get indexer_path(indexer, proxy_activity: "failed")
+
+    expect(response.body).to include(indexer_path(indexer))
+    expect(response.body).to include("Showing recent failed proxy requests with error details.")
+    expect(response.body).to include(failed_request.error)
+    expect(response.body).not_to include("19 items")
+  end
+
   it "syncs one app assignment" do
     indexer
     assignment = indexer.indexer_apps.first
