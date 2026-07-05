@@ -49,6 +49,21 @@ SOLID_QUEUE_IN_PUMA=true
 
 Set `SOLID_QUEUE_IN_PUMA=false` when running a separate `bin/jobs` worker.
 
+## Runtime Tuning
+
+Some public torrent indexers can take a while to answer Jackett queries,
+especially while an *arr app validates a newly synced Torznab indexer. These
+timeouts can be adjusted without rebuilding the image:
+
+```bash
+ARR_INDEXER_SYNC_TIMEOUT_SECONDS=150
+JACKETT_TORZNAB_TIMEOUT_SECONDS=120
+```
+
+`ARR_INDEXER_SYNC_TIMEOUT_SECONDS` should usually be greater than
+`JACKETT_TORZNAB_TIMEOUT_SECONDS` because Sonarr/Radarr may call back through
+Bridgarr while Bridgarr is waiting for the *arr API response.
+
 ## Container Images
 
 GitHub Actions builds the Docker image on pull requests without publishing it.
