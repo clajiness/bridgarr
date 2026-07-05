@@ -121,7 +121,7 @@ module Dashboard
 
       def active_assignments
         IndexerApp.joins(:indexer, :arr_app)
-          .where(enabled: true, indexers: { enabled: true }, arr_apps: { enabled: true })
+          .where(indexers: { enabled: true }, arr_apps: { enabled: true })
       end
 
       def recent_proxy_scope

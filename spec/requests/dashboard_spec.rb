@@ -37,6 +37,13 @@ RSpec.describe "Dashboard", type: :request do
       indexer: Indexer.create!(name: "EZTV", jackett_id: "eztv", enabled: true),
       enabled: true
     )
+    IndexerApp.create!(
+      arr_app: sonarr,
+      indexer: Indexer.create!(name: "ExtraTorrent.st", jackett_id: "extratorrent-st", enabled: true),
+      enabled: false,
+      remote_indexer_id: 42,
+      last_status: "ok"
+    )
     SyncRun.create!(
       status: "partial",
       total_count: 2,
@@ -72,6 +79,7 @@ RSpec.describe "Dashboard", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Monitor Bridgarr health")
+    expect(response.body).to include("3 total assignments")
     expect(response.body).to include("Needs attention")
     expect(response.body).to include("latest sync run, 1 failed assignment, and 1 unsynced assignment need attention")
     expect(response.body).to include("Partial")
