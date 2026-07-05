@@ -8,4 +8,59 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("Dashboard")
     expect(response.body).to include(BrandingHelper::TAGLINE)
   end
+
+  it "shows sync, assignment, and proxy health" do
+    sonarr = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key",
+      enabled: true
+    )
+    indexer = Indexer.create!(name: "1337x", jackett_id: "1337x", enabled: true)
+    failed_assignment = IndexerApp.create!(
+      arr_app: sonarr,
+      indexer:,
+      enabled: true,
+      last_status: "error",
+      last_error: "Could not sync categories"
+    )
+    IndexerApp.create!(
+      arr_app: sonarr,
+      indexer: Indexer.create!(name: "EZTV", jackett_id: "eztv", enabled: true),
+      enabled: true
+    )
+    SyncRun.create!(
+      status: "partial",
+      total_count: 2,
+      success_count: 1,
+      failure_count: 1,
+      started_at: Time.zone.local(2026, 7, 5, 12, 0, 0)
+    )
+    ProxyRequest.create!(
+      indexer:,
+      jackett_id: "1337x",
+      request_type: "tvsearch",
+      query: "Silo",
+      categories: "5000,5030",
+      http_status: 504,
+      item_count: 0,
+      duration_ms: 12_500,
+      error: "Jackett timed out"
+    )
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Monitor Bridgarr health")
+    expect(response.body).to include("Needs attention")
+    expect(response.body).to include("Partial")
+    expect(response.body).to include("Could not sync categories")
+    expect(response.body).to include("Not synced")
+    expect(response.body).to include("Proxy activity")
+    expect(response.body).to include("Jackett timed out")
+    expect(response.body).to include("12.5 s")
+    expect(response.body).to include(indexer_path(failed_assignment.indexer))
+    expect(response.body).to include(arr_app_path(failed_assignment.arr_app))
+  end
 end
