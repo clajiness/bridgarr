@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_222350) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_231804) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
@@ -49,6 +49,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_222350) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "proxy_requests", force: :cascade do |t|
+    t.string "categories"
+    t.datetime "created_at", null: false
+    t.integer "duration_ms", default: 0, null: false
+    t.text "error"
+    t.integer "http_status"
+    t.integer "indexer_id"
+    t.integer "item_count"
+    t.string "jackett_id", null: false
+    t.string "query"
+    t.text "query_params"
+    t.string "request_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["indexer_id", "created_at"], name: "index_proxy_requests_on_indexer_id_and_created_at"
+    t.index ["indexer_id"], name: "index_proxy_requests_on_indexer_id"
+    t.index ["jackett_id", "created_at"], name: "index_proxy_requests_on_jackett_id_and_created_at"
+    t.index ["request_type"], name: "index_proxy_requests_on_request_type"
+  end
+
   create_table "settings", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "key"
@@ -58,4 +77,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_222350) do
 
   add_foreign_key "indexer_apps", "arr_apps"
   add_foreign_key "indexer_apps", "indexers"
+  add_foreign_key "proxy_requests", "indexers"
 end

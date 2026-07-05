@@ -35,6 +35,8 @@ class IndexersController < ApplicationController
   end
 
   def show
+    @proxy_activity_stats = @indexer.proxy_activity_stats
+    @proxy_requests = @indexer.proxy_requests.recent.limit(10)
   end
 
   def new
