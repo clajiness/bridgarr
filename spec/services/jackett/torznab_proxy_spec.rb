@@ -129,7 +129,9 @@ RSpec.describe Jackett::TorznabProxy do
       connection:
     )
 
-    expect(result.body).to eq("Jackett did not return tvsearch results for 1337x within 60 seconds.")
+    expect(result.body).to eq(
+      "Jackett did not return tvsearch results for 1337x within #{described_class::READ_TIMEOUT_SECONDS} seconds."
+    )
     expect(result.http_status).to eq(:bad_gateway)
     expect(result.content_type).to eq("text/plain")
   end

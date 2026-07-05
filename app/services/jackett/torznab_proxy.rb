@@ -6,7 +6,7 @@ module Jackett
 
     TORZNAB_CONTENT_TYPE = "application/rss+xml"
     OPEN_TIMEOUT_SECONDS = 5
-    READ_TIMEOUT_SECONDS = 60
+    READ_TIMEOUT_SECONDS = ENV.fetch("JACKETT_TORZNAB_TIMEOUT_SECONDS", 120).to_i
 
     def self.call(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection: nil)
       new(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection:).call

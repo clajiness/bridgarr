@@ -97,6 +97,10 @@ RSpec.describe Arr::GenericTorznabClient do
     FakeTorznabCapsClient.reset!
   end
 
+  it "allows slow Arr validation callbacks during sync" do
+    expect(described_class::REQUEST_TIMEOUT_SECONDS).to be >= Jackett::TorznabProxy::READ_TIMEOUT_SECONDS
+  end
+
   it "creates a Generic Torznab indexer from the Arr schema" do
     connection = FakeArrIndexerConnection.new(
       schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
