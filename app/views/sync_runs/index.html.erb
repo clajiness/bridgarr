@@ -36,7 +36,12 @@
               <td class="px-4 py-3 text-slate-700"><%= sync_run.success_count %></td>
               <td class="px-4 py-3 text-slate-700"><%= sync_run.failure_count %></td>
               <td class="px-4 py-3 text-right">
-                <%= link_to "View", sync_run_path(sync_run), class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
+                <div class="flex flex-wrap justify-end gap-3">
+                  <% unless sync_run.complete? %>
+                    <%= button_to "Abandon", abandon_sync_run_path(sync_run), class: "text-sm font-semibold text-red-700 hover:text-red-900", data: { turbo_confirm: "Mark this unfinished sync run as failed?" } %>
+                  <% end %>
+                  <%= link_to "View", sync_run_path(sync_run), class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
+                </div>
               </td>
             </tr>
           <% end %>

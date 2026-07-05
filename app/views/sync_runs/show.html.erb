@@ -11,6 +11,9 @@
 
     <div class="flex flex-wrap gap-3">
       <%= link_to "All sync runs", sync_runs_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+      <% unless @sync_run.complete? %>
+        <%= button_to "Abandon run", abandon_sync_run_path(@sync_run), class: "inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50", data: { turbo_confirm: "Mark this unfinished sync run as failed?" } %>
+      <% end %>
       <%= button_to "Sync all", sync_runs_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
     </div>
   </div>

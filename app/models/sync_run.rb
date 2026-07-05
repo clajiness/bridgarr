@@ -52,6 +52,25 @@ class SyncRun < ApplicationRecord
     update!(attributes)
   end
 
+  def abandon!(message: "Sync run was abandoned.")
+    return if complete?
+
+    transaction do
+      sync_run_items.where(status: %w[queued running]).find_each do |item|
+        item.update!(status: "failed", finished_at: Time.current, error: message)
+      end
+
+      update!(
+        status: "failed",
+        failure_count: sync_run_items.where(status: "failed").count,
+        success_count: sync_run_items.where(status: "succeeded").count,
+        total_count: sync_run_items.count,
+        finished_at: Time.current,
+        error: message
+      )
+    end
+  end
+
   private
 
     def final_status(successes:, failures:)
