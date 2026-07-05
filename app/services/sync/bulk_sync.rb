@@ -8,7 +8,7 @@ module Sync
       IndexerApp
         .includes(:indexer, :arr_app)
         .joins(:indexer, :arr_app)
-        .where(enabled: true, indexers: { enabled: true }, arr_apps: { enabled: true })
+        .where(indexers: { enabled: true }, arr_apps: { enabled: true })
         .order("indexers.name", "arr_apps.name")
     end
 
