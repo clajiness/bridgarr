@@ -48,16 +48,30 @@ RSpec.describe "Dashboard", type: :request do
       duration_ms: 12_500,
       error: "Jackett timed out"
     )
+    6.times do |index|
+      ProxyRequest.create!(
+        indexer:,
+        jackett_id: "1337x",
+        request_type: "tvsearch",
+        query: "Successful #{index}",
+        categories: "5000,5030",
+        http_status: 200,
+        item_count: 5,
+        duration_ms: 250
+      )
+    end
 
     get root_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Monitor Bridgarr health")
     expect(response.body).to include("Needs attention")
+    expect(response.body).to include("latest sync run, 1 failed assignment, and 1 unsynced assignment need attention")
     expect(response.body).to include("Partial")
     expect(response.body).to include("Could not sync categories")
     expect(response.body).to include("Not synced")
     expect(response.body).to include("Proxy activity")
+    expect(response.body).to include("Recent failures are shown for context")
     expect(response.body).to include("Jackett timed out")
     expect(response.body).to include("12.5 s")
     expect(response.body).to include(indexer_path(failed_assignment.indexer))
