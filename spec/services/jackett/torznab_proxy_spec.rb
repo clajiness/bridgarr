@@ -115,4 +115,22 @@ RSpec.describe Jackett::TorznabProxy do
     expect(result.http_status).to eq(:bad_gateway)
     expect(result.content_type).to eq("text/plain")
   end
+
+  it "returns a timeout-specific response when Jackett takes too long" do
+    connection = instance_double(Faraday::Connection)
+    allow(connection).to receive(:get).and_raise(Faraday::TimeoutError.new("Net::ReadTimeout"))
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      bridgarr_base_url: "http://bridgarr.example",
+      api_key: "jackett-api-key",
+      jackett_id: "1337x",
+      query_params: { "t" => "tvsearch" },
+      connection:
+    )
+
+    expect(result.body).to eq("Jackett did not return tvsearch results for 1337x within 60 seconds.")
+    expect(result.http_status).to eq(:bad_gateway)
+    expect(result.content_type).to eq("text/plain")
+  end
 end

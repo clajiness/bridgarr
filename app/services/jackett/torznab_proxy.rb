@@ -5,6 +5,8 @@ module Jackett
     Result = Data.define(:body, :http_status, :content_type)
 
     TORZNAB_CONTENT_TYPE = "application/rss+xml"
+    OPEN_TIMEOUT_SECONDS = 5
+    READ_TIMEOUT_SECONDS = 60
 
     def self.call(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection: nil)
       new(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection:).call
@@ -31,6 +33,8 @@ module Jackett
         jackett_response.status,
         content_type
       )
+    rescue Faraday::TimeoutError, Net::ReadTimeout
+      response(timeout_message, :bad_gateway, "text/plain")
     rescue Faraday::Error => e
       response("Could not connect to Jackett: #{e.message}", :bad_gateway, "text/plain")
     end
@@ -42,8 +46,8 @@ module Jackett
       def http
         @http ||= connection || Faraday.new(url: base_url) do |faraday|
           faraday.request :url_encoded
-          faraday.options.timeout = 15
-          faraday.options.open_timeout = 2
+          faraday.options.timeout = READ_TIMEOUT_SECONDS
+          faraday.options.open_timeout = OPEN_TIMEOUT_SECONDS
           faraday.adapter Faraday.default_adapter
         end
       end
@@ -54,6 +58,11 @@ module Jackett
 
       def forwarded_params
         query_params.merge("apikey" => api_key)
+      end
+
+      def timeout_message
+        request_type = query_params["t"].presence || "Torznab request"
+        "Jackett did not return #{request_type} results for #{jackett_id} within #{READ_TIMEOUT_SECONDS} seconds."
       end
 
       def rewrite_download_links(body, content_type)
