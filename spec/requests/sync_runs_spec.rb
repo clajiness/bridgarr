@@ -36,12 +36,27 @@ RSpec.describe "Sync runs", type: :request do
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
     indexer_app = IndexerApp.create!(arr_app:, indexer:)
     sync_run = SyncRun.create!(total_count: 1)
-    sync_run.sync_run_items.create!(indexer_app:)
+    sync_run.sync_run_items.create!(indexer_app:, indexer_name: "EZTV", arr_app_name: "Sonarr")
 
     get sync_run_path(sync_run)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Bulk sync")
+    expect(response.body).to include("EZTV")
+    expect(response.body).to include("Sonarr")
+  end
+
+  it "renders removed assignments from stored sync run labels" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app:, indexer_name: "EZTV", arr_app_name: "Sonarr")
+    indexer_app.destroy!
+
+    get sync_run_path(sync_run)
+
+    expect(response).to have_http_status(:ok)
     expect(response.body).to include("EZTV")
     expect(response.body).to include("Sonarr")
   end

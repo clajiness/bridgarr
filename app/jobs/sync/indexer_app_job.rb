@@ -7,6 +7,8 @@ module Sync
       sync_run = sync_run_item.sync_run
 
       sync_run.mark_running!
+      return record_missing_assignment(sync_run_item) if sync_run_item.indexer_app.blank?
+
       sync_run_item.mark_running!
 
       result = Sync::IndexerAppSync.call(indexer_app: sync_run_item.indexer_app)
@@ -17,5 +19,15 @@ module Sync
     ensure
       sync_run_item&.sync_run&.refresh_status!
     end
+
+    private
+
+      def record_missing_assignment(sync_run_item)
+        sync_run_item.update!(
+          status: "failed",
+          finished_at: Time.current,
+          error: "Assignment was removed before sync."
+        )
+      end
   end
 end

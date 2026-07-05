@@ -225,6 +225,34 @@ RSpec.describe "Indexers", type: :request do
     expect(indexer.arr_apps).to be_empty
   end
 
+  it "removes assignments that already have sync run history" do
+    indexer
+    assignment = indexer.indexer_apps.first
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(
+      indexer_app: assignment,
+      indexer_name: indexer.name,
+      arr_app_name: arr_app.name
+    )
+
+    patch indexer_path(indexer), params: {
+      indexer: {
+        name: indexer.name,
+        jackett_id: indexer.jackett_id,
+        enabled: indexer.enabled,
+        arr_app_ids: []
+      }
+    }
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(indexer.reload.arr_apps).to be_empty
+    expect(sync_run_item.reload).to have_attributes(
+      indexer_app_id: nil,
+      indexer_name: "First Indexer",
+      arr_app_name: "Main Sonarr"
+    )
+  end
+
   it "destroys an indexer" do
     indexer
     result = Sync::IndexerDestroyer::Result.new(success?: true, message: "Indexer removed.", error: nil)

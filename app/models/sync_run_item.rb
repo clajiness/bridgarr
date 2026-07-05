@@ -2,15 +2,29 @@ class SyncRunItem < ApplicationRecord
   STATUSES = %w[queued running succeeded failed skipped].freeze
 
   belongs_to :sync_run
-  belongs_to :indexer_app
+  belongs_to :indexer_app, optional: true
 
   validates :status, inclusion: { in: STATUSES }
 
-  scope :ordered, -> { joins(indexer_app: %i[indexer arr_app]).order("indexers.name", "arr_apps.name") }
+  scope :ordered, -> { order(:indexer_name, :arr_app_name, :id) }
 
   after_update_commit -> { broadcast_replace_later_to sync_run }
 
-  delegate :indexer, :arr_app, to: :indexer_app
+  def indexer
+    indexer_app&.indexer
+  end
+
+  def arr_app
+    indexer_app&.arr_app
+  end
+
+  def indexer_label
+    indexer&.name || indexer_name || "Removed indexer"
+  end
+
+  def arr_app_label
+    arr_app&.name || arr_app_name || "Removed app"
+  end
 
   def queued?
     status == "queued"

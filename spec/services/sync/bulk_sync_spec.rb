@@ -25,6 +25,8 @@ RSpec.describe Sync::BulkSync do
     expect(sync_run).to be_persisted
     expect(sync_run.total_count).to eq(2)
     expect(sync_run.sync_run_items.pluck(:indexer_app_id)).to contain_exactly(enabled_assignment.id, hidden_disabled_assignment.id)
+    expect(sync_run.sync_run_items.pluck(:indexer_name)).to contain_exactly("EZTV", "Hidden Disabled")
+    expect(sync_run.sync_run_items.pluck(:arr_app_name)).to contain_exactly("Sonarr", "Sonarr 4K")
     expect(sync_run.sync_run_items.pluck(:indexer_app_id)).not_to include(disabled_assignment.id)
     expect(Sync::BulkSyncJob).to have_been_enqueued.with(sync_run.id)
   end
