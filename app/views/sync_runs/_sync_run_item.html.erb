@@ -1,6 +1,18 @@
 <tr id="<%= dom_id(sync_run_item) %>">
-  <td class="px-4 py-3 font-medium text-slate-950"><%= link_to sync_run_item.indexer.name, sync_run_item.indexer, class: "hover:underline" %></td>
-  <td class="px-4 py-3 text-slate-700"><%= link_to sync_run_item.arr_app.name, sync_run_item.arr_app, class: "hover:underline" %></td>
+  <td class="px-4 py-3 font-medium text-slate-950">
+    <% if sync_run_item.indexer.present? %>
+      <%= link_to sync_run_item.indexer_label, sync_run_item.indexer, class: "hover:underline" %>
+    <% else %>
+      <%= sync_run_item.indexer_label %>
+    <% end %>
+  </td>
+  <td class="px-4 py-3 text-slate-700">
+    <% if sync_run_item.arr_app.present? %>
+      <%= link_to sync_run_item.arr_app_label, sync_run_item.arr_app, class: "hover:underline" %>
+    <% else %>
+      <%= sync_run_item.arr_app_label %>
+    <% end %>
+  </td>
   <td class="px-4 py-3">
     <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(sync_run_item.status)) %>">
       <%= sync_run_status_label(sync_run_item.status) %>

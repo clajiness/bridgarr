@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_05_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_05_162000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
@@ -76,10 +76,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120100) do
   end
 
   create_table "sync_run_items", force: :cascade do |t|
+    t.string "arr_app_name"
     t.datetime "created_at", null: false
     t.text "error"
     t.datetime "finished_at"
-    t.integer "indexer_app_id", null: false
+    t.integer "indexer_app_id"
+    t.string "indexer_name"
     t.datetime "started_at"
     t.string "status", default: "queued", null: false
     t.integer "sync_run_id", null: false
@@ -108,6 +110,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120100) do
   add_foreign_key "indexer_apps", "arr_apps"
   add_foreign_key "indexer_apps", "indexers"
   add_foreign_key "proxy_requests", "indexers"
-  add_foreign_key "sync_run_items", "indexer_apps"
+  add_foreign_key "sync_run_items", "indexer_apps", on_delete: :nullify
   add_foreign_key "sync_run_items", "sync_runs"
 end

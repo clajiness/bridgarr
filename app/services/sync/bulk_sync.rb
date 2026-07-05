@@ -20,7 +20,11 @@ module Sync
       SyncRun.transaction do
         sync_run = SyncRun.create!(mode: "bulk", status: "queued")
         scope.each do |indexer_app|
-          sync_run.sync_run_items.create!(indexer_app:)
+          sync_run.sync_run_items.create!(
+            indexer_app:,
+            indexer_name: indexer_app.indexer.name,
+            arr_app_name: indexer_app.arr_app.name
+          )
         end
         sync_run.update!(total_count: sync_run.sync_run_items.count)
         Sync::BulkSyncJob.perform_later(sync_run.id)

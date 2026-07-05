@@ -1,6 +1,7 @@
 class IndexerApp < ApplicationRecord
   belongs_to :indexer
   belongs_to :arr_app
+  has_many :sync_run_items, dependent: :nullify
 
   validates :indexer_id, uniqueness: { scope: :arr_app_id }
 
