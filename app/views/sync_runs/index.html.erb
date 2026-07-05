@@ -1,0 +1,51 @@
+<% content_for :title, "Sync runs" %>
+
+<div class="space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-slate-950">Sync runs</h1>
+      <p class="mt-2 text-sm leading-6 text-slate-600">Bulk sync history for managed indexer assignments.</p>
+    </div>
+
+    <%= button_to "Sync all", sync_runs_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+  </div>
+
+  <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+    <% if @sync_runs.any? %>
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+          <tr>
+            <th class="px-4 py-3">Started</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Assignments</th>
+            <th class="px-4 py-3">Succeeded</th>
+            <th class="px-4 py-3">Failed</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          <% @sync_runs.each do |sync_run| %>
+            <tr>
+              <td class="px-4 py-3 text-slate-700"><%= format_utc_timestamp(sync_run.started_at || sync_run.created_at) %></td>
+              <td class="px-4 py-3">
+                <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(sync_run.status)) %>">
+                  <%= sync_run_status_label(sync_run.status) %>
+                </span>
+              </td>
+              <td class="px-4 py-3 text-slate-700"><%= sync_run.total_count %></td>
+              <td class="px-4 py-3 text-slate-700"><%= sync_run.success_count %></td>
+              <td class="px-4 py-3 text-slate-700"><%= sync_run.failure_count %></td>
+              <td class="px-4 py-3 text-right">
+                <%= link_to "View", sync_run_path(sync_run), class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-sm font-medium text-slate-700">No sync runs yet.</p>
+      </div>
+    <% end %>
+  </div>
+</div>

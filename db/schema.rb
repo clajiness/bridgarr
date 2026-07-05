@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_04_231804) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_05_120100) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
@@ -75,7 +75,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_231804) do
     t.text "value"
   end
 
+  create_table "sync_run_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "error"
+    t.datetime "finished_at"
+    t.integer "indexer_app_id", null: false
+    t.datetime "started_at"
+    t.string "status", default: "queued", null: false
+    t.integer "sync_run_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["indexer_app_id", "created_at"], name: "index_sync_run_items_on_indexer_app_id_and_created_at"
+    t.index ["indexer_app_id"], name: "index_sync_run_items_on_indexer_app_id"
+    t.index ["sync_run_id", "status"], name: "index_sync_run_items_on_sync_run_id_and_status"
+    t.index ["sync_run_id"], name: "index_sync_run_items_on_sync_run_id"
+  end
+
+  create_table "sync_runs", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "error"
+    t.integer "failure_count", default: 0, null: false
+    t.datetime "finished_at"
+    t.string "mode", default: "bulk", null: false
+    t.datetime "started_at"
+    t.string "status", default: "queued", null: false
+    t.integer "success_count", default: 0, null: false
+    t.integer "total_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["mode"], name: "index_sync_runs_on_mode"
+    t.index ["status", "created_at"], name: "index_sync_runs_on_status_and_created_at"
+  end
+
   add_foreign_key "indexer_apps", "arr_apps"
   add_foreign_key "indexer_apps", "indexers"
   add_foreign_key "proxy_requests", "indexers"
+  add_foreign_key "sync_run_items", "indexer_apps"
+  add_foreign_key "sync_run_items", "sync_runs"
 end

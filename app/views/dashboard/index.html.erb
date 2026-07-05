@@ -9,7 +9,10 @@
       </p>
     </div>
 
-    <%= link_to "Add indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    <div class="flex flex-wrap gap-3">
+      <%= button_to "Sync all", sync_runs_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+      <%= link_to "Add indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    </div>
   </section>
 
   <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -32,6 +35,49 @@
       <p class="text-sm font-medium text-slate-500">Assignments</p>
       <p class="mt-3 text-2xl font-semibold text-stone-950"><%= @assignments_count %></p>
     </div>
+  </section>
+
+  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-base font-semibold text-slate-950">Sync status</h2>
+        <p class="mt-1 text-sm leading-6 text-slate-600">Track bulk sync runs as Bridgarr updates managed indexers.</p>
+      </div>
+      <%= link_to "View sync runs", sync_runs_path, class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
+    </div>
+
+    <% if @latest_sync_run.present? %>
+      <div class="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="bg-white px-5 py-4">
+          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Status</p>
+          <p class="mt-2">
+            <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(@latest_sync_run.status)) %>">
+              <%= sync_run_status_label(@latest_sync_run.status) %>
+            </span>
+          </p>
+        </div>
+        <div class="bg-white px-5 py-4">
+          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Assignments</p>
+          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @latest_sync_run.total_count %></p>
+        </div>
+        <div class="bg-white px-5 py-4">
+          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Succeeded</p>
+          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @latest_sync_run.success_count %></p>
+        </div>
+        <div class="bg-white px-5 py-4">
+          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Failed</p>
+          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @latest_sync_run.failure_count %></p>
+        </div>
+        <div class="bg-white px-5 py-4">
+          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Started</p>
+          <p class="mt-2 text-sm font-semibold text-slate-700"><%= format_utc_timestamp(@latest_sync_run.started_at || @latest_sync_run.created_at) %></p>
+        </div>
+      </div>
+    <% else %>
+      <div class="px-6 py-10 text-center">
+        <p class="text-sm font-medium text-slate-700">No sync runs yet.</p>
+      </div>
+    <% end %>
   </section>
 
   <section class="grid gap-4 lg:grid-cols-3">
