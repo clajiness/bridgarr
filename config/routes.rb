@@ -13,6 +13,7 @@ Rails.application.routes.draw do
   resources :indexer_apps, only: [] do
     post :sync, on: :member
   end
+  resources :sync_runs, only: %i[ index show create ]
   resources :arr_apps do
     post :test_connections, on: :collection
     post :test_connection, on: :member

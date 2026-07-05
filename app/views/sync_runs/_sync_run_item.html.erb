@@ -1,0 +1,12 @@
+<tr id="<%= dom_id(sync_run_item) %>">
+  <td class="px-4 py-3 font-medium text-slate-950"><%= link_to sync_run_item.indexer.name, sync_run_item.indexer, class: "hover:underline" %></td>
+  <td class="px-4 py-3 text-slate-700"><%= link_to sync_run_item.arr_app.name, sync_run_item.arr_app, class: "hover:underline" %></td>
+  <td class="px-4 py-3">
+    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(sync_run_item.status)) %>">
+      <%= sync_run_status_label(sync_run_item.status) %>
+    </span>
+  </td>
+  <td class="px-4 py-3 text-slate-700"><%= sync_run_item.started_at.present? ? format_utc_timestamp(sync_run_item.started_at) : "Not started" %></td>
+  <td class="px-4 py-3 text-slate-700"><%= sync_run_item.finished_at.present? ? format_utc_timestamp(sync_run_item.finished_at) : "Not finished" %></td>
+  <td class="px-4 py-3 text-red-800"><%= sync_run_item.error.presence || "None" %></td>
+</tr>

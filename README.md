@@ -9,8 +9,8 @@ assignments as managed Generic Torznab indexers.
 ## Status
 
 Bridgarr is public alpha software. Core CRUD, Jackett discovery, app connection
-tests, managed indexer sync, and the first Torznab proxy path exist. Background
-jobs, authentication, and production hardening are still future work.
+tests, managed indexer sync, bulk sync jobs, and the first Torznab proxy path
+exist. Authentication and production hardening are still future work.
 
 ## Development
 
@@ -29,6 +29,22 @@ Run local CI checks:
 
 ```bash
 bin/ci
+```
+
+## Jobs
+
+Bridgarr uses Rails Active Job with Solid Queue. In development or deployments
+that split web and worker processes, run the worker with:
+
+```bash
+bin/jobs
+```
+
+Production deployments can also run the Solid Queue supervisor inside Puma by
+setting:
+
+```bash
+SOLID_QUEUE_IN_PUMA=true
 ```
 
 ## Container Images
