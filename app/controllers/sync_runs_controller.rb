@@ -15,4 +15,11 @@ class SyncRunsController < ApplicationController
 
     redirect_to sync_run_path(sync_run), notice: message
   end
+
+  def abandon
+    sync_run = SyncRun.find(params.expect(:id))
+    sync_run.abandon!(message: "Sync run was abandoned by the user.")
+
+    redirect_to sync_run_path(sync_run), notice: "Sync run abandoned."
+  end
 end

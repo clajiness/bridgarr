@@ -45,4 +45,14 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).to include("EZTV")
     expect(response.body).to include("Sonarr")
   end
+
+  it "abandons unfinished sync runs" do
+    sync_run = SyncRun.create!(status: "queued", total_count: 0)
+
+    post abandon_sync_run_path(sync_run)
+
+    expect(response).to redirect_to(sync_run_path(sync_run))
+    expect(flash[:notice]).to eq("Sync run abandoned.")
+    expect(sync_run.reload).to have_attributes(status: "failed", error: "Sync run was abandoned by the user.")
+  end
 end

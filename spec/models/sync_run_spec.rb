@@ -26,6 +26,26 @@ RSpec.describe SyncRun, type: :model do
     expect(sync_run.finished_at).to be_present
   end
 
+  it "abandons unfinished items without changing completed items" do
+    sync_run = described_class.create!(status: "running", started_at: Time.current)
+    successful_item = create_sync_run_item(sync_run:)
+    queued_item = create_sync_run_item(sync_run:)
+
+    successful_item.update!(status: "succeeded", finished_at: Time.current)
+
+    sync_run.abandon!(message: "No worker was running.")
+
+    expect(sync_run).to have_attributes(
+      status: "failed",
+      total_count: 2,
+      success_count: 1,
+      failure_count: 1,
+      error: "No worker was running."
+    )
+    expect(successful_item.reload).to be_succeeded
+    expect(queued_item.reload).to have_attributes(status: "failed", error: "No worker was running.")
+  end
+
   def create_sync_run_item(sync_run:)
     arr_app = ArrApp.create!(name: "Sonarr #{SecureRandom.hex(4)}", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
     indexer = Indexer.create!(name: "Indexer #{SecureRandom.hex(4)}", jackett_id: SecureRandom.hex(8))

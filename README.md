@@ -40,12 +40,14 @@ that split web and worker processes, run the worker with:
 bin/jobs
 ```
 
-Production deployments can also run the Solid Queue supervisor inside Puma by
-setting:
+The published Docker image runs the Solid Queue supervisor inside Puma by
+default for single-container deployments. You can control that with:
 
 ```bash
 SOLID_QUEUE_IN_PUMA=true
 ```
+
+Set `SOLID_QUEUE_IN_PUMA=false` when running a separate `bin/jobs` worker.
 
 ## Container Images
 
