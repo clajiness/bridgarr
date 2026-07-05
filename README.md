@@ -3,8 +3,8 @@
 Jackett-backed Torznab proxy and indexer manager for the *arr stack.
 
 Bridgarr lets you configure Jackett once, import Jackett indexers once, assign
-them to Sonarr, Radarr, Lidarr, Whisparr, and compatible apps, and sync those
-assignments as managed Generic Torznab indexers.
+them to Sonarr, Radarr, Lidarr, and compatible apps, and sync those assignments
+as managed Generic Torznab indexers.
 
 ## Status
 
