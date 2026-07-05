@@ -7,16 +7,20 @@ RSpec.describe "Torznab proxy", type: :request do
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
 
     result = Jackett::TorznabProxy::Result.new(
-      body: "<rss></rss>",
+      body: "<rss><channel><item><title>Release</title></item></channel></rss>",
       http_status: 200,
       content_type: "application/rss+xml"
     )
     allow(Jackett::TorznabProxy).to receive(:call).and_return(result)
 
-    get torznab_proxy_path(jackett_id: "eztv"), params: { t: "caps", apikey: "bridgarr" }
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+
+    expect do
+      get torznab_proxy_path(jackett_id: "eztv"), params: { t: "tvsearch", q: "Silo", cat: "5000,5030", apikey: "bridgarr" }
+    end.to change(ProxyRequest, :count).by(1)
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to eq("<rss></rss>")
+    expect(response.body).to eq("<rss><channel><item><title>Release</title></item></channel></rss>")
     expect(response.content_type).to eq("application/rss+xml; charset=utf-8")
     expect(Jackett::TorznabProxy).to have_received(:call).with(
       base_url: "http://localhost:9117",
@@ -24,10 +28,20 @@ RSpec.describe "Torznab proxy", type: :request do
       api_key: "jackett-api-key",
       jackett_id: "eztv",
       query_params: {
-        "t" => "caps",
+        "t" => "tvsearch",
+        "q" => "Silo",
+        "cat" => "5000,5030",
         "apikey" => "bridgarr"
       }
     )
+    proxy_request = ProxyRequest.last
+    expect(proxy_request.indexer).to eq(indexer)
+    expect(proxy_request.request_type).to eq("tvsearch")
+    expect(proxy_request.query).to eq("Silo")
+    expect(proxy_request.categories).to eq("5000,5030")
+    expect(proxy_request.http_status).to eq(200)
+    expect(proxy_request.item_count).to eq(1)
+    expect(proxy_request.query_params).not_to include("bridgarr")
   end
 
   it "proxies download requests through Jackett settings" do
@@ -40,8 +54,11 @@ RSpec.describe "Torznab proxy", type: :request do
       content_type: "application/x-bittorrent"
     )
     allow(Jackett::DownloadProxy).to receive(:call).and_return(result)
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
 
-    get torznab_download_proxy_path(jackett_id: "eztv"), params: { path: "abc123", file: "release.torrent" }
+    expect do
+      get torznab_download_proxy_path(jackett_id: "eztv"), params: { path: "abc123", file: "release.torrent" }
+    end.to change(ProxyRequest, :count).by(1)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to eq("torrent-body")
@@ -55,5 +72,9 @@ RSpec.describe "Torznab proxy", type: :request do
         "file" => "release.torrent"
       }
     )
+    proxy_request = ProxyRequest.last
+    expect(proxy_request.indexer).to eq(indexer)
+    expect(proxy_request.request_type).to eq("download")
+    expect(proxy_request.item_count).to be_nil
   end
 end

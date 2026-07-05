@@ -34,4 +34,30 @@ RSpec.describe Indexer, type: :model do
     expect(indexer).not_to be_valid
     expect(indexer.errors[:jackett_id]).to include("must be a Jackett ID or Jackett Torznab URL")
   end
+
+  it "summarizes recent proxy activity" do
+    indexer = described_class.create!(name: "First Indexer", jackett_id: "first-indexer")
+    indexer.proxy_requests.create!(jackett_id: "first-indexer", request_type: "tvsearch", http_status: 200, duration_ms: 100, item_count: 2)
+    indexer.proxy_requests.create!(jackett_id: "first-indexer", request_type: "download", http_status: 200, duration_ms: 300)
+    indexer.proxy_requests.create!(jackett_id: "first-indexer", request_type: "search", http_status: 500, duration_ms: 500, error: "Failed")
+    indexer.proxy_requests.create!(
+      jackett_id: "first-indexer",
+      request_type: "search",
+      http_status: 200,
+      duration_ms: 10,
+      created_at: 2.days.ago,
+      updated_at: 2.days.ago
+    )
+
+    stats = indexer.proxy_activity_stats
+
+    expect(stats).to include(
+      total: 3,
+      successful: 2,
+      failed: 1,
+      downloads: 1,
+      average_duration_ms: 300
+    )
+    expect(stats[:last_request].request_type).to eq("search")
+  end
 end

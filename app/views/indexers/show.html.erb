@@ -17,6 +17,82 @@
 
   <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
     <div class="border-b border-slate-200 px-4 py-3">
+      <h2 class="text-base font-semibold text-slate-950">Proxy activity</h2>
+    </div>
+
+    <div class="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-5">
+      <div class="bg-white px-4 py-4">
+        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Last 24h</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @proxy_activity_stats[:total] %></p>
+      </div>
+      <div class="bg-white px-4 py-4">
+        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Successful</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @proxy_activity_stats[:successful] %></p>
+      </div>
+      <div class="bg-white px-4 py-4">
+        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Failed</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @proxy_activity_stats[:failed] %></p>
+      </div>
+      <div class="bg-white px-4 py-4">
+        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Downloads</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @proxy_activity_stats[:downloads] %></p>
+      </div>
+      <div class="bg-white px-4 py-4">
+        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Avg duration</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-950"><%= proxy_duration(@proxy_activity_stats[:average_duration_ms]) %></p>
+      </div>
+    </div>
+
+    <% if @proxy_requests.any? %>
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+          <tr>
+            <th class="px-4 py-3">When</th>
+            <th class="px-4 py-3">Type</th>
+            <th class="px-4 py-3">Query</th>
+            <th class="px-4 py-3">Categories</th>
+            <th class="px-4 py-3">Result</th>
+            <th class="px-4 py-3">Duration</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          <% @proxy_requests.each do |proxy_request| %>
+            <tr>
+              <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500"><%= format_utc_timestamp(proxy_request.created_at) %></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-slate-700">
+                  <%= proxy_request_type_label(proxy_request.request_type) %>
+                </span>
+              </td>
+              <td class="px-4 py-3 text-slate-700"><%= proxy_request.query.presence || "None" %></td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-600"><%= proxy_request.categories.presence || "None" %></td>
+              <td class="px-4 py-3">
+                <div class="space-y-2">
+                  <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", proxy_request_status_classes(proxy_request)) %>">
+                    <%= proxy_request_status_label(proxy_request) %>
+                  </span>
+                  <p class="text-xs text-slate-500">
+                    HTTP <%= proxy_request.http_status.presence || "n/a" %> · <%= proxy_request_item_count(proxy_request) %>
+                  </p>
+                  <% if proxy_request.error.present? %>
+                    <p class="max-w-xl text-xs leading-5 text-red-800"><%= proxy_request.error %></p>
+                  <% end %>
+                </div>
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap text-slate-700"><%= proxy_duration(proxy_request.duration_ms) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-10 text-center">
+        <p class="text-sm font-medium text-slate-700">No proxy requests recorded yet.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+    <div class="border-b border-slate-200 px-4 py-3">
       <h2 class="text-base font-semibold text-slate-950">App assignments</h2>
     </div>
 
