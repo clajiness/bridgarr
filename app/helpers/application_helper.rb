@@ -1,7 +1,7 @@
 module ApplicationHelper
   def format_server_timestamp(timestamp)
     timestamp = Time.iso8601(timestamp) if timestamp.is_a?(String)
-    timestamp.to_time.localtime.strftime("%Y-%m-%d %H:%M:%S %Z")
+    Time.at(timestamp.to_time.to_r).localtime.strftime("%Y-%m-%d %H:%M:%S %Z")
   rescue ArgumentError, NoMethodError
     timestamp
   end
