@@ -126,14 +126,14 @@
               <td class="px-4 py-3">
                 <% if assignment.last_status.present? %>
                   <div class="min-w-40 space-y-2">
-                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment.last_status == "ok" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800") %>">
-                      <%= assignment.last_status == "ok" ? "Synced" : "Failed" %>
+                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment_status_classes(assignment)) %>">
+                      <%= assignment_status_label(assignment) %>
                     </span>
                     <% if assignment.last_synced_at.present? %>
                       <p class="text-xs leading-5 text-slate-500"><%= format_utc_timestamp(assignment.last_synced_at) %></p>
                     <% end %>
                     <% if assignment.last_error.present? %>
-                      <p class="text-xs leading-5 text-red-800"><%= assignment.last_error %></p>
+                      <p class="<%= class_names("text-xs leading-5", assignment.last_status == "error" ? "text-red-800" : "text-slate-500") %>"><%= assignment.last_error %></p>
                     <% end %>
                   </div>
                 <% else %>

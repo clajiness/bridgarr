@@ -1,6 +1,6 @@
 module Sync
   class IndexerAppSync
-    Result = Data.define(:success?, :remote_indexer_id, :message, :error)
+    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, keyword_init: true)
 
     REMOTE_NAME_SUFFIX = " (Bridgarr)"
 
@@ -29,6 +29,8 @@ module Sync
 
       if result.success?
         record(success(result.remote_indexer_id, result.message))
+      elsif result.skipped?
+        record(skipped(result.message))
       else
         record(failure(result.message))
       end
@@ -48,14 +50,19 @@ module Sync
       def success(remote_indexer_id, client_message)
         Result.new(
           success?: true,
+          skipped?: false,
           remote_indexer_id:,
           message: success_message(client_message),
           error: nil
         )
       end
 
+      def skipped(message)
+        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message)
+      end
+
       def failure(message)
-        Result.new(success?: false, remote_indexer_id: nil, message:, error: message)
+        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message)
       end
 
       def remote_indexer_name
