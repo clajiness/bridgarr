@@ -58,7 +58,8 @@ RSpec.describe "Dashboard", type: :request do
     get root_path
 
     expect(response.body).to match(/Dashboard.*Apps.*Indexers.*Settings.*Sync/m)
-    expect(response.body).to match(/<h2 class="text-base font-semibold">Apps<\/h2>.*<h2 class="text-base font-semibold">Indexers<\/h2>.*<h2 class="text-base font-semibold">Settings<\/h2>/m)
+    expect(response.body).not_to include("Add Sonarr, Radarr, Lidarr, and compatible app records.")
+    expect(response.body).not_to include("Track Jackett indexer records and assign them to one or more apps.")
   end
 
   it "shows sync, assignment, and proxy health" do
@@ -169,6 +170,8 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("Managed indexers look steady.")
     expect(response.body).to include("1 enabled")
     expect(response.body).to include("1 total assignment")
+    expect(response.body).not_to include("Sync attention")
+    expect(response.body).not_to include("All enabled assignments are synced.")
     expect(response.body).not_to include("need attention")
     expect(response.body).not_to include("EZTV does not expose")
   end
