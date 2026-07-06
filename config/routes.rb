@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   root "dashboard#index"
+  get "readiness", to: "dashboard#readiness", as: :readiness
 
   resource :settings, only: %i[ show update ] do
     post :test_jackett

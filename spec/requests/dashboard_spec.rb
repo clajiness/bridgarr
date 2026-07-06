@@ -9,7 +9,9 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include(BrandingHelper::TAGLINE)
     expect(response.body).to include("Readiness")
     expect(response.body).to include("7 setup steps remaining.")
-    expect(response.body).to include("Bridgarr URL")
+    expect(response.body).to include(readiness_path)
+    expect(response.body).not_to include("Set the URL apps use to reach Bridgarr.")
+    expect(response.body).not_to include("Open settings")
   end
 
   it "shows when setup readiness is complete" do
@@ -37,6 +39,18 @@ RSpec.describe "Dashboard", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Bridgarr is ready to manage and proxy indexers.")
+    expect(response.body).to include("View setup")
+    expect(response.body).not_to include("Open sync")
+  end
+
+  it "shows setup readiness details on their own page" do
+    get readiness_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Setup checklist")
+    expect(response.body).to include("7 setup steps remaining.")
+    expect(response.body).to include("Bridgarr URL")
+    expect(response.body).to include("Open settings")
     expect(response.body).to include("Open sync")
   end
 
