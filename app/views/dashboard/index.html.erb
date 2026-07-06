@@ -72,18 +72,7 @@
       <% end %>
     </div>
 
-    <div class="grid gap-px bg-slate-200 lg:grid-cols-4">
-      <%= link_to sync_runs_path, class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
-        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Latest sync</p>
-        <p class="mt-2 text-xl font-semibold text-slate-950">
-          <% if @dashboard.latest_sync_run.present? %>
-            <%= sync_run_status_label(@dashboard.latest_sync_run.status) %>
-          <% else %>
-            None
-          <% end %>
-        </p>
-      <% end %>
-
+    <div class="grid gap-px bg-slate-200 lg:grid-cols-3">
       <%= link_to sync_runs_path, class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
         <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Failed assignments</p>
         <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.failed_assignments_count %></p>
@@ -144,14 +133,16 @@
     <% end %>
   </section>
 
-  <section class="grid gap-4 lg:grid-cols-2">
-    <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-5 py-4">
-        <h2 class="text-base font-semibold text-slate-950">Sync attention</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600">Recent failed or pending indexer assignments.</p>
-      </div>
+  <% show_sync_attention = @dashboard.failed_assignments.any? || @dashboard.unsynced_assignments.any? %>
 
-      <% if @dashboard.failed_assignments.any? || @dashboard.unsynced_assignments.any? %>
+  <section class="<%= class_names("grid gap-4", show_sync_attention && "lg:grid-cols-2") %>">
+    <% if show_sync_attention %>
+      <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-5 py-4">
+          <h2 class="text-base font-semibold text-slate-950">Sync attention</h2>
+          <p class="mt-1 text-sm leading-6 text-slate-600">Recent failed or pending indexer assignments.</p>
+        </div>
+
         <div class="divide-y divide-slate-200">
           <% (@dashboard.failed_assignments + @dashboard.unsynced_assignments).uniq.first(5).each do |assignment| %>
             <div class="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -175,12 +166,8 @@
             </div>
           <% end %>
         </div>
-      <% else %>
-        <div class="px-6 py-10 text-center">
-          <p class="text-sm font-medium text-slate-700">All enabled assignments are synced.</p>
-        </div>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
 
     <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
       <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -212,22 +199,5 @@
         <% end %>
       </div>
     </div>
-  </section>
-
-  <section class="grid gap-4 lg:grid-cols-3">
-    <%= link_to arr_apps_path, class: "rounded-md border border-stone-200 bg-white p-5 shadow-sm hover:border-amber-300" do %>
-      <h2 class="text-base font-semibold">Apps</h2>
-      <p class="mt-2 text-sm leading-6 text-slate-600">Add Sonarr, Radarr, Lidarr, and compatible app records.</p>
-    <% end %>
-
-    <%= link_to indexers_path, class: "rounded-md border border-stone-200 bg-white p-5 shadow-sm hover:border-amber-300" do %>
-      <h2 class="text-base font-semibold">Indexers</h2>
-      <p class="mt-2 text-sm leading-6 text-slate-600">Track Jackett indexer records and assign them to one or more apps.</p>
-    <% end %>
-
-    <%= link_to settings_path, class: "rounded-md border border-stone-200 bg-white p-5 shadow-sm hover:border-amber-300" do %>
-      <h2 class="text-base font-semibold">Settings</h2>
-      <p class="mt-2 text-sm leading-6 text-slate-600">Store the Bridgarr URL plus the Jackett connection used for discovery, proxying, and sync.</p>
-    <% end %>
   </section>
 </div>
