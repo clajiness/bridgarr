@@ -51,6 +51,14 @@ Set `SOLID_QUEUE_IN_PUMA=false` when running a separate `bin/jobs` worker.
 
 ## Runtime Tuning
 
+Bridgarr stores timestamps in UTC but renders them using the container's local
+timezone. Set `TZ` in your deployment if you want UI timestamps to match your
+server or homelab timezone:
+
+```bash
+TZ=America/Chicago
+```
+
 Some public torrent indexers can take a while to answer Jackett queries,
 especially while an *arr app validates a newly synced Torznab indexer. These
 timeouts can be adjusted without rebuilding the image:
