@@ -31,6 +31,28 @@ RSpec.describe Sync::BulkSync do
     expect(Sync::BulkSyncJob).to have_been_enqueued.with(sync_run.id)
   end
 
+  it "enqueues the coordinator job after the sync run transaction block finishes" do
+    create_assignment(indexer_name: "EZTV", arr_app_name: "Sonarr")
+    events = []
+
+    allow(SyncRun).to receive(:transaction).and_wrap_original do |method, &block|
+      method.call do
+        result = block.call
+        events << :transaction_finished
+        result
+      end
+    end
+    allow(Sync::BulkSyncJob).to receive(:perform_later) do |sync_run_id|
+      events << :coordinator_enqueued
+      sync_run = SyncRun.find(sync_run_id)
+      expect(sync_run.sync_run_items.count).to eq(1)
+    end
+
+    described_class.call
+
+    expect(events).to eq(%i[transaction_finished coordinator_enqueued])
+  end
+
   def create_assignment(indexer_name:, arr_app_name:, indexer_enabled: true, assignment_enabled: true)
     arr_app = ArrApp.create!(
       name: arr_app_name,
