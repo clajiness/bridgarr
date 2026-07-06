@@ -146,6 +146,68 @@ RSpec.describe Arr::GenericTorznabClient do
     )
   end
 
+  it "does not create an indexer when Jackett categories do not match the Arr app" do
+    arr_app.app_type = "radarr"
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: true,
+      category_ids: [ 5000, 5030, 5040, 5070 ],
+      message: "Found 4 Torznab categories.",
+      error: nil,
+      http_status: 200
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to eq("EZTV does not expose Radarr-compatible Torznab categories.")
+    expect(result.remote_indexer_id).to be_nil
+    expect(connection.get_paths).to eq([ "/api/v3/indexer" ])
+    expect(connection.post_path).to be_nil
+  end
+
+  it "does not create an indexer when Jackett categories cannot be inspected" do
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: false,
+      category_ids: [],
+      message: "Jackett returned HTTP 500.",
+      error: "Jackett returned HTTP 500.",
+      http_status: 500
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to eq("Could not inspect Torznab categories for EZTV: Jackett returned HTTP 500.")
+    expect(connection.get_paths).to eq([ "/api/v3/indexer" ])
+    expect(connection.post_path).to be_nil
+  end
+
   it "fails when the Arr app does not expose a Torznab schema" do
     connection = FakeArrIndexerConnection.new(
       schema_response: ArrIndexerResponse.new(status: 200, body: [ { implementation: "Newznab", fields: [] } ].to_json),

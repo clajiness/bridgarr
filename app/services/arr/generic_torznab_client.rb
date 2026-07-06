@@ -47,6 +47,9 @@ module Arr
         return success(managed_indexer.fetch("id"), nil, "Generic Torznab indexer already exists.")
       end
 
+      compatibility_error = category_compatibility_error
+      return failure(compatibility_error) if compatibility_error
+
       schema_response = http.get(SCHEMA_PATH)
       return http_failure(schema_response, "fetch indexer schema") unless schema_response.success?
 
@@ -120,13 +123,7 @@ module Arr
       end
 
       def category_ids
-        @category_ids ||= begin
-          roots = CATEGORY_ROOTS_BY_APP_TYPE.fetch(arr_app.app_type, [])
-          ids = torznab_category_ids
-          selected_ids = roots.any? ? ids.select { |id| roots.include?(category_root(id)) } : ids
-
-          selected_ids.presence || ids
-        end
+        @category_ids ||= compatible_category_ids
       end
 
       def anime_category_ids
@@ -140,15 +137,39 @@ module Arr
       end
 
       def torznab_category_ids
-        @torznab_category_ids ||= begin
-          result = caps_client.call(
-            base_url: jackett_base_url,
-            api_key: jackett_api_key,
-            jackett_id:
-          )
+        @torznab_category_ids ||= torznab_caps_result.success? ? torznab_caps_result.category_ids : []
+      end
 
-          result.success? ? result.category_ids : []
+      def torznab_caps_result
+        @torznab_caps_result ||= caps_client.call(
+          base_url: jackett_base_url,
+          api_key: jackett_api_key,
+          jackett_id:
+        )
+      end
+
+      def compatible_category_ids
+        @compatible_category_ids ||= begin
+          return torznab_category_ids if category_roots.blank?
+
+          torznab_category_ids.select { |id| category_roots.include?(category_root(id)) }
         end
+      end
+
+      def category_roots
+        @category_roots ||= CATEGORY_ROOTS_BY_APP_TYPE.fetch(arr_app.app_type, [])
+      end
+
+      def category_compatibility_error
+        return if category_roots.blank?
+
+        unless torznab_caps_result.success?
+          return "Could not inspect Torznab categories for #{name}: #{torznab_caps_result.message}"
+        end
+
+        return if compatible_category_ids.present?
+
+        "#{name} does not expose #{arr_app.app_type.to_s.titleize}-compatible Torznab categories."
       end
 
       def category_root(category_id)
