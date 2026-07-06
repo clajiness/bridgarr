@@ -58,7 +58,7 @@
             </span>
 
             <% if @jackett_last_tested_at.present? %>
-              <p class="text-sm leading-6 text-slate-600">Last tested <%= format_utc_timestamp(@jackett_last_tested_at) %></p>
+              <p class="text-sm leading-6 text-slate-600">Last tested <%= format_server_timestamp(@jackett_last_tested_at) %></p>
             <% end %>
           </div>
 

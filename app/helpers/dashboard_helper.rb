@@ -13,7 +13,7 @@ module DashboardHelper
     [
       dashboard.latest_sync_run_needs_attention? ? "latest sync run" : nil,
       dashboard.failed_assignments_count.positive? ? pluralize(dashboard.failed_assignments_count, "failed assignment") : nil,
-      dashboard.unsynced_assignments_count.positive? ? pluralize(dashboard.unsynced_assignments_count, "unsynced assignment") : nil
+      dashboard.unsynced_assignments_count.positive? ? pluralize(dashboard.unsynced_assignments_count, "pending sync") : nil
     ].compact
   end
 end

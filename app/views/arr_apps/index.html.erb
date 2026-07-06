@@ -46,7 +46,7 @@
                       <%= arr_app.last_status == "ok" ? "Connected" : "Failed" %>
                     </span>
                     <% if arr_app.last_tested_at.present? %>
-                      <p class="text-xs leading-5 text-slate-500"><%= format_utc_timestamp(arr_app.last_tested_at) %></p>
+                      <p class="text-xs leading-5 text-slate-500"><%= format_server_timestamp(arr_app.last_tested_at) %></p>
                     <% end %>
                   </div>
                 <% else %>

@@ -91,7 +91,7 @@
           <tbody class="divide-y divide-slate-200">
             <% @proxy_requests.each do |proxy_request| %>
               <tr>
-                <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-500"><%= format_utc_timestamp(proxy_request.created_at) %></td>
+                <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-500"><%= format_server_timestamp(proxy_request.created_at) %></td>
                 <td class="px-4 py-3 font-medium text-slate-950">
                   <% if proxy_request.indexer.present? %>
                     <% indexer_path_for_request = proxy_request.failed? ? indexer_path(proxy_request.indexer, proxy_activity: "failed") : indexer_path(proxy_request.indexer) %>

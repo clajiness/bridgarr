@@ -22,7 +22,7 @@
     </div>
     <div class="bg-white px-4 py-4">
       <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Started</p>
-      <p class="mt-2 text-sm font-semibold text-slate-700"><%= sync_run.started_at.present? ? format_utc_timestamp(sync_run.started_at) : "Queued" %></p>
+      <p class="mt-2 text-sm font-semibold text-slate-700"><%= sync_run.started_at.present? ? format_server_timestamp(sync_run.started_at) : "Queued" %></p>
     </div>
   </div>
 

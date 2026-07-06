@@ -75,7 +75,7 @@
       <% end %>
 
       <%= link_to indexers_path, class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
-        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Not synced</p>
+        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Pending sync</p>
         <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.unsynced_assignments_count %></p>
       <% end %>
 
@@ -119,7 +119,7 @@
         </div>
         <div class="bg-white px-5 py-4">
           <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Started</p>
-          <p class="mt-2 text-sm font-semibold text-slate-700"><%= format_utc_timestamp(@dashboard.latest_sync_run.started_at || @dashboard.latest_sync_run.created_at) %></p>
+          <p class="mt-2 text-sm font-semibold text-slate-700"><%= format_server_timestamp(@dashboard.latest_sync_run.started_at || @dashboard.latest_sync_run.created_at) %></p>
         </div>
       </div>
     <% else %>
@@ -149,7 +149,7 @@
                 <% if assignment.last_error.present? %>
                   <p class="mt-1 text-xs leading-5 text-red-800"><%= assignment.last_error %></p>
                 <% elsif assignment.last_synced_at.present? %>
-                  <p class="mt-1 text-xs leading-5 text-slate-500">Last synced <%= format_utc_timestamp(assignment.last_synced_at) %></p>
+                  <p class="mt-1 text-xs leading-5 text-slate-500">Last synced <%= format_server_timestamp(assignment.last_synced_at) %></p>
                 <% else %>
                   <p class="mt-1 text-xs leading-5 text-slate-500">Ready for first sync.</p>
                 <% end %>
