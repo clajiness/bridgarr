@@ -1,7 +1,7 @@
 module ApplicationHelper
-  def format_utc_timestamp(timestamp)
+  def format_server_timestamp(timestamp)
     timestamp = Time.iso8601(timestamp) if timestamp.is_a?(String)
-    timestamp.utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp.to_time.localtime.strftime("%Y-%m-%d %H:%M:%S %Z")
   rescue ArgumentError, NoMethodError
     timestamp
   end
@@ -19,6 +19,6 @@ module ApplicationHelper
     return "Skipped" if assignment.last_status == "skipped"
     return "Synced" if assignment.remote_indexer_id.present?
 
-    "Not synced"
+    "Pending sync"
   end
 end

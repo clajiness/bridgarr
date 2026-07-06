@@ -26,7 +26,7 @@
         <tbody class="divide-y divide-slate-200">
           <% @sync_runs.each do |sync_run| %>
             <tr>
-              <td class="px-4 py-3 text-slate-700"><%= format_utc_timestamp(sync_run.started_at || sync_run.created_at) %></td>
+              <td class="px-4 py-3 text-slate-700"><%= format_server_timestamp(sync_run.started_at || sync_run.created_at) %></td>
               <td class="px-4 py-3">
                 <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(sync_run.status)) %>">
                   <%= sync_run_status_label(sync_run.status) %>

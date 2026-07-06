@@ -50,14 +50,14 @@
                       <%= assignment_status_label(assignment) %>
                     </span>
                     <% if assignment.last_synced_at.present? %>
-                      <p class="text-xs leading-5 text-slate-500"><%= format_utc_timestamp(assignment.last_synced_at) %></p>
+                      <p class="text-xs leading-5 text-slate-500"><%= format_server_timestamp(assignment.last_synced_at) %></p>
                     <% end %>
                     <% if assignment.last_error.present? %>
                       <p class="<%= class_names("text-xs leading-5", assignment.last_status == "error" ? "text-red-800" : "text-slate-500") %>"><%= assignment.last_error %></p>
                     <% end %>
                   </div>
                 <% else %>
-                  <span class="text-sm text-slate-500">Not synced</span>
+                  <span class="text-sm text-slate-500">Pending sync</span>
                 <% end %>
               </td>
               <td class="px-4 py-3 text-right">

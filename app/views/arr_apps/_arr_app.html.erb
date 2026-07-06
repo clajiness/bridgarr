@@ -26,7 +26,7 @@
     </div>
     <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
       <dt class="font-medium text-slate-500">Last tested</dt>
-      <dd class="sm:col-span-2"><%= arr_app.last_tested_at.present? ? format_utc_timestamp(arr_app.last_tested_at) : "Never" %></dd>
+      <dd class="sm:col-span-2"><%= arr_app.last_tested_at.present? ? format_server_timestamp(arr_app.last_tested_at) : "Never" %></dd>
     </div>
     <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
       <dt class="font-medium text-slate-500">Last error</dt>

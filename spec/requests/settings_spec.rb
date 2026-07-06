@@ -54,6 +54,6 @@ RSpec.describe "Settings", type: :request do
     get settings_path
 
     expect(response.body).to include("Connected")
-    expect(response.body).to include("2026-07-04 12:00:00 UTC")
+    expect(response.body).to include(Time.iso8601("2026-07-04T12:00:00Z").localtime.strftime("%Y-%m-%d %H:%M:%S %Z"))
   end
 end
