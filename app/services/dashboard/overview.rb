@@ -13,6 +13,10 @@ module Dashboard
       Setting.jackett_configured?
     end
 
+    def readiness
+      @readiness ||= Readiness.new
+    end
+
     def arr_apps_count
       ArrApp.count
     end
