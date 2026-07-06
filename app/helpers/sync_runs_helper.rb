@@ -5,6 +5,8 @@ module SyncRunsHelper
       "border-amber-200 bg-amber-50 text-amber-900"
     when "failed", "partial"
       "border-red-200 bg-red-50 text-red-800"
+    when "skipped"
+      "border-stone-200 bg-stone-50 text-slate-700"
     when "running"
       "border-blue-200 bg-blue-50 text-blue-800"
     else

@@ -9,8 +9,17 @@ class IndexerApp < ApplicationRecord
     update!(
       remote_indexer_id: result.remote_indexer_id || remote_indexer_id,
       last_synced_at: synced_at,
-      last_status: result.success? ? "ok" : "error",
+      last_status: sync_status_for(result),
       last_error: result.error
     )
   end
+
+  private
+
+    def sync_status_for(result)
+      return "ok" if result.success?
+      return "skipped" if result.skipped?
+
+      "error"
+    end
 end

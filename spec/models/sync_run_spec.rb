@@ -46,6 +46,24 @@ RSpec.describe SyncRun, type: :model do
     expect(queued_item.reload).to have_attributes(status: "failed", error: "No worker was running.")
   end
 
+  it "does not count skipped items as failures" do
+    sync_run = described_class.create!(status: "running", started_at: Time.current)
+    successful_item = create_sync_run_item(sync_run:)
+    skipped_item = create_sync_run_item(sync_run:)
+
+    successful_item.update!(status: "succeeded", finished_at: Time.current)
+    skipped_item.update!(status: "skipped", finished_at: Time.current, error: "No compatible categories.")
+
+    sync_run.refresh_status!
+
+    expect(sync_run).to have_attributes(
+      status: "succeeded",
+      total_count: 2,
+      success_count: 1,
+      failure_count: 0
+    )
+  end
+
   def create_sync_run_item(sync_run:)
     arr_app = ArrApp.create!(name: "Sonarr #{SecureRandom.hex(4)}", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
     indexer = Indexer.create!(name: "Indexer #{SecureRandom.hex(4)}", jackett_id: SecureRandom.hex(8))

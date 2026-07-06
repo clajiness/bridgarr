@@ -97,4 +97,31 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include(indexer_path(failed_assignment.indexer))
     expect(response.body).to include(arr_app_path(failed_assignment.arr_app))
   end
+
+  it "does not treat skipped assignments as dashboard attention" do
+    sonarr = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key",
+      enabled: true
+    )
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv", enabled: true)
+    IndexerApp.create!(
+      arr_app: sonarr,
+      indexer:,
+      enabled: true,
+      last_status: "skipped",
+      last_error: "EZTV does not expose Radarr-compatible Torznab categories."
+    )
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Managed indexers look steady.")
+    expect(response.body).to include("1 enabled")
+    expect(response.body).to include("1 total assignment")
+    expect(response.body).not_to include("need attention")
+    expect(response.body).not_to include("EZTV does not expose")
+  end
 end

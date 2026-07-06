@@ -1,6 +1,6 @@
 module Arr
   class GenericTorznabClient
-    Result = Data.define(:success?, :remote_indexer_id, :message, :error, :http_status)
+    Result = Data.define(:success?, :skipped?, :remote_indexer_id, :message, :error, :http_status)
 
     INDEXER_PATH = "/api/v3/indexer"
     SCHEMA_PATH = "/api/v3/indexer/schema"
@@ -48,7 +48,7 @@ module Arr
       end
 
       compatibility_error = category_compatibility_error
-      return failure(compatibility_error) if compatibility_error
+      return skipped(compatibility_error) if compatibility_error
 
       schema_response = http.get(SCHEMA_PATH)
       return http_failure(schema_response, "fetch indexer schema") unless schema_response.success?
@@ -218,7 +218,11 @@ module Arr
       end
 
       def success(remote_indexer_id, http_status, message = "Generic Torznab indexer created.")
-        Result.new(success?: true, remote_indexer_id:, message:, error: nil, http_status:)
+        Result.new(success?: true, skipped?: false, remote_indexer_id:, message:, error: nil, http_status:)
+      end
+
+      def skipped(message)
+        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, http_status: nil)
       end
 
       def http_failure(response, action)
@@ -230,7 +234,7 @@ module Arr
       end
 
       def failure(message, http_status: nil)
-        Result.new(success?: false, remote_indexer_id: nil, message:, error: message, http_status:)
+        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, http_status:)
       end
 
       def response_detail(body)

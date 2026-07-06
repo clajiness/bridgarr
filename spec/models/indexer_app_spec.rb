@@ -40,4 +40,21 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_status).to eq("ok")
     expect(assignment.last_error).to be_nil
   end
+
+  it "records skipped sync results" do
+    assignment = described_class.create!(arr_app: arr_app, indexer: indexer)
+    result = Sync::IndexerAppSync::Result.new(
+      success?: false,
+      skipped?: true,
+      remote_indexer_id: nil,
+      message: "First Indexer does not expose Radarr-compatible Torznab categories.",
+      error: "First Indexer does not expose Radarr-compatible Torznab categories."
+    )
+
+    assignment.record_sync_result(result)
+
+    expect(assignment.remote_indexer_id).to be_nil
+    expect(assignment.last_status).to eq("skipped")
+    expect(assignment.last_error).to eq("First Indexer does not expose Radarr-compatible Torznab categories.")
+  end
 end

@@ -42,13 +42,17 @@ class SyncRunItem < ApplicationRecord
     status == "failed"
   end
 
+  def skipped?
+    status == "skipped"
+  end
+
   def mark_running!
     update!(status: "running", started_at: Time.current, error: nil)
   end
 
   def record_result!(result, finished_at: Time.current)
     update!(
-      status: result.success? ? "succeeded" : "failed",
+      status: sync_status_for(result),
       finished_at:,
       error: result.error
     )
@@ -57,4 +61,13 @@ class SyncRunItem < ApplicationRecord
   def to_partial_path
     "sync_runs/sync_run_item"
   end
+
+  private
+
+    def sync_status_for(result)
+      return "succeeded" if result.success?
+      return "skipped" if result.skipped?
+
+      "failed"
+    end
 end

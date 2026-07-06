@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe Sync::IndexerAppSync do
   class FakeGenericTorznabClient
-    Result = Data.define(:success?, :remote_indexer_id, :message, :error)
+    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, keyword_init: true)
 
     attr_reader :calls
 
@@ -85,6 +85,26 @@ RSpec.describe Sync::IndexerAppSync do
     expect(result.message).to eq("Jackett URL is missing.")
     expect(assignment.reload.last_status).to eq("error")
     expect(assignment.last_error).to eq("Jackett URL is missing.")
+  end
+
+  it "records skipped syncs without treating them as failures" do
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: false,
+        skipped?: true,
+        remote_indexer_id: nil,
+        message: "EZTV does not expose Radarr-compatible Torznab categories.",
+        error: "EZTV does not expose Radarr-compatible Torznab categories."
+      )
+    )
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result).not_to be_success
+    expect(result).to be_skipped
+    expect(result.message).to eq("EZTV does not expose Radarr-compatible Torznab categories.")
+    expect(assignment.reload.last_status).to eq("skipped")
+    expect(assignment.last_error).to eq("EZTV does not expose Radarr-compatible Torznab categories.")
   end
 
   it "syncs assignments even if their hidden enabled flag is false" do

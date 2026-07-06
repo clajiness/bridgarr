@@ -20,5 +20,5 @@
   </td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.started_at.present? ? format_utc_timestamp(sync_run_item.started_at) : "Not started" %></td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.finished_at.present? ? format_utc_timestamp(sync_run_item.finished_at) : "Not finished" %></td>
-  <td class="px-4 py-3 text-red-800"><%= sync_run_item.error.presence || "None" %></td>
+  <td class="<%= class_names("px-4 py-3", sync_run_item.failed? ? "text-red-800" : "text-slate-700") %>"><%= sync_run_item.error.presence || "None" %></td>
 </tr>

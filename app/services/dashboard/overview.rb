@@ -131,7 +131,7 @@ module Dashboard
       def unsynced_assignment_scope
         active_assignments
           .where(remote_indexer_id: nil)
-          .where("indexer_apps.last_status IS NULL OR indexer_apps.last_status != ?", "error")
+          .where(last_status: nil)
       end
   end
 end
