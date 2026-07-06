@@ -43,7 +43,7 @@
   <section class="<%= class_names("overflow-hidden rounded-md border bg-white shadow-sm", @dashboard.needs_attention? ? "border-red-200" : "border-amber-200/70") %>">
     <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 class="text-base font-semibold text-slate-950">Health summary</h2>
+        <h2 class="text-base font-semibold text-slate-950">System status</h2>
         <p class="mt-1 text-sm leading-6 text-slate-600"><%= dashboard_attention_summary(@dashboard) %></p>
       </div>
       <% if @dashboard.needs_attention? %>
@@ -132,8 +132,8 @@
   <section class="grid gap-4 lg:grid-cols-2">
     <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
       <div class="border-b border-slate-200 px-5 py-4">
-        <h2 class="text-base font-semibold text-slate-950">Assignment health</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600">Recent failed or unsynced indexer assignments.</p>
+        <h2 class="text-base font-semibold text-slate-950">Sync attention</h2>
+        <p class="mt-1 text-sm leading-6 text-slate-600">Recent failed or pending indexer assignments.</p>
       </div>
 
       <% if @dashboard.failed_assignments.any? || @dashboard.unsynced_assignments.any? %>
