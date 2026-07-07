@@ -179,6 +179,135 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(connection.post_path).to be_nil
   end
 
+  it "does not include tracker-specific categories in auto mode" do
+    arr_app.app_type = "radarr"
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: true,
+      category_ids: [ 2000, 2010, 2040, 8000, 5000 ],
+      message: "Found 5 Torznab categories.",
+      error: nil,
+      http_status: 200
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "LimeTorrents",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "limetorrents",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 2010, 2040 ])
+  end
+
+  it "does not include Other category for normal Radarr indexers" do
+    arr_app.app_type = "radarr"
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: true,
+      category_ids: [ 2000, 2010, 8000 ],
+      message: "Found 3 Torznab categories.",
+      error: nil,
+      http_status: 200
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "The Pirate Bay",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "thepiratebay",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 2010 ])
+  end
+
+  it "uses custom categories without inspecting Jackett capabilities" do
+    arr_app.app_type = "radarr"
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: false,
+      category_ids: [],
+      message: "Jackett returned HTTP 500.",
+      error: "Jackett returned HTTP 500.",
+      http_status: 500
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "LimeTorrents",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "limetorrents",
+      category_mode: "custom",
+      custom_category_ids: [ 2000, 8000 ],
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 8000 ])
+    expect(FakeTorznabCapsClient.calls).to be_empty
+  end
+
+  it "uses empty category fields in none mode without inspecting Jackett capabilities" do
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: false,
+      category_ids: [],
+      message: "Jackett returned HTTP 500.",
+      error: "Jackett returned HTTP 500.",
+      http_status: 500
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "Custom Tracker",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "custom-tracker",
+      category_mode: "none",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("categories").fetch("value")).to eq([])
+    expect(fields.fetch("animeCategories").fetch("value")).to eq([])
+    expect(FakeTorznabCapsClient.calls).to be_empty
+  end
+
   it "does not create an indexer when Jackett categories cannot be inspected" do
     FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
       success?: false,

@@ -57,4 +57,39 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_status).to eq("skipped")
     expect(assignment.last_error).to eq("First Indexer does not expose Radarr-compatible Torznab categories.")
   end
+
+  it "normalizes custom categories" do
+    assignment = described_class.create!(
+      arr_app:,
+      indexer:,
+      category_mode: "custom",
+      custom_categories: "2000, 2010 8000,2000"
+    )
+
+    expect(assignment.custom_categories).to eq("2000,2010,8000")
+    expect(assignment.custom_category_ids).to eq([ 2000, 2010, 8000 ])
+    expect(assignment).to be_custom_categories
+    expect(assignment).to be_category_mode_custom
+  end
+
+  it "rejects invalid custom categories" do
+    assignment = described_class.new(arr_app:, indexer:, custom_categories: "movies,8000")
+
+    expect(assignment).not_to be_valid
+    expect(assignment.errors[:custom_categories]).to include("must be a comma-separated list of positive category IDs")
+  end
+
+  it "requires custom categories when category mode is custom" do
+    assignment = described_class.new(arr_app:, indexer:, category_mode: "custom")
+
+    expect(assignment).not_to be_valid
+    expect(assignment.errors[:custom_categories]).to include("must be present when category mode is custom")
+  end
+
+  it "defaults category mode to auto" do
+    assignment = described_class.create!(arr_app:, indexer:)
+
+    expect(assignment.category_mode).to eq("auto")
+    expect(assignment).to be_category_mode_auto
+  end
 end
