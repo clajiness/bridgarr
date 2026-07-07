@@ -385,6 +385,7 @@ module Arr
       end
 
       def skipped(message)
+        message = Secrets::Redactor.call(message)
         Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, http_status: nil)
       end
 
@@ -397,6 +398,7 @@ module Arr
       end
 
       def failure(message, http_status: nil)
+        message = Secrets::Redactor.call(message)
         Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, http_status:)
       end
 

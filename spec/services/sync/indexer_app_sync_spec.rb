@@ -122,6 +122,23 @@ RSpec.describe Sync::IndexerAppSync do
     expect(assignment.last_error).to eq("Jackett URL is missing.")
   end
 
+  it "redacts sync failure details before persisting assignment state" do
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: false,
+        remote_indexer_id: nil,
+        message: "GET http://localhost:9117/api?t=tvsearch&apikey=super-secret-key timed out",
+        error: "GET http://localhost:9117/api?t=tvsearch&apikey=super-secret-key timed out"
+      )
+    )
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result.error).to include("apikey=super-secret-key")
+    expect(assignment.reload.last_error).to include("apikey=[REDACTED]")
+    expect(assignment.last_error).not_to include("super-secret-key")
+  end
+
   it "records skipped syncs without treating them as failures" do
     client = FakeGenericTorznabClient.new(
       FakeGenericTorznabClient::Result.new(

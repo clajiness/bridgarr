@@ -2,13 +2,14 @@ require "rails_helper"
 
 RSpec.describe "Sync runs", type: :request do
   it "renders sync run history" do
-    SyncRun.create!(status: "succeeded", total_count: 1, success_count: 1, started_at: Time.current, finished_at: Time.current)
+    SyncRun.create!(status: "partial", total_count: 2, success_count: 1, skipped_count: 1, started_at: Time.current, finished_at: Time.current)
 
     get sync_runs_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Sync runs")
-    expect(response.body).to include("Succeeded")
+    expect(response.body).to include("Skipped")
+    expect(response.body).to include("Partial")
   end
 
   it "queues a bulk sync run" do
@@ -44,6 +45,7 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).to include("Bulk sync")
     expect(response.body).to include("EZTV")
     expect(response.body).to include("Sonarr")
+    expect(response.body).to include("Skipped")
   end
 
   it "renders removed assignments from stored sync run labels" do
@@ -69,5 +71,26 @@ RSpec.describe "Sync runs", type: :request do
     expect(response).to redirect_to(sync_run_path(sync_run))
     expect(flash[:notice]).to eq("Sync run abandoned.")
     expect(sync_run.reload).to have_attributes(status: "failed", error: "Sync run was abandoned by the user.")
+  end
+
+  it "renders sanitized sync item errors" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run.sync_run_items.create!(
+      indexer_app:,
+      indexer_name: "EZTV",
+      arr_app_name: "Sonarr",
+      status: "failed",
+      error: "GET http://localhost:9117/api?t=tvsearch&apikey=[REDACTED]",
+      error_kind: "timeout"
+    )
+
+    get sync_run_path(sync_run)
+
+    expect(response.body).to include("apikey=[REDACTED]")
+    expect(response.body).to include("Timeout")
+    expect(response.body).not_to include("super-secret-key")
   end
 end

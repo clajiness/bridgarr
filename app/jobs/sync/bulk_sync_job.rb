@@ -18,7 +18,11 @@ module Sync
       Rails.logger.warn("Sync::BulkSyncJob could not find SyncRun #{sync_run_id}. It may have been removed before the job ran.")
       raise
     rescue StandardError => e
-      sync_run&.update!(status: "failed", finished_at: Time.current, error: "Bulk sync failed: #{e.message}")
+      sync_run&.update!(
+        status: "failed",
+        finished_at: Time.current,
+        error: Secrets::Redactor.call("Bulk sync failed: #{e.message}")
+      )
       raise
     end
   end

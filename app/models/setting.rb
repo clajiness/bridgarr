@@ -24,7 +24,7 @@ class Setting < ApplicationRecord
 
   def self.record_jackett_test_result(result, tested_at: Time.current)
     write_value(JACKETT_LAST_STATUS_KEY, result.success? ? "ok" : "error")
-    write_value(JACKETT_LAST_ERROR_KEY, result.error.to_s)
+    write_value(JACKETT_LAST_ERROR_KEY, Secrets::Redactor.call(result.error).to_s)
     write_value(JACKETT_LAST_TESTED_AT_KEY, tested_at.iso8601)
   end
 end

@@ -12,7 +12,7 @@ class ArrApp < ApplicationRecord
   def record_connection_test_result(result, tested_at: Time.current)
     update!(
       last_status: result.success? ? "ok" : "error",
-      last_error: result.error,
+      last_error: Secrets::Redactor.call(result.error),
       last_tested_at: tested_at
     )
   end

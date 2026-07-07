@@ -47,14 +47,19 @@ class SyncRunItem < ApplicationRecord
   end
 
   def mark_running!
-    update!(status: "running", started_at: Time.current, error: nil)
+    update!(status: "running", started_at: Time.current, error: nil, error_kind: nil, retryable: false)
   end
 
   def record_result!(result, finished_at: Time.current)
+    sanitized_error = result.success? ? nil : Secrets::Redactor.call(result.error)
+    classification = sanitized_error.present? ? Sync::ErrorClassifier.call(sanitized_error, skipped: result.skipped?) : nil
+
     update!(
       status: sync_status_for(result),
       finished_at:,
-      error: result.error
+      error: sanitized_error,
+      error_kind: classification&.kind,
+      retryable: classification&.retryable? || false
     )
   end
 

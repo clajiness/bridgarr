@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_07_011000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_07_143000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
@@ -82,9 +82,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_07_011000) do
     t.string "arr_app_name"
     t.datetime "created_at", null: false
     t.text "error"
+    t.string "error_kind"
     t.datetime "finished_at"
     t.integer "indexer_app_id"
     t.string "indexer_name"
+    t.boolean "retryable", default: false, null: false
     t.datetime "started_at"
     t.string "status", default: "queued", null: false
     t.integer "sync_run_id", null: false
@@ -101,6 +103,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_07_011000) do
     t.integer "failure_count", default: 0, null: false
     t.datetime "finished_at"
     t.string "mode", default: "bulk", null: false
+    t.integer "skipped_count", default: 0, null: false
     t.datetime "started_at"
     t.string "status", default: "queued", null: false
     t.integer "success_count", default: 0, null: false

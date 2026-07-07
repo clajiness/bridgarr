@@ -17,4 +17,8 @@ module SyncRunsHelper
   def sync_run_status_label(status)
     status.to_s.titleize
   end
+
+  def sync_error_kind_label(error_kind)
+    error_kind.to_s.tr("_", " ").presence&.titleize
+  end
 end
