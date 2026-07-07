@@ -37,7 +37,7 @@ module Arr
       @remote_indexer_id = remote_indexer_id
       @connection_mode = connection_mode.to_s.presence || "direct"
       @category_mode = category_mode.presence || "auto"
-      @custom_category_ids = Array(custom_category_ids).map(&:to_i).select(&:positive?).uniq
+      @custom_category_ids = normalize_category_ids(custom_category_ids)
       @connection = connection
       @caps_client = caps_client
     end
@@ -55,13 +55,15 @@ module Arr
         return sync_existing_indexer(managed_indexer, already_exists_message)
       end
 
+      schema_failure = load_torznab_schema
+      return schema_failure if schema_failure
+
       compatibility_error = category_compatibility_error
       return skipped(compatibility_error) if compatibility_error
 
-      schema_response = http.get(SCHEMA_PATH)
-      return http_failure(schema_response, "fetch indexer schema") unless schema_response.success?
+      log_category_selection
 
-      payload = torznab_payload(JSON.parse(schema_response.body))
+      payload = torznab_payload
       response = post_indexer(payload)
       return http_failure(response, "create Generic Torznab indexer") unless response.success?
 
@@ -105,11 +107,24 @@ module Arr
         end
       end
 
-      def torznab_payload(schemas)
-        schema = schemas.find { |candidate| candidate["implementation"] == "Torznab" || candidate["configContract"] == "TorznabSettings" }
-        raise KeyError unless schema
+      def load_torznab_schema
+        return if @torznab_schema
 
-        schema.deep_dup.tap do |payload|
+        response = http.get(SCHEMA_PATH)
+        return http_failure(response, "fetch indexer schema") unless response.success?
+
+        @torznab_schema = select_torznab_schema(JSON.parse(response.body))
+        raise KeyError unless @torznab_schema
+
+        nil
+      end
+
+      def select_torznab_schema(schemas)
+        schemas.find { |candidate| candidate["implementation"] == "Torznab" || candidate["configContract"] == "TorznabSettings" }
+      end
+
+      def torznab_payload
+        torznab_schema.deep_dup.tap do |payload|
           payload["name"] = name
           payload["enableRss"] = true
           payload["enableAutomaticSearch"] = true
@@ -141,16 +156,12 @@ module Arr
         end
       end
 
-      def category_field_value(field)
-        return [] if category_policy.none?
-
-        category_ids.presence || field["value"]
+      def category_field_value(_field)
+        category_ids
       end
 
-      def anime_category_field_value(field)
-        return [] if category_policy.none?
-
-        anime_category_ids.presence || field["value"]
+      def anime_category_field_value(_field)
+        anime_category_ids
       end
 
       def category_ids
@@ -176,7 +187,9 @@ module Arr
       def category_policy
         @category_policy ||= Arr::TorznabCategoryPolicy.new(
           app_type: arr_app.app_type,
-          category_ids: category_policy_manual? ? [] : torznab_category_ids,
+          jackett_category_ids: category_policy_manual? ? [] : torznab_category_ids,
+          arr_default_category_ids:,
+          arr_default_anime_category_ids:,
           category_mode:,
           custom_category_ids:
         )
@@ -184,7 +197,6 @@ module Arr
 
       def category_compatibility_error
         return if category_policy.manual?
-        return unless category_policy.app_filtered?
 
         unless torznab_caps_result.success?
           return "Could not inspect Torznab categories for #{name}: #{torznab_caps_result.message}"
@@ -192,7 +204,7 @@ module Arr
 
         return if category_policy.compatible?
 
-        "#{name} does not expose #{arr_app.app_type.to_s.titleize}-compatible Torznab categories."
+        "No compatible default categories were found for #{name}. #{arr_app.name}'s Generic Torznab defaults do not overlap with the categories advertised by this Jackett indexer. Review the category mode or choose custom categories."
       end
 
       def category_policy_manual?
@@ -217,6 +229,14 @@ module Arr
 
       def sync_existing_indexer(remote_indexer, message)
         return success(remote_indexer.fetch("id"), nil, message) unless remote_indexer_configurable?(remote_indexer)
+
+        schema_failure = load_torznab_schema
+        return schema_failure if schema_failure
+
+        compatibility_error = category_compatibility_error
+        return skipped(compatibility_error) if compatibility_error
+
+        log_category_selection
         return success(remote_indexer.fetch("id"), nil, message) if remote_indexer_matches?(remote_indexer)
 
         response = update_indexer(remote_indexer)
@@ -248,7 +268,7 @@ module Arr
       end
 
       def category_values(value)
-        Array(value).map(&:to_i).select(&:positive?).uniq.sort
+        normalize_category_ids(value).sort
       end
 
       def updated_indexer_payload(remote_indexer)
@@ -296,6 +316,49 @@ module Arr
         find_indexer_by_name
       rescue Faraday::Error, JSON::ParserError
         nil
+      end
+
+      def torznab_schema
+        @torznab_schema || raise(KeyError)
+      end
+
+      def arr_default_category_ids
+        @arr_default_category_ids ||= schema_category_ids("categories")
+      end
+
+      def arr_default_anime_category_ids
+        @arr_default_anime_category_ids ||= schema_category_ids("animeCategories")
+      end
+
+      def schema_category_ids(field_name)
+        field = torznab_schema.fetch("fields", []).find { |candidate| candidate["name"] == field_name }
+
+        normalize_category_ids(field&.fetch("value", nil))
+      end
+
+      def normalize_category_ids(value)
+        Array(value).flat_map { |category_id| category_id.to_s.scan(/\d+/) }.map(&:to_i).select(&:positive?).uniq
+      end
+
+      def log_category_selection
+        return if category_policy_manual?
+
+        Rails.logger.info(
+          {
+            message: "Selected Torznab categories",
+            arr_app: arr_app.name,
+            app_type: arr_app.app_type,
+            indexer: name,
+            jackett_id:,
+            connection_mode:,
+            category_mode:,
+            arr_default_categories: arr_default_category_ids,
+            arr_default_anime_categories: arr_default_anime_category_ids,
+            selected_categories: category_ids,
+            selected_anime_categories: anime_category_ids,
+            root_fallback: category_policy.root_fallback?
+          }.to_json
+        )
       end
 
       def find_existing_indexer_after_timeout

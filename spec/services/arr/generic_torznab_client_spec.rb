@@ -94,7 +94,7 @@ RSpec.describe Arr::GenericTorznabClient do
     )
   end
 
-  let(:torznab_schema) do
+  def torznab_schema_with(categories:, anime_categories: [])
     [
       {
         implementation: "Torznab",
@@ -103,11 +103,19 @@ RSpec.describe Arr::GenericTorznabClient do
           { name: "baseUrl", value: "" },
           { name: "apiPath", value: "/api" },
           { name: "apiKey", value: "" },
-          { name: "categories", value: [ 5030, 5040 ] },
-          { name: "animeCategories", value: [] }
+          { name: "categories", value: categories },
+          { name: "animeCategories", value: anime_categories }
         ]
       }
     ]
+  end
+
+  let(:torznab_schema) do
+    torznab_schema_with(categories: [ 5030, 5040 ])
+  end
+
+  let(:radarr_torznab_schema) do
+    torznab_schema_with(categories: [ 2000, 2010 ])
   end
 
   before do
@@ -152,8 +160,8 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:9117/api/v2.0/indexers/eztv/results/torznab")
     expect(fields.fetch("apiPath").fetch("value")).to eq("/api")
     expect(fields.fetch("apiKey").fetch("value")).to eq("jackett-api-key")
-    expect(fields.fetch("categories").fetch("value")).to eq([ 5000, 5030, 5040, 5070 ])
-    expect(fields.fetch("animeCategories").fetch("value")).to eq([ 5070 ])
+    expect(fields.fetch("categories").fetch("value")).to eq([ 5030, 5040 ])
+    expect(fields.fetch("animeCategories").fetch("value")).to eq([])
     expect(FakeTorznabCapsClient.calls).to contain_exactly(
       {
         base_url: "http://localhost:9117",
@@ -161,6 +169,38 @@ RSpec.describe Arr::GenericTorznabClient do
         jackett_id: "eztv"
       }
     )
+  end
+
+  it "keeps regular and anime categories separate from Arr schema defaults" do
+    schema = torznab_schema_with(categories: [ 5030, 5040 ], anime_categories: [ 5070 ])
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: true,
+      category_ids: [ 5040, 5070, 5080 ],
+      message: "Found 3 Torznab categories.",
+      error: nil,
+      http_status: 200
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "Anime Tracker",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "anime-tracker",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("categories").fetch("value")).to eq([ 5040 ])
+    expect(fields.fetch("animeCategories").fetch("value")).to eq([ 5070 ])
   end
 
   it "can create a bridged Generic Torznab indexer through Bridgarr" do
@@ -213,6 +253,7 @@ RSpec.describe Arr::GenericTorznabClient do
 
   it "does not create an indexer when Jackett categories do not match the Arr app" do
     arr_app.app_type = "radarr"
+    arr_app.name = "Main Radarr"
     FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
       success?: true,
       category_ids: [ 5000, 5030, 5040, 5070 ],
@@ -221,7 +262,7 @@ RSpec.describe Arr::GenericTorznabClient do
       http_status: 200
     )
     connection = FakeArrIndexerConnection.new(
-      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: radarr_torznab_schema.to_json),
       create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
     )
 
@@ -238,9 +279,9 @@ RSpec.describe Arr::GenericTorznabClient do
 
     expect(result).not_to be_success
     expect(result).to be_skipped
-    expect(result.message).to eq("EZTV does not expose Radarr-compatible Torznab categories.")
+    expect(result.message).to eq("No compatible default categories were found for EZTV. Main Radarr's Generic Torznab defaults do not overlap with the categories advertised by this Jackett indexer. Review the category mode or choose custom categories.")
     expect(result.remote_indexer_id).to be_nil
-    expect(connection.get_paths).to eq([ "/api/v3/indexer" ])
+    expect(connection.get_paths).to eq([ "/api/v3/indexer", "/api/v3/indexer/schema" ])
     expect(connection.post_path).to be_nil
   end
 
@@ -254,7 +295,7 @@ RSpec.describe Arr::GenericTorznabClient do
       http_status: 200
     )
     connection = FakeArrIndexerConnection.new(
-      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: radarr_torznab_schema.to_json),
       create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
     )
 
@@ -272,7 +313,7 @@ RSpec.describe Arr::GenericTorznabClient do
     fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
 
     expect(result).to be_success
-    expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 2010, 2040 ])
+    expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 2010 ])
   end
 
   it "does not include Other category for normal Radarr indexers" do
@@ -285,7 +326,7 @@ RSpec.describe Arr::GenericTorznabClient do
       http_status: 200
     )
     connection = FakeArrIndexerConnection.new(
-      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: radarr_torznab_schema.to_json),
       create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
     )
 
@@ -304,6 +345,37 @@ RSpec.describe Arr::GenericTorznabClient do
 
     expect(result).to be_success
     expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 2010 ])
+  end
+
+  it "keeps Other when the Arr schema selected it and Jackett supports it" do
+    arr_app.app_type = "radarr"
+    FakeTorznabCapsClient.result = FakeTorznabCapsClient::Result.new(
+      success?: true,
+      category_ids: [ 2000, 8000 ],
+      message: "Found 2 Torznab categories.",
+      error: nil,
+      http_status: 200
+    )
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema_with(categories: [ 2000, 8000 ]).to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "LimeTorrents",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "limetorrents",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("categories").fetch("value")).to eq([ 2000, 8000 ])
   end
 
   it "uses custom categories without inspecting Jackett capabilities" do
@@ -400,7 +472,7 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(result).not_to be_success
     expect(result).to be_skipped
     expect(result.message).to eq("Could not inspect Torznab categories for EZTV: Jackett returned HTTP 500.")
-    expect(connection.get_paths).to eq([ "/api/v3/indexer" ])
+    expect(connection.get_paths).to eq([ "/api/v3/indexer", "/api/v3/indexer/schema" ])
     expect(connection.post_path).to be_nil
   end
 
@@ -486,8 +558,8 @@ RSpec.describe Arr::GenericTorznabClient do
               { name: "baseUrl", value: "http://localhost:9117/api/v2.0/indexers/eztv/results/torznab" },
               { name: "apiPath", value: "/api" },
               { name: "apiKey", value: "jackett-api-key" },
-              { name: "categories", value: [ "5070", "5040", "5030", "5000" ] },
-              { name: "animeCategories", value: [ "5070" ] }
+              { name: "categories", value: [ "5040", "5030" ] },
+              { name: "animeCategories", value: [] }
             ]
           }
         ].to_json
