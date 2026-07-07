@@ -39,6 +39,14 @@
       </div>
     </div>
 
+    <div>
+      <%= form.label :connection_mode, "Connection mode", class: "block text-sm font-medium text-slate-700" %>
+      <%= form.select :connection_mode, [["Direct", "direct"], ["Bridged", "bridged"]], {}, class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" %>
+      <p class="mt-2 text-xs leading-5 text-slate-500">
+        Direct points the app at Jackett. Bridged points the app at Bridgarr so proxy traffic can be recorded.
+      </p>
+    </div>
+
     <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
       <div>
         <%= form.label :category_mode, "Category mode", class: "block text-sm font-medium text-slate-700" %>

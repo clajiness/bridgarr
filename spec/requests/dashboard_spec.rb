@@ -8,14 +8,13 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("Dashboard")
     expect(response.body).to include(BrandingHelper::TAGLINE)
     expect(response.body).to include("Readiness")
-    expect(response.body).to include("7 setup steps remaining.")
+    expect(response.body).to include("6 setup steps remaining.")
     expect(response.body).to include(readiness_path)
-    expect(response.body).not_to include("Set the URL apps use to reach Bridgarr.")
+    expect(response.body).not_to include("Set the URL apps use when assignments run in bridged mode.")
     expect(response.body).not_to include("Open settings")
   end
 
   it "shows when setup readiness is complete" do
-    Setting.write_value(Setting::BRIDGARR_BASE_URL_KEY, "http://bridgarr.example.test")
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
     Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "ok")
@@ -38,7 +37,7 @@ RSpec.describe "Dashboard", type: :request do
     get root_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Bridgarr is ready to manage and proxy indexers.")
+    expect(response.body).to include("Bridgarr is ready to manage indexers.")
     expect(response.body).to include("View setup")
     expect(response.body).not_to include("Open sync")
   end
@@ -48,10 +47,35 @@ RSpec.describe "Dashboard", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Setup checklist")
-    expect(response.body).to include("7 setup steps remaining.")
-    expect(response.body).to include("Bridgarr URL")
+    expect(response.body).to include("6 setup steps remaining.")
+    expect(response.body).not_to include("Bridgarr URL")
     expect(response.body).to include("Open settings")
     expect(response.body).to include("Open sync")
+  end
+
+  it "shows Bridgarr URL readiness only when assignments are bridged" do
+    arr_app = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key",
+      enabled: true
+    )
+    indexer = Indexer.create!(name: "1337x", jackett_id: "1337x", enabled: true)
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      enabled: true,
+      connection_mode: "bridged",
+      remote_indexer_id: 42,
+      last_status: "ok"
+    )
+
+    get readiness_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Bridgarr URL")
+    expect(response.body).to include("Set the URL apps use when assignments run in bridged mode.")
   end
 
   it "orders navigation and dashboard links by daily workflow" do

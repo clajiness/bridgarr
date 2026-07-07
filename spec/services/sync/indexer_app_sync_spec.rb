@@ -66,6 +66,7 @@ RSpec.describe Sync::IndexerAppSync do
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
       remote_indexer_id: nil,
+      connection_mode: "direct",
       category_mode: "auto",
       custom_category_ids: []
     )
@@ -85,6 +86,22 @@ RSpec.describe Sync::IndexerAppSync do
     described_class.call(indexer_app: assignment, client:)
 
     expect(client.calls.first).to include(category_mode: "custom", custom_category_ids: [ 2000, 8000 ])
+  end
+
+  it "passes assignment connection mode to the Arr client" do
+    assignment.update!(connection_mode: "bridged")
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer created.",
+        error: nil
+      )
+    )
+
+    described_class.call(indexer_app: assignment, client:)
+
+    expect(client.calls.first).to include(connection_mode: "bridged")
   end
 
   it "records sync failures" do

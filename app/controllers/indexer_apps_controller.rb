@@ -29,7 +29,7 @@ class IndexerAppsController < ApplicationController
     end
 
     def indexer_app_params
-      params.expect(indexer_app: [ :category_mode, :custom_categories ])
+      params.expect(indexer_app: [ :connection_mode, :category_mode, :custom_categories ])
     end
 
     def indexer_app_redirect_path(indexer_app)

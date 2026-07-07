@@ -68,6 +68,7 @@ RSpec.describe "Arr apps", type: :request do
     assignment = IndexerApp.create!(
       arr_app:,
       indexer:,
+      connection_mode: "bridged",
       remote_indexer_id: 42,
       last_status: "ok",
       last_synced_at: Time.zone.parse("2026-07-04 14:10:10")
@@ -78,6 +79,8 @@ RSpec.describe "Arr apps", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("EZTV")
     expect(response.body).to include("eztv")
+    expect(response.body).to include("Connection")
+    expect(response.body).to include("Bridged")
     expect(response.body).to include("42")
     expect(response.body).to include("Synced")
     expect(response.body).to include(sync_indexer_app_path(assignment))

@@ -5,14 +5,14 @@
 Bridgarr is a Jackett-backed Torznab proxy and indexer sync manager for Sonarr,
 Radarr, Lidarr, and compatible apps. Configure Jackett once, import Jackett
 indexers once, assign them to one or more apps, and let Bridgarr create managed
-Generic Torznab indexers that point back through Bridgarr.
+Generic Torznab indexers.
 
 Bridgarr is not a Prowlarr clone. It is intentionally focused on Jackett-backed
-indexer discovery, assignment, sync, and Torznab proxying.
+indexer discovery, assignment, sync, and optional Torznab bridging.
 
 ## Status
 
-Bridgarr is public alpha software. The 0.1.x line includes the core pieces
+Bridgarr is public alpha software. The 0.2.x line includes the core pieces
 needed for a useful homelab trial:
 
 - Jackett connection settings and connection testing
@@ -22,7 +22,8 @@ needed for a useful homelab trial:
 - Indexer-to-app assignments
 - Managed Generic Torznab indexer sync
 - Bulk sync jobs with Solid Queue
-- Torznab search and download proxying through Bridgarr
+- Direct Jackett-backed app indexers by default
+- Optional bridged Torznab search and download proxying through Bridgarr
 - Proxy activity, sync run history, and dashboard health summaries
 
 Authentication, multi-user permissions, scheduled health checks, and deeper
@@ -34,7 +35,7 @@ network for now.
 The published image is available from GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/clajiness/bridgarr:0.1.0
+docker pull ghcr.io/clajiness/bridgarr:0.2.0
 ```
 
 Generate a Rails secret and keep it with your deployment secrets:
@@ -54,7 +55,7 @@ Example `compose.yml`:
 ```yaml
 services:
   bridgarr:
-    image: ghcr.io/clajiness/bridgarr:0.1.0
+    image: ghcr.io/clajiness/bridgarr:0.2.0
     container_name: bridgarr
     ports:
       - "9697:80"
@@ -79,7 +80,7 @@ docker compose up -d
 ```
 
 Before a final release tag exists, use `latest` or a published `sha-*` tag
-instead of `0.1.0`.
+instead of `0.2.0`.
 
 Open Bridgarr at the published port, for example:
 
@@ -94,30 +95,35 @@ sure the mounted storage directory is writable by UID/GID `1000`.
 ## First Setup
 
 1. Open **Settings**.
-2. Set **Bridgarr URL** to the URL your *arr apps can use to reach Bridgarr.
-3. Set **Jackett URL** to the URL the Bridgarr container can use to reach
+2. Set **Jackett URL** to the URL the Bridgarr container can use to reach
    Jackett.
-4. Paste the Jackett API key from the Jackett dashboard.
-5. Test the Jackett connection.
-6. Open **Indexers**, discover from Jackett, and import the indexers you want
+3. Paste the Jackett API key from the Jackett dashboard.
+4. Test the Jackett connection.
+5. Open **Indexers**, discover from Jackett, and import the indexers you want
    Bridgarr to manage.
-7. Open **Apps**, add your Sonarr/Radarr/Lidarr instances, and test each
+6. Open **Apps**, add your Sonarr/Radarr/Lidarr instances, and test each
    connection.
-8. Assign indexers to apps from either the app or indexer edit screens.
-9. Sync the assignments.
-10. In the *arr app, test the new `Indexer (Bridgarr)` Generic Torznab indexer.
+7. Assign indexers to apps from either the app or indexer edit screens.
+8. Sync the assignments.
+9. In the *arr app, test the new `Indexer (Bridgarr)` Generic Torznab indexer.
 
-After sync, the managed *arr indexer points at Bridgarr, not directly at
-Jackett. Bridgarr receives Torznab searches from the app, forwards them to
-Jackett, and records proxy activity for visibility.
+By default, managed *arr indexers point directly at Jackett. This keeps Jackett
+as the Torznab source of truth while Bridgarr manages the app/indexer
+relationship.
+
+For assignments where you want Bridgarr to record proxy activity or rewrite
+download links, edit the assignment and switch **Connection mode** from
+**Direct** to **Bridged**. Bridged assignments point the *arr app at Bridgarr,
+and Bridgarr forwards Torznab traffic to Jackett.
 
 ## Network Notes
 
 There are two important URLs, and they are often different:
 
+- **Jackett URL** is the address Bridgarr uses when calling Jackett. This is
+  required.
 - **Bridgarr URL** is the address Sonarr, Radarr, Lidarr, and friends use when
-  calling back into Bridgarr.
-- **Jackett URL** is the address Bridgarr uses when calling Jackett.
+  calling back into Bridgarr. This is only required for bridged assignments.
 
 For Docker deployments, `localhost` is usually wrong unless everything is in the
 same container. Use a Docker service name on the same network, a container IP, or
@@ -182,8 +188,8 @@ Queue worker is running.
 
 ## Proxy Activity
 
-Bridgarr records recent Torznab proxy requests so you can see what the apps are
-doing:
+For bridged assignments, Bridgarr records recent Torznab proxy requests so you
+can see what the apps are doing:
 
 - requests and failures in the last 24 hours
 - search versus download traffic
@@ -204,10 +210,10 @@ Pushes to `main` publish:
 - `sha-<commit>`
 
 Version tags publish semver image tags. For example, pushing Git tag
-`v0.1.0` publishes image tags like:
+`v0.2.0` publishes image tags like:
 
-- `0.1.0`
-- `0.1`
+- `0.2.0`
+- `0.2`
 
 The image tags intentionally omit the leading `v`.
 
@@ -254,7 +260,7 @@ can manage configured apps and indexers.
 
 ## Roadmap
 
-Likely 0.1.x follow-up work:
+Likely follow-up work:
 
 - scheduled app and indexer health checks
 - clearer readiness and troubleshooting flows
