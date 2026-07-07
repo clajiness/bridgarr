@@ -19,7 +19,7 @@ class IndexerApp < ApplicationRecord
       remote_indexer_id: result.remote_indexer_id || remote_indexer_id,
       last_synced_at: synced_at,
       last_status: sync_status_for(result),
-      last_error: result.error
+      last_error: Secrets::Redactor.call(result.error)
     )
   end
 

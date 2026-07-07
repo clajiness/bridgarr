@@ -53,4 +53,26 @@ RSpec.describe ProxyActivity::Recorder do
     expect(proxy_request.error).to eq("Jackett timed out")
     expect(proxy_request.item_count).to be_nil
   end
+
+  it "redacts secrets from failed response bodies before storing them" do
+    result = Jackett::TorznabProxy::Result.new(
+      body: "GET http://localhost:9117/api?t=search&apikey=super-secret-key X-Api-Key: sonarr-secret",
+      http_status: 400,
+      content_type: "text/plain"
+    )
+
+    proxy_request = described_class.call(
+      indexer: nil,
+      jackett_id: "leaky-indexer",
+      request_type: "search",
+      query_params: {},
+      result:,
+      duration_ms: 1_000
+    )
+
+    expect(proxy_request.error).to include("apikey=[REDACTED]")
+    expect(proxy_request.error).to include("X-Api-Key: [REDACTED]")
+    expect(proxy_request.error).not_to include("super-secret-key")
+    expect(proxy_request.error).not_to include("sonarr-secret")
+  end
 end

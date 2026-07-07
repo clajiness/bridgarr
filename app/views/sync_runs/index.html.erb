@@ -20,6 +20,7 @@
             <th class="px-4 py-3">Assignments</th>
             <th class="px-4 py-3">Succeeded</th>
             <th class="px-4 py-3">Failed</th>
+            <th class="px-4 py-3">Skipped</th>
             <th class="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
@@ -35,6 +36,7 @@
               <td class="px-4 py-3 text-slate-700"><%= sync_run.total_count %></td>
               <td class="px-4 py-3 text-slate-700"><%= sync_run.success_count %></td>
               <td class="px-4 py-3 text-slate-700"><%= sync_run.failure_count %></td>
+              <td class="px-4 py-3 text-slate-700"><%= sync_run.skipped_count %></td>
               <td class="px-4 py-3 text-right">
                 <div class="flex flex-wrap justify-end gap-3">
                   <% unless sync_run.complete? %>

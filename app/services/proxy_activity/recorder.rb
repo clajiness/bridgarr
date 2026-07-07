@@ -2,7 +2,7 @@ require "json"
 
 module ProxyActivity
   class Recorder
-    SENSITIVE_PARAMS = %w[apikey jackett_apikey].freeze
+    SENSITIVE_PARAMS = %w[apikey apiKey APIKEY jackett_apikey token access_token auth_token].freeze
     ERROR_BODY_LIMIT = 500
 
     def self.call(indexer:, jackett_id:, request_type:, query_params:, result:, duration_ms:)
@@ -32,7 +32,7 @@ module ProxyActivity
         query_params: sanitized_params.to_json
       )
     rescue StandardError => e
-      Rails.logger.warn("Could not record proxy request: #{e.class}: #{e.message}")
+      Rails.logger.warn(Secrets::Redactor.call("Could not record proxy request: #{e.class}: #{e.message}"))
       nil
     end
 
@@ -56,7 +56,7 @@ module ProxyActivity
       def error_message
         return nil if result.http_status.to_i.between?(200, 399)
 
-        result.body.to_s.truncate(ERROR_BODY_LIMIT)
+        Secrets::Redactor.call(result.body.to_s).truncate(ERROR_BODY_LIMIT)
       end
 
       def xml_response?

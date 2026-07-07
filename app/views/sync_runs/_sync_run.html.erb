@@ -1,5 +1,5 @@
 <section id="<%= dom_id(sync_run) %>" class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-  <div class="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-5">
+  <div class="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-6">
     <div class="bg-white px-4 py-4">
       <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Status</p>
       <p class="mt-2">
@@ -21,13 +21,17 @@
       <p class="mt-2 text-2xl font-semibold text-slate-950"><%= sync_run.failure_count %></p>
     </div>
     <div class="bg-white px-4 py-4">
+      <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Skipped</p>
+      <p class="mt-2 text-2xl font-semibold text-slate-950"><%= sync_run.skipped_count %></p>
+    </div>
+    <div class="bg-white px-4 py-4">
       <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Started</p>
       <p class="mt-2 text-sm font-semibold text-slate-700"><%= sync_run.started_at.present? ? format_server_timestamp(sync_run.started_at) : "Queued" %></p>
     </div>
   </div>
 
   <% if sync_run.error.present? %>
-    <div class="border-t border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+    <div class="break-words border-t border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
       <%= sync_run.error %>
     </div>
   <% end %>
