@@ -5,24 +5,28 @@ module Arr
     INDEXER_PATH = "/api/v3/indexer"
     SCHEMA_PATH = "/api/v3/indexer/schema"
 
-    CATEGORY_ROOTS_BY_APP_TYPE = {
-      "sonarr" => [ 5000 ],
-      "radarr" => [ 2000 ],
-      "lidarr" => [ 3000 ],
-      "whisparr" => [ 6000 ]
-    }.freeze
-    ANIME_CATEGORY_ROOT = 5000
-    ANIME_CATEGORY_IDS = [ 5070 ].freeze
     REQUEST_TIMEOUT_SECONDS = ENV.fetch("ARR_INDEXER_SYNC_TIMEOUT_SECONDS", 150).to_i
     TIMEOUT_ADOPTION_ATTEMPTS = 4
     TIMEOUT_ADOPTION_INTERVAL_SECONDS = 0.75
     PROXY_API_KEY = "bridgarr"
 
-    def self.call(arr_app:, name:, bridgarr_base_url:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id: nil, connection: nil, caps_client: Jackett::TorznabCaps)
-      new(arr_app:, name:, bridgarr_base_url:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id:, connection:, caps_client:).call
+    def self.call(**attributes)
+      new(**attributes).call
     end
 
-    def initialize(arr_app:, name:, bridgarr_base_url:, jackett_base_url:, jackett_api_key:, jackett_id:, remote_indexer_id: nil, connection: nil, caps_client: Jackett::TorznabCaps)
+    def initialize(
+      arr_app:,
+      name:,
+      bridgarr_base_url:,
+      jackett_base_url:,
+      jackett_api_key:,
+      jackett_id:,
+      remote_indexer_id: nil,
+      category_mode: "auto",
+      custom_category_ids: nil,
+      connection: nil,
+      caps_client: Jackett::TorznabCaps
+    )
       @arr_app = arr_app
       @name = name
       @bridgarr_base_url = bridgarr_base_url.to_s.strip.delete_suffix("/")
@@ -30,6 +34,8 @@ module Arr
       @jackett_api_key = jackett_api_key.to_s.strip
       @jackett_id = jackett_id
       @remote_indexer_id = remote_indexer_id
+      @category_mode = category_mode.presence || "auto"
+      @custom_category_ids = Array(custom_category_ids).map(&:to_i).select(&:positive?).uniq
       @connection = connection
       @caps_client = caps_client
     end
@@ -75,7 +81,17 @@ module Arr
 
     private
 
-      attr_reader :arr_app, :name, :bridgarr_base_url, :jackett_base_url, :jackett_api_key, :jackett_id, :remote_indexer_id, :connection, :caps_client
+      attr_reader :arr_app,
+        :name,
+        :bridgarr_base_url,
+        :jackett_base_url,
+        :jackett_api_key,
+        :jackett_id,
+        :remote_indexer_id,
+        :category_mode,
+        :custom_category_ids,
+        :connection,
+        :caps_client
 
       def http
         @http ||= connection || Faraday.new(url: arr_app.base_url, headers: { "X-Api-Key" => arr_app.api_key }) do |faraday|
@@ -114,26 +130,32 @@ module Arr
         when "apiKey"
           PROXY_API_KEY
         when "categories"
-          category_ids.presence || field["value"]
+          category_field_value(field)
         when "animeCategories"
-          anime_category_ids.presence || field["value"]
+          anime_category_field_value(field)
         else
           field["value"]
         end
       end
 
+      def category_field_value(field)
+        return [] if category_policy.none?
+
+        category_ids.presence || field["value"]
+      end
+
+      def anime_category_field_value(field)
+        return [] if category_policy.none?
+
+        anime_category_ids.presence || field["value"]
+      end
+
       def category_ids
-        @category_ids ||= compatible_category_ids
+        category_policy.category_ids
       end
 
       def anime_category_ids
-        @anime_category_ids ||= begin
-          return [] unless arr_app.app_type == "sonarr"
-
-          torznab_category_ids.select do |id|
-            category_root(id) == ANIME_CATEGORY_ROOT && ANIME_CATEGORY_IDS.include?(id)
-          end
-        end
+        category_policy.anime_category_ids
       end
 
       def torznab_category_ids
@@ -148,32 +170,30 @@ module Arr
         )
       end
 
-      def compatible_category_ids
-        @compatible_category_ids ||= begin
-          return torznab_category_ids if category_roots.blank?
-
-          torznab_category_ids.select { |id| category_roots.include?(category_root(id)) }
-        end
-      end
-
-      def category_roots
-        @category_roots ||= CATEGORY_ROOTS_BY_APP_TYPE.fetch(arr_app.app_type, [])
+      def category_policy
+        @category_policy ||= Arr::TorznabCategoryPolicy.new(
+          app_type: arr_app.app_type,
+          category_ids: category_policy_manual? ? [] : torznab_category_ids,
+          category_mode:,
+          custom_category_ids:
+        )
       end
 
       def category_compatibility_error
-        return if category_roots.blank?
+        return if category_policy.manual?
+        return unless category_policy.app_filtered?
 
         unless torznab_caps_result.success?
           return "Could not inspect Torznab categories for #{name}: #{torznab_caps_result.message}"
         end
 
-        return if compatible_category_ids.present?
+        return if category_policy.compatible?
 
         "#{name} does not expose #{arr_app.app_type.to_s.titleize}-compatible Torznab categories."
       end
 
-      def category_root(category_id)
-        category_id / 1000 * 1000
+      def category_policy_manual?
+        %w[ custom none ].include?(category_mode)
       end
 
       def post_indexer(payload)

@@ -24,7 +24,9 @@ module Sync
         jackett_base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
         jackett_api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
         jackett_id: indexer.jackett_id,
-        remote_indexer_id: indexer_app.remote_indexer_id
+        remote_indexer_id: indexer_app.remote_indexer_id,
+        category_mode: indexer_app.category_mode,
+        custom_category_ids: indexer_app.custom_category_ids
       )
 
       if result.success?

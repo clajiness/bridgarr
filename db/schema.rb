@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_05_162000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_215000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
@@ -26,6 +26,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_162000) do
 
   create_table "indexer_apps", force: :cascade do |t|
     t.integer "arr_app_id", null: false
+    t.text "custom_categories"
+    t.string "category_mode", default: "auto", null: false
     t.datetime "created_at", null: false
     t.boolean "enabled"
     t.integer "indexer_id", null: false
