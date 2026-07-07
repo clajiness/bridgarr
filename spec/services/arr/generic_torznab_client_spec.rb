@@ -10,12 +10,18 @@ RSpec.describe Arr::GenericTorznabClient do
   FakeRequest = Struct.new(:headers, :body, keyword_init: true)
 
   class FakeArrIndexerConnection
-    attr_reader :get_paths, :post_path, :post_body, :post_headers
+    attr_reader :get_paths, :post_path, :post_body, :post_headers, :put_path, :put_body, :put_headers
 
-    def initialize(schema_response:, create_response:, indexers_response: ArrIndexerResponse.new(status: 200, body: [].to_json))
+    def initialize(
+      schema_response:,
+      create_response:,
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [].to_json),
+      update_response: ArrIndexerResponse.new(status: 200, body: {}.to_json)
+    )
       @indexers_responses = indexers_response.is_a?(Array) ? indexers_response : [ indexers_response ]
       @schema_response = schema_response
       @create_response = create_response
+      @update_response = update_response
       @get_paths = []
     end
 
@@ -39,6 +45,17 @@ RSpec.describe Arr::GenericTorznabClient do
       raise @create_response if @create_response.is_a?(StandardError)
 
       @create_response
+    end
+
+    def put(path)
+      request = FakeRequest.new(headers: {})
+      yield request
+      @put_path = path
+      @put_body = request.body
+      @put_headers = request.headers
+      raise @update_response if @update_response.is_a?(StandardError)
+
+      @update_response
     end
   end
 
@@ -132,9 +149,9 @@ RSpec.describe Arr::GenericTorznabClient do
       "enableAutomaticSearch" => true,
       "enableInteractiveSearch" => true
     )
-    expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:3000/torznab/eztv")
+    expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:9117/api/v2.0/indexers/eztv/results/torznab")
     expect(fields.fetch("apiPath").fetch("value")).to eq("/api")
-    expect(fields.fetch("apiKey").fetch("value")).to eq("bridgarr")
+    expect(fields.fetch("apiKey").fetch("value")).to eq("jackett-api-key")
     expect(fields.fetch("categories").fetch("value")).to eq([ 5000, 5030, 5040, 5070 ])
     expect(fields.fetch("animeCategories").fetch("value")).to eq([ 5070 ])
     expect(FakeTorznabCapsClient.calls).to contain_exactly(
@@ -144,6 +161,54 @@ RSpec.describe Arr::GenericTorznabClient do
         jackett_id: "eztv"
       }
     )
+  end
+
+  it "can create a bridged Generic Torznab indexer through Bridgarr" do
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000/",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection_mode: "bridged",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.post_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:3000/torznab/eztv")
+    expect(fields.fetch("apiKey").fetch("value")).to eq("bridgarr")
+  end
+
+  it "requires a Bridgarr URL for bridged indexers" do
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "",
+      jackett_base_url: "http://localhost:9117/",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection_mode: "bridged",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to eq("Bridgarr URL is missing.")
+    expect(connection.get_paths).to be_empty
   end
 
   it "does not create an indexer when Jackett categories do not match the Arr app" do
@@ -407,6 +472,131 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(result.remote_indexer_id).to eq(42)
     expect(result.message).to eq("Generic Torznab indexer is already synced.")
     expect(connection.post_path).to be_nil
+  end
+
+  it "does not update a matching managed indexer when Arr returns category IDs in a different shape" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(
+        status: 200,
+        body: [
+          {
+            id: 42,
+            name: "EZTV",
+            fields: [
+              { name: "baseUrl", value: "http://localhost:9117/api/v2.0/indexers/eztv/results/torznab" },
+              { name: "apiPath", value: "/api" },
+              { name: "apiKey", value: "jackett-api-key" },
+              { name: "categories", value: [ "5070", "5040", "5030", "5000" ] },
+              { name: "animeCategories", value: [ "5070" ] }
+            ]
+          }
+        ].to_json
+      ),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(result.message).to eq("Generic Torznab indexer is already synced.")
+    expect(connection.put_path).to be_nil
+  end
+
+  it "updates an existing managed indexer when assignment settings change" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(
+        status: 200,
+        body: [
+          {
+            id: 42,
+            name: "EZTV",
+            fields: [
+              { name: "baseUrl", value: "http://localhost:3000/torznab/eztv" },
+              { name: "apiPath", value: "/api" },
+              { name: "apiKey", value: "bridgarr" },
+              { name: "categories", value: [ 5030, 5040 ] },
+              { name: "animeCategories", value: [] }
+            ]
+          }
+        ].to_json
+      ),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json),
+      update_response: ArrIndexerResponse.new(status: 202, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.put_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(result.remote_indexer_id).to eq(42)
+    expect(result.message).to eq("Generic Torznab indexer updated.")
+    expect(connection.put_path).to eq("/api/v3/indexer/42")
+    expect(connection.put_headers).to include("Content-Type" => "application/json")
+    expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:9117/api/v2.0/indexers/eztv/results/torznab")
+    expect(fields.fetch("apiKey").fetch("value")).to eq("jackett-api-key")
+  end
+
+  it "keeps the known remote indexer ID when an Arr update succeeds with an empty body" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(
+        status: 200,
+        body: [
+          {
+            id: 42,
+            name: "EZTV",
+            fields: [
+              { name: "baseUrl", value: "http://localhost:3000/torznab/eztv" },
+              { name: "apiPath", value: "/api" },
+              { name: "apiKey", value: "bridgarr" },
+              { name: "categories", value: [ 5030, 5040 ] },
+              { name: "animeCategories", value: [] }
+            ]
+          }
+        ].to_json
+      ),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json),
+      update_response: ArrIndexerResponse.new(status: 202, body: "")
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(result.remote_indexer_id).to eq(42)
+    expect(result.message).to eq("Generic Torznab indexer updated.")
   end
 
   it "adopts a matching managed indexer when the saved remote ID is stale" do

@@ -4,7 +4,7 @@
   <div>
     <h1 class="text-3xl font-semibold text-slate-950">Settings</h1>
     <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-      Connect Bridgarr to the Jackett instance that owns your indexer configuration. Bridgarr uses these settings to track whether Jackett is configured and to share one Jackett connection across indexer discovery, Torznab proxying, and app sync work.
+      Connect Bridgarr to the Jackett instance that owns your indexer configuration. Bridgarr uses these settings to discover indexers, sync apps directly to Jackett by default, and bridge selected assignments through Bridgarr when you want proxy visibility.
     </p>
   </div>
 
@@ -13,7 +13,7 @@
       <div>
         <h2 class="text-xl font-semibold text-slate-950">Connection settings</h2>
         <p class="mt-2 text-sm leading-6 text-slate-600">
-          Save the URL apps should use to reach Bridgarr, plus the Jackett connection Bridgarr should use behind the scenes.
+          Save the Jackett connection Bridgarr should use behind the scenes. The Bridgarr URL is only required for assignments set to bridged mode.
         </p>
       </div>
 
@@ -21,7 +21,7 @@
         <%= form.label :bridgarr_base_url, "Bridgarr URL", class: "block text-sm font-medium text-slate-700" %>
         <%= form.url_field :bridgarr_base_url, value: @bridgarr_base_url, placeholder: "http://localhost:3000", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" %>
         <p class="mt-2 text-xs leading-5 text-slate-500">
-          Use a URL your Sonarr, Radarr, Lidarr, and other apps can reach. Bridgarr-managed indexers will point here.
+          Use a URL your Sonarr, Radarr, Lidarr, and other apps can reach. Bridged assignments point here; direct assignments point apps at Jackett.
         </p>
       </div>
 
@@ -44,7 +44,7 @@
       <div class="space-y-4">
         <h2 class="text-xl font-semibold text-slate-950">Jackett connection</h2>
         <p class="mt-2 text-sm leading-6 text-slate-600">
-          Test the saved Jackett URL and API key Bridgarr uses for discovery, proxying, and sync.
+          Test the saved Jackett URL and API key Bridgarr uses for discovery, app sync, and bridged proxy requests.
         </p>
 
         <%= button_to "Test Jackett", test_jackett_settings_path, class: "w-full rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>

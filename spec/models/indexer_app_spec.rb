@@ -92,4 +92,17 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.category_mode).to eq("auto")
     expect(assignment).to be_category_mode_auto
   end
+
+  it "defaults connection mode to direct" do
+    assignment = described_class.create!(arr_app:, indexer:)
+
+    expect(assignment.connection_mode).to eq("direct")
+    expect(assignment).to be_connection_mode_direct
+  end
+
+  it "allows bridged connection mode" do
+    assignment = described_class.create!(arr_app:, indexer:, connection_mode: "bridged")
+
+    expect(assignment).to be_connection_mode_bridged
+  end
 end

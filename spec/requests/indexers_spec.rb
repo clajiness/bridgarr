@@ -161,6 +161,8 @@ RSpec.describe "Indexers", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Main Sonarr")
     expect(response.body).to include("App assignments")
+    expect(response.body).to include("Connection")
+    expect(response.body).to include("Direct")
     expect(response.body).to include("Sync")
   end
 

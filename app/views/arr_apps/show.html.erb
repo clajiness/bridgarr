@@ -32,6 +32,7 @@
           <tr>
             <th class="px-4 py-3">Indexer</th>
             <th class="px-4 py-3">Jackett ID</th>
+            <th class="px-4 py-3">Connection</th>
             <th class="px-4 py-3">Remote ID</th>
             <th class="px-4 py-3">Sync status</th>
             <th class="px-4 py-3 text-right">Actions</th>
@@ -42,6 +43,11 @@
             <tr>
               <td class="px-4 py-3 font-medium text-slate-950"><%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %></td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.indexer.jackett_id %></td>
+              <td class="px-4 py-3">
+                <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment_connection_mode_classes(assignment)) %>">
+                  <%= assignment.connection_mode.titleize %>
+                </span>
+              </td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.remote_indexer_id.presence || "None" %></td>
               <td class="px-4 py-3">
                 <% if assignment.last_status.present? %>

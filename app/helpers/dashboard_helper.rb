@@ -18,7 +18,7 @@ module DashboardHelper
   end
 
   def dashboard_readiness_summary(readiness)
-    return "Bridgarr is ready to manage and proxy indexers." if readiness.complete?
+    return "Bridgarr is ready to manage indexers." if readiness.complete?
 
     "#{pluralize(readiness.remaining_count, "setup step")} remaining."
   end

@@ -21,4 +21,10 @@ module ApplicationHelper
 
     "Pending sync"
   end
+
+  def assignment_connection_mode_classes(assignment)
+    return "border-amber-200 bg-amber-50 text-amber-900" if assignment.connection_mode_bridged?
+
+    "border-stone-200 bg-stone-50 text-slate-700"
+  end
 end

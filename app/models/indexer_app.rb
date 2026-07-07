@@ -1,13 +1,15 @@
 class IndexerApp < ApplicationRecord
+  CONNECTION_MODES = %w[ direct bridged ].freeze
   CATEGORY_MODES = %w[ auto custom none ].freeze
 
   belongs_to :indexer
   belongs_to :arr_app
   has_many :sync_run_items, dependent: :nullify
 
-  before_validation :normalize_category_settings
+  before_validation :normalize_settings
 
   validates :indexer_id, uniqueness: { scope: :arr_app_id }
+  validates :connection_mode, inclusion: { in: CONNECTION_MODES }
   validates :category_mode, inclusion: { in: CATEGORY_MODES }
   validate :custom_categories_are_category_id_list
   validate :custom_categories_are_present_for_custom_mode
@@ -29,6 +31,14 @@ class IndexerApp < ApplicationRecord
     custom_category_ids.any?
   end
 
+  def connection_mode_direct?
+    connection_mode == "direct"
+  end
+
+  def connection_mode_bridged?
+    connection_mode == "bridged"
+  end
+
   def category_mode_auto?
     category_mode == "auto"
   end
@@ -43,7 +53,8 @@ class IndexerApp < ApplicationRecord
 
   private
 
-    def normalize_category_settings
+    def normalize_settings
+      self.connection_mode = connection_mode.presence || "direct"
       self.category_mode = category_mode.presence || "auto"
 
       raw_categories = custom_categories.to_s.strip

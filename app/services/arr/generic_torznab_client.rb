@@ -22,6 +22,7 @@ module Arr
       jackett_api_key:,
       jackett_id:,
       remote_indexer_id: nil,
+      connection_mode: "direct",
       category_mode: "auto",
       custom_category_ids: nil,
       connection: nil,
@@ -34,6 +35,7 @@ module Arr
       @jackett_api_key = jackett_api_key.to_s.strip
       @jackett_id = jackett_id
       @remote_indexer_id = remote_indexer_id
+      @connection_mode = connection_mode.to_s.presence || "direct"
       @category_mode = category_mode.presence || "auto"
       @custom_category_ids = Array(custom_category_ids).map(&:to_i).select(&:positive?).uniq
       @connection = connection
@@ -41,16 +43,16 @@ module Arr
     end
 
     def call
-      return failure("Bridgarr URL is missing.") if bridgarr_base_url.blank?
+      return failure("Bridgarr URL is missing.") if connection_mode_bridged? && bridgarr_base_url.blank?
       return failure("Jackett URL is missing.") if jackett_base_url.blank?
       return failure("Jackett API key is missing.") if jackett_api_key.blank?
 
       if (remote_indexer = find_indexer_by_id)
-        return success(remote_indexer.fetch("id"), nil, "Generic Torznab indexer is already synced.")
+        return sync_existing_indexer(remote_indexer, already_synced_message)
       end
 
       if (managed_indexer = find_indexer_by_name)
-        return success(managed_indexer.fetch("id"), nil, "Generic Torznab indexer already exists.")
+        return sync_existing_indexer(managed_indexer, already_exists_message)
       end
 
       compatibility_error = category_compatibility_error
@@ -88,6 +90,7 @@ module Arr
         :jackett_api_key,
         :jackett_id,
         :remote_indexer_id,
+        :connection_mode,
         :category_mode,
         :custom_category_ids,
         :connection,
@@ -124,11 +127,11 @@ module Arr
       def field_value(field)
         case field["name"]
         when "baseUrl"
-          "#{bridgarr_base_url}/torznab/#{jackett_id}"
+          torznab_base_url
         when "apiPath"
           "/api"
         when "apiKey"
-          PROXY_API_KEY
+          torznab_api_key
         when "categories"
           category_field_value(field)
         when "animeCategories"
@@ -196,6 +199,75 @@ module Arr
         %w[ custom none ].include?(category_mode)
       end
 
+      def torznab_base_url
+        if connection_mode_bridged?
+          "#{bridgarr_base_url}/torznab/#{jackett_id}"
+        else
+          "#{jackett_base_url}/api/v2.0/indexers/#{jackett_id}/results/torznab"
+        end
+      end
+
+      def torznab_api_key
+        connection_mode_bridged? ? PROXY_API_KEY : jackett_api_key
+      end
+
+      def connection_mode_bridged?
+        connection_mode == "bridged"
+      end
+
+      def sync_existing_indexer(remote_indexer, message)
+        return success(remote_indexer.fetch("id"), nil, message) unless remote_indexer_configurable?(remote_indexer)
+        return success(remote_indexer.fetch("id"), nil, message) if remote_indexer_matches?(remote_indexer)
+
+        response = update_indexer(remote_indexer)
+        return http_failure(response, "update Generic Torznab indexer") unless response.success?
+
+        body = parse_response_body(response.body)
+        success(body["id"] || remote_indexer.fetch("id"), response.status, "Generic Torznab indexer updated.")
+      end
+
+      def remote_indexer_configurable?(remote_indexer)
+        remote_indexer["fields"].is_a?(Array)
+      end
+
+      def remote_indexer_matches?(remote_indexer)
+        fields = remote_indexer.fetch("fields").index_by { |field| field.fetch("name") }
+
+        fields.dig("baseUrl", "value") == torznab_base_url &&
+          fields.dig("apiPath", "value") == "/api" &&
+          fields.dig("apiKey", "value") == torznab_api_key &&
+          category_matches?(fields["categories"]) &&
+          category_matches?(fields["animeCategories"], anime: true)
+      end
+
+      def category_matches?(field, anime: false)
+        return true unless field
+
+        expected = anime ? anime_category_field_value(field) : category_field_value(field)
+        category_values(field["value"]) == category_values(expected)
+      end
+
+      def category_values(value)
+        Array(value).map(&:to_i).select(&:positive?).uniq.sort
+      end
+
+      def updated_indexer_payload(remote_indexer)
+        remote_indexer.deep_dup.tap do |payload|
+          payload["name"] = name
+          payload["enableRss"] = true
+          payload["enableAutomaticSearch"] = true
+          payload["enableInteractiveSearch"] = true
+          payload["fields"] = fields_with_jackett_settings(payload["fields"])
+        end
+      end
+
+      def update_indexer(remote_indexer)
+        http.put("#{INDEXER_PATH}/#{remote_indexer.fetch("id")}") do |request|
+          request.headers["Content-Type"] = "application/json"
+          request.body = JSON.generate(updated_indexer_payload(remote_indexer))
+        end
+      end
+
       def post_indexer(payload)
         http.post(INDEXER_PATH) do |request|
           request.headers["Content-Type"] = "application/json"
@@ -241,6 +313,14 @@ module Arr
         Result.new(success?: true, skipped?: false, remote_indexer_id:, message:, error: nil, http_status:)
       end
 
+      def already_synced_message
+        "Generic Torznab indexer is already synced."
+      end
+
+      def already_exists_message
+        "Generic Torznab indexer already exists."
+      end
+
       def skipped(message)
         Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, http_status: nil)
       end
@@ -265,6 +345,13 @@ module Arr
         validation_messages(parsed).presence
       rescue JSON::ParserError
         text.truncate(300)
+      end
+
+      def parse_response_body(body)
+        text = body.to_s.strip
+        return {} if text.blank?
+
+        JSON.parse(text)
       end
 
       def validation_messages(parsed)

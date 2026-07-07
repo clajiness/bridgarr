@@ -23,6 +23,7 @@ RSpec.describe "Indexer app assignments", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Assignment settings")
+    expect(response.body).to include("Connection mode")
     expect(response.body).to include("Category mode")
     expect(response.body).to include("LimeTorrents")
     expect(response.body).to include("Main Radarr")
@@ -31,6 +32,7 @@ RSpec.describe "Indexer app assignments", type: :request do
   it "updates assignment category settings" do
     patch indexer_app_path(assignment), params: {
       indexer_app: {
+        connection_mode: "bridged",
         category_mode: "custom",
         custom_categories: "2000, 8000"
       }
@@ -38,6 +40,7 @@ RSpec.describe "Indexer app assignments", type: :request do
 
     expect(response).to redirect_to(indexer_path(indexer))
     expect(flash[:notice]).to eq("Assignment settings saved.")
+    expect(assignment.reload.connection_mode).to eq("bridged")
     expect(assignment.reload.category_mode).to eq("custom")
     expect(assignment.custom_categories).to eq("2000,8000")
   end

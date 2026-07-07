@@ -4,14 +4,14 @@ module Dashboard
 
     def items
       @items ||= [
-        bridgarr_url_item,
         jackett_settings_item,
         jackett_test_item,
         app_item,
         indexer_item,
         assignment_item,
+        bridgarr_url_item,
         sync_item
-      ]
+      ].compact
     end
 
     def complete?
@@ -25,10 +25,12 @@ module Dashboard
     private
 
       def bridgarr_url_item
+        return unless bridged_assignments.exists?
+
         Item.new(
           key: :settings,
           label: "Bridgarr URL",
-          description: "Set the URL apps use to reach Bridgarr.",
+          description: "Set the URL apps use when assignments run in bridged mode.",
           complete: Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY).present?,
           action_label: "Open settings"
         )
@@ -97,6 +99,10 @@ module Dashboard
       def active_assignments
         IndexerApp.joins(:indexer, :arr_app)
           .where(indexers: { enabled: true }, arr_apps: { enabled: true })
+      end
+
+      def bridged_assignments
+        active_assignments.where(connection_mode: "bridged")
       end
 
       def blocking_assignments

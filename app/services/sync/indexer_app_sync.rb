@@ -25,6 +25,7 @@ module Sync
         jackett_api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
         jackett_id: indexer.jackett_id,
         remote_indexer_id: indexer_app.remote_indexer_id,
+        connection_mode: indexer_app.connection_mode,
         category_mode: indexer_app.category_mode,
         custom_category_ids: indexer_app.custom_category_ids
       )
