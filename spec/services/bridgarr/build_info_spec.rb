@@ -52,7 +52,7 @@ RSpec.describe Bridgarr::BuildInfo do
   end
 
   def preserve_env(*keys)
-    original = keys.to_h { |key| [key, ENV[key]] }
+    original = keys.to_h { |key| [ key, ENV[key] ] }
     yield
   ensure
     original.each do |key, value|
