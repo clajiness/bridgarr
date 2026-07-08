@@ -1,12 +1,17 @@
 class SyncRunItem < ApplicationRecord
-  STATUSES = %w[queued running succeeded failed skipped].freeze
+  ACTIVE_STATUSES = %w[queued running retrying].freeze
+  TERMINAL_STATUSES = %w[succeeded failed skipped].freeze
+  STATUSES = (ACTIVE_STATUSES + TERMINAL_STATUSES).freeze
 
   belongs_to :sync_run
   belongs_to :indexer_app, optional: true
 
   validates :status, inclusion: { in: STATUSES }
+  validates :attempt_count, numericality: { greater_than_or_equal_to: 0 }
+  validates :max_attempts, numericality: { greater_than: 0 }
 
   scope :ordered, -> { order(:indexer_name, :arr_app_name, :id) }
+  scope :active, -> { where(status: ACTIVE_STATUSES) }
 
   after_update_commit -> { broadcast_replace_later_to sync_run }
 
@@ -34,6 +39,18 @@ class SyncRunItem < ApplicationRecord
     status == "running"
   end
 
+  def retrying?
+    status == "retrying"
+  end
+
+  def active?
+    ACTIVE_STATUSES.include?(status)
+  end
+
+  def terminal?
+    TERMINAL_STATUSES.include?(status)
+  end
+
   def succeeded?
     status == "succeeded"
   end
@@ -47,7 +64,19 @@ class SyncRunItem < ApplicationRecord
   end
 
   def mark_running!
-    update!(status: "running", started_at: Time.current, error: nil, error_kind: nil, retryable: false)
+    now = Time.current
+
+    update!(
+      status: "running",
+      started_at: started_at || now,
+      last_attempt_at: now,
+      next_retry_at: nil,
+      attempt_count: attempt_count + 1,
+      finished_at: nil,
+      error: nil,
+      error_kind: nil,
+      retryable: false
+    )
   end
 
   def record_result!(result, finished_at: Time.current)
@@ -59,7 +88,19 @@ class SyncRunItem < ApplicationRecord
       finished_at:,
       error: sanitized_error,
       error_kind: classification&.kind,
-      retryable: classification&.retryable? || false
+      retryable: classification&.retryable? || false,
+      next_retry_at: nil
+    )
+  end
+
+  def record_retry!(error:, classification:, next_retry_at:)
+    update!(
+      status: "retrying",
+      finished_at: nil,
+      error: Secrets::Redactor.call(error),
+      error_kind: classification.kind,
+      retryable: true,
+      next_retry_at:
     )
   end
 

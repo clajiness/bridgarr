@@ -1,6 +1,6 @@
 class SyncRun < ApplicationRecord
   STATUSES = %w[queued running succeeded failed partial skipped].freeze
-  MODES = %w[bulk].freeze
+  MODES = %w[bulk assignment].freeze
 
   has_many :sync_run_items, dependent: :destroy
 
@@ -35,7 +35,7 @@ class SyncRun < ApplicationRecord
     successes = items.where(status: "succeeded").count
     failures = items.where(status: "failed").count
     skipped = items.where(status: "skipped").count
-    unfinished = items.where(status: %w[queued running]).exists?
+    unfinished = items.active.exists?
 
     attributes = {
       total_count: total,
@@ -60,14 +60,15 @@ class SyncRun < ApplicationRecord
     sanitized_message = Secrets::Redactor.call(message)
 
     transaction do
-      sync_run_items.where(status: %w[queued running]).find_each do |item|
+      sync_run_items.active.find_each do |item|
         classification = Sync::ErrorClassifier.call(sanitized_message)
         item.update!(
           status: "failed",
           finished_at: Time.current,
           error: sanitized_message,
           error_kind: classification.kind,
-          retryable: classification.retryable?
+          retryable: classification.retryable?,
+          next_retry_at: nil
         )
       end
 

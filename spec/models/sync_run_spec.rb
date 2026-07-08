@@ -100,6 +100,54 @@ RSpec.describe SyncRun, type: :model do
     )
   end
 
+  it "stays active while an item is waiting for a retry" do
+    sync_run = described_class.create!(status: "running", started_at: Time.current)
+    retrying_item = create_sync_run_item(sync_run:)
+
+    retrying_item.update!(
+      status: "retrying",
+      next_retry_at: 30.seconds.from_now,
+      attempt_count: 1,
+      error: "Indexer validation timed out.",
+      error_kind: "timeout",
+      retryable: true
+    )
+
+    sync_run.refresh_status!
+
+    expect(sync_run).to have_attributes(
+      status: "running",
+      total_count: 1,
+      success_count: 0,
+      failure_count: 0,
+      skipped_count: 0,
+      finished_at: nil
+    )
+  end
+
+  it "abandons retrying items and clears their scheduled retry metadata" do
+    sync_run = described_class.create!(status: "running", started_at: Time.current)
+    retrying_item = create_sync_run_item(sync_run:)
+    retrying_item.update!(
+      status: "retrying",
+      next_retry_at: 30.seconds.from_now,
+      attempt_count: 1,
+      error: "Indexer validation timed out.",
+      error_kind: "timeout",
+      retryable: true
+    )
+
+    sync_run.abandon!(message: "No worker was running.")
+
+    expect(retrying_item.reload).to have_attributes(
+      status: "failed",
+      error: "No worker was running.",
+      retryable: false,
+      next_retry_at: nil
+    )
+    expect(sync_run.reload).to have_attributes(status: "failed", failure_count: 1)
+  end
+
   def create_sync_run_item(sync_run:)
     arr_app = ArrApp.create!(name: "Sonarr #{SecureRandom.hex(4)}", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
     indexer = Indexer.create!(name: "Indexer #{SecureRandom.hex(4)}", jackett_id: SecureRandom.hex(8))

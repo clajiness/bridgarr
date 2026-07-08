@@ -13,13 +13,10 @@ class IndexerAppsController < ApplicationController
   end
 
   def sync
-    result = Sync::IndexerAppSync.call(indexer_app: @indexer_app)
+    result = Sync::AssignmentSync.call(indexer_app: @indexer_app)
+    notice = result.created? ? "Assignment sync queued." : "Assignment sync is already queued."
 
-    if result.success?
-      redirect_to indexer_app_redirect_path(@indexer_app), notice: result.message
-    else
-      redirect_to indexer_app_redirect_path(@indexer_app), alert: result.message
-    end
+    redirect_to sync_run_path(result.sync_run), notice:
   end
 
   private

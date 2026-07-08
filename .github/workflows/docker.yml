@@ -50,6 +50,10 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
+      - name: Capture build date
+        id: build_date
+        run: echo "value=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -58,5 +62,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BRIDGARR_VERSION=${{ steps.meta.outputs.version }}
+            BRIDGARR_COMMIT_SHA=${{ github.sha }}
+            BRIDGARR_BUILD_DATE=${{ steps.build_date.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -17,15 +17,25 @@
     <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(sync_run_item.status)) %>">
       <%= sync_run_status_label(sync_run_item.status) %>
     </span>
+    <% if sync_run_item.attempt_count.positive? %>
+      <p class="mt-1 text-xs leading-5 text-slate-500">Attempt <%= sync_run_item.attempt_count %> of <%= sync_run_item.max_attempts %></p>
+    <% end %>
   </td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.started_at.present? ? format_server_timestamp(sync_run_item.started_at) : "Not started" %></td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.finished_at.present? ? format_server_timestamp(sync_run_item.finished_at) : "Not finished" %></td>
-  <td class="<%= class_names("max-w-xl px-4 py-3 align-top", sync_run_item.failed? ? "text-red-800" : "text-slate-700") %>">
+  <td class="<%= class_names("min-w-0 px-4 py-3 align-top", sync_run_item.failed? ? "text-red-800" : "text-slate-700") %>">
     <% if sync_run_item.error.present? %>
       <% if sync_run_item.error_kind.present? %>
         <p class="mb-1 text-xs font-semibold uppercase tracking-normal text-slate-500"><%= sync_error_kind_label(sync_run_item.error_kind) %></p>
       <% end %>
-      <p class="whitespace-pre-wrap break-words text-sm leading-6"><%= sync_run_item.error %></p>
+      <p class="text-sm leading-6 [overflow-wrap:anywhere]"><%= sync_error_summary(sync_run_item) %></p>
+      <% if sync_run_item.retrying? && sync_run_item.next_retry_at.present? %>
+        <p class="mt-1 text-xs leading-5 text-blue-700">Retry scheduled for <%= format_server_timestamp(sync_run_item.next_retry_at) %>.</p>
+      <% end %>
+      <details class="mt-2">
+        <summary class="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-950">Show technical details</summary>
+        <p class="mt-2 max-h-40 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-stone-50 p-3 font-mono text-xs leading-5 text-slate-700 [overflow-wrap:anywhere]"><%= sync_run_item.error %></p>
+      </details>
     <% else %>
       None
     <% end %>

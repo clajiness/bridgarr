@@ -93,4 +93,37 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).to include("Timeout")
     expect(response.body).not_to include("super-secret-key")
   end
+
+  it "renders retrying items with wrapped sanitized technical details" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(mode: "assignment", status: "running", total_count: 1, started_at: Time.current)
+    sync_run.sync_run_items.create!(
+      indexer_app:,
+      indexer_name: "1337x",
+      arr_app_name: "Sonarr",
+      status: "retrying",
+      attempt_count: 1,
+      max_attempts: 2,
+      next_retry_at: 30.seconds.from_now,
+      error: "GET http://localhost:9117/api?t=tvsearch&cat=5000,5030,5040&apikey=[REDACTED] timed out while solving the challenge",
+      error_kind: "challenge_solver_timeout",
+      retryable: true
+    )
+
+    get sync_run_path(sync_run)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Assignment sync")
+    expect(response.body).to include("Retrying")
+    expect(response.body).to include("Attempt 1 of 2")
+    expect(response.body).to include("Retry scheduled for")
+    expect(response.body).to include("The anti-bot challenge solver could not complete")
+    expect(response.body).to include("Show technical details")
+    expect(response.body).to include("apikey=[REDACTED]")
+    expect(response.body).not_to include("super-secret-key")
+    expect(response.body).to include("table-fixed")
+    expect(response.body).to include("[overflow-wrap:anywhere]")
+  end
 end
