@@ -27,4 +27,10 @@ module ApplicationHelper
 
     "border-stone-200 bg-stone-50 text-slate-700"
   end
+
+  def assignment_error_summary(assignment)
+    return nil if assignment.last_error.blank?
+
+    Sync::ErrorClassifier.call(assignment.last_error, skipped: assignment.last_status == "skipped").summary
+  end
 end

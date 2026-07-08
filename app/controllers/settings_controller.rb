@@ -35,6 +35,7 @@ class SettingsController < ApplicationController
       @jackett_last_status = Setting.fetch_value(Setting::JACKETT_LAST_STATUS_KEY)
       @jackett_last_error = Setting.fetch_value(Setting::JACKETT_LAST_ERROR_KEY)
       @jackett_last_tested_at = Setting.fetch_value(Setting::JACKETT_LAST_TESTED_AT_KEY)
+      @build_info = Bridgarr::BuildInfo.current
     end
 
     def settings_params

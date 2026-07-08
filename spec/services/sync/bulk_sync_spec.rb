@@ -53,6 +53,20 @@ RSpec.describe Sync::BulkSync do
     expect(events).to eq(%i[transaction_finished coordinator_enqueued])
   end
 
+  it "does not create duplicate active work for assignments already syncing elsewhere" do
+    busy_assignment = create_assignment(indexer_name: "1337x", arr_app_name: "Sonarr")
+    available_assignment = create_assignment(indexer_name: "EZTV", arr_app_name: "Sonarr 4K")
+    existing_sync_run = SyncRun.create!(mode: "assignment", status: "running", total_count: 1)
+    existing_sync_run.sync_run_items.create!(indexer_app: busy_assignment, status: "running")
+
+    sync_run = described_class.call
+
+    expect(sync_run.sync_run_items.pluck(:indexer_app_id)).to contain_exactly(available_assignment.id)
+    expect(sync_run.total_count).to eq(1)
+    expect(busy_assignment.sync_run_items.active.count).to eq(1)
+    expect(Sync::BulkSyncJob).to have_been_enqueued.with(sync_run.id)
+  end
+
   def create_assignment(indexer_name:, arr_app_name:, indexer_enabled: true, assignment_enabled: true)
     arr_app = ArrApp.create!(
       name: arr_app_name,

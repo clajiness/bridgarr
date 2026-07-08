@@ -205,36 +205,28 @@ RSpec.describe "Indexers", type: :request do
   it "syncs one app assignment" do
     indexer
     assignment = indexer.indexer_apps.first
-    result = Sync::IndexerAppSync::Result.new(
-      success?: true,
-      remote_indexer_id: 42,
-      message: "First Indexer synced to Main Sonarr.",
-      error: nil
-    )
-    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+    sync_run = SyncRun.create!(mode: "assignment", total_count: 1)
+    result = Sync::AssignmentSync::Result.new(sync_run:, created?: true)
+    allow(Sync::AssignmentSync).to receive(:call).and_return(result)
 
     post sync_indexer_app_path(assignment)
 
-    expect(response).to redirect_to(indexer_path(indexer))
-    expect(Sync::IndexerAppSync).to have_received(:call).with(indexer_app: assignment)
-    expect(flash[:notice]).to eq("First Indexer synced to Main Sonarr.")
+    expect(response).to redirect_to(sync_run_path(sync_run))
+    expect(Sync::AssignmentSync).to have_received(:call).with(indexer_app: assignment)
+    expect(flash[:notice]).to eq("Assignment sync queued.")
   end
 
-  it "shows sync failures" do
+  it "reuses an active assignment sync run" do
     indexer
     assignment = indexer.indexer_apps.first
-    result = Sync::IndexerAppSync::Result.new(
-      success?: false,
-      remote_indexer_id: nil,
-      message: "Jackett URL is missing.",
-      error: "Jackett URL is missing."
-    )
-    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+    sync_run = SyncRun.create!(mode: "assignment", status: "running", total_count: 1)
+    result = Sync::AssignmentSync::Result.new(sync_run:, created?: false)
+    allow(Sync::AssignmentSync).to receive(:call).and_return(result)
 
     post sync_indexer_app_path(assignment)
 
-    expect(response).to redirect_to(indexer_path(indexer))
-    expect(flash[:alert]).to eq("Jackett URL is missing.")
+    expect(response).to redirect_to(sync_run_path(sync_run))
+    expect(flash[:notice]).to eq("Assignment sync is already queued.")
   end
 
   it "renders the edit indexer page" do

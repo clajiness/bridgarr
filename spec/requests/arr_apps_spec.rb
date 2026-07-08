@@ -91,18 +91,14 @@ RSpec.describe "Arr apps", type: :request do
   it "syncs an indexer assignment from the app page" do
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
     assignment = IndexerApp.create!(arr_app:, indexer:)
-    result = Sync::IndexerAppSync::Result.new(
-      success?: true,
-      remote_indexer_id: 42,
-      message: "EZTV synced to Main Sonarr.",
-      error: nil
-    )
-    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+    sync_run = SyncRun.create!(mode: "assignment", total_count: 1)
+    result = Sync::AssignmentSync::Result.new(sync_run:, created?: true)
+    allow(Sync::AssignmentSync).to receive(:call).and_return(result)
 
     post sync_indexer_app_path(assignment), params: { return_to: "arr_app" }
 
-    expect(response).to redirect_to(arr_app_path(arr_app))
-    expect(flash[:notice]).to eq("EZTV synced to Main Sonarr.")
+    expect(response).to redirect_to(sync_run_path(sync_run))
+    expect(flash[:notice]).to eq("Assignment sync queued.")
   end
 
   it "tests an app connection" do

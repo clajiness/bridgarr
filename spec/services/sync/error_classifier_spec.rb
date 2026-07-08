@@ -28,4 +28,12 @@ RSpec.describe Sync::ErrorClassifier do
     expect(result.kind).to eq("authentication")
     expect(result).not_to be_retryable
   end
+
+  it "classifies challenge solver timeouts as retryable" do
+    result = described_class.call("FlareSolverr was unable to process the request. Error solving the challenge. Timeout after 55.0 seconds.")
+
+    expect(result.kind).to eq("challenge_solver_timeout")
+    expect(result.summary).to eq("The anti-bot challenge solver could not complete the indexer request before the validation timeout.")
+    expect(result).to be_retryable
+  end
 end

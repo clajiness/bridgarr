@@ -27,19 +27,20 @@
     </div>
 
     <% if @arr_app.indexer_apps.any? %>
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
           <tr>
-            <th class="px-4 py-3">Indexer</th>
-            <th class="px-4 py-3">Jackett ID</th>
-            <th class="px-4 py-3">Connection</th>
-            <th class="px-4 py-3">Remote ID</th>
+            <th class="w-1/6 px-4 py-3">Indexer</th>
+            <th class="w-1/6 px-4 py-3">Jackett ID</th>
+            <th class="w-28 px-4 py-3">Connection</th>
+            <th class="w-24 px-4 py-3">Remote ID</th>
             <th class="px-4 py-3">Sync status</th>
-            <th class="px-4 py-3 text-right">Actions</th>
+            <th class="w-44 px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
           <% @arr_app.indexer_apps.includes(:indexer).order("indexers.name").each do |assignment| %>
+            <% active_sync_run_item = assignment.active_sync_run_item %>
             <tr>
               <td class="px-4 py-3 font-medium text-slate-950"><%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %></td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.indexer.jackett_id %></td>
@@ -49,9 +50,9 @@
                 </span>
               </td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.remote_indexer_id.presence || "None" %></td>
-              <td class="px-4 py-3">
+              <td class="min-w-0 px-4 py-3">
                 <% if assignment.last_status.present? %>
-                  <div class="min-w-40 space-y-2">
+                  <div class="min-w-0 space-y-2">
                     <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment_status_classes(assignment)) %>">
                       <%= assignment_status_label(assignment) %>
                     </span>
@@ -59,7 +60,11 @@
                       <p class="text-xs leading-5 text-slate-500"><%= format_server_timestamp(assignment.last_synced_at) %></p>
                     <% end %>
                     <% if assignment.last_error.present? %>
-                      <p class="<%= class_names("text-xs leading-5", assignment.last_status == "error" ? "text-red-800" : "text-slate-500") %>"><%= assignment.last_error %></p>
+                      <p class="<%= class_names("text-xs leading-5 [overflow-wrap:anywhere]", assignment.last_status == "error" ? "text-red-800" : "text-slate-500") %>"><%= assignment_error_summary(assignment) %></p>
+                      <details>
+                        <summary class="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-950">Show technical details</summary>
+                        <p class="mt-2 max-h-32 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-stone-50 p-2 font-mono text-xs leading-5 text-slate-700 [overflow-wrap:anywhere]"><%= assignment.last_error %></p>
+                      </details>
                     <% end %>
                   </div>
                 <% else %>
@@ -69,7 +74,11 @@
               <td class="px-4 py-3 text-right">
                 <div class="flex flex-wrap justify-end gap-2">
                   <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "arr_app"), class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
-                  <%= button_to "Sync", sync_indexer_app_path(assignment), params: { return_to: "arr_app" }, class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
+                  <% if active_sync_run_item.present? %>
+                    <%= link_to "View sync", sync_run_path(active_sync_run_item.sync_run), class: "inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100" %>
+                  <% else %>
+                    <%= button_to "Sync", sync_indexer_app_path(assignment), params: { return_to: "arr_app" }, class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
+                  <% end %>
                 </div>
               </td>
             </tr>

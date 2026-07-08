@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_07_143000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_07_170000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
@@ -80,12 +80,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_07_143000) do
 
   create_table "sync_run_items", force: :cascade do |t|
     t.string "arr_app_name"
+    t.integer "attempt_count", default: 0, null: false
     t.datetime "created_at", null: false
     t.text "error"
     t.string "error_kind"
     t.datetime "finished_at"
     t.integer "indexer_app_id"
     t.string "indexer_name"
+    t.datetime "last_attempt_at"
+    t.integer "max_attempts", default: 2, null: false
+    t.datetime "next_retry_at"
     t.boolean "retryable", default: false, null: false
     t.datetime "started_at"
     t.string "status", default: "queued", null: false
@@ -93,6 +97,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_07_143000) do
     t.datetime "updated_at", null: false
     t.index ["indexer_app_id", "created_at"], name: "index_sync_run_items_on_indexer_app_id_and_created_at"
     t.index ["indexer_app_id"], name: "index_sync_run_items_on_indexer_app_id"
+    t.index ["status", "next_retry_at"], name: "index_sync_run_items_on_status_and_next_retry_at"
     t.index ["sync_run_id", "status"], name: "index_sync_run_items_on_sync_run_id_and_status"
     t.index ["sync_run_id"], name: "index_sync_run_items_on_sync_run_id"
   end

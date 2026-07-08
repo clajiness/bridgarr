@@ -17,6 +17,8 @@ module Sync
           "incompatible_categories"
         elsif authentication?
           "authentication"
+        elsif challenge_solver_timeout?
+          "challenge_solver_timeout"
         elsif timeout?
           "timeout"
         elsif unavailable?
@@ -48,6 +50,12 @@ module Sync
         message.match?(/\b(401|403)\b|unauthorized|forbidden|authentication|invalid api key|api key is invalid/i)
       end
 
+      def challenge_solver_timeout?
+        return false unless message.match?(/flaresolverr|byparr|anti-bot|cloudflare|challenge/i)
+
+        message.match?(/timeout|timed out|unable to process|error solving|challenge/i)
+      end
+
       def timeout?
         message.match?(/timeout|timed out|Net::ReadTimeout|execution expired/i)
       end
@@ -73,11 +81,13 @@ module Sync
       end
 
       def retryable?(kind)
-        %w[timeout unavailable network].include?(kind)
+        %w[challenge_solver_timeout timeout unavailable network].include?(kind)
       end
 
       def summary_for(kind)
         case kind
+        when "challenge_solver_timeout"
+          "The anti-bot challenge solver could not complete the indexer request before the validation timeout."
         when "timeout"
           "Indexer validation timed out. The upstream indexer may be slow or unavailable."
         when "unavailable"

@@ -1,12 +1,32 @@
 require "rails_helper"
 
 RSpec.describe "Settings", type: :request do
+  around do |example|
+    preserve_env("BRIDGARR_VERSION", "BRIDGARR_COMMIT_SHA", "BRIDGARR_BUILD_DATE") do
+      example.run
+    end
+  end
+
   it "renders the settings page" do
     get settings_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Bridgarr URL")
     expect(response.body).to include("Jackett URL")
+    expect(response.body).to include("Build info")
+  end
+
+  it "renders injected build identity" do
+    ENV["BRIDGARR_VERSION"] = "0.2.0"
+    ENV["BRIDGARR_COMMIT_SHA"] = "abcdef1234567890"
+    ENV["BRIDGARR_BUILD_DATE"] = "2026-07-07T12:34:56Z"
+
+    get settings_path
+
+    expect(response.body).to include("0.2.0")
+    expect(response.body).to include("abcdef123456")
+    expect(response.body).to include("2026-07-07T12:34:56Z")
+    expect(response.body).not_to include("7890</dd>")
   end
 
   it "updates connection settings" do
@@ -55,5 +75,14 @@ RSpec.describe "Settings", type: :request do
 
     expect(response.body).to include("Connected")
     expect(response.body).to include(Time.iso8601("2026-07-04T12:00:00Z").localtime.strftime("%Y-%m-%d %H:%M:%S %Z"))
+  end
+
+  def preserve_env(*keys)
+    original = keys.to_h { |key| [ key, ENV[key] ] }
+    yield
+  ensure
+    original.each do |key, value|
+      value.nil? ? ENV.delete(key) : ENV[key] = value
+    end
   end
 end
