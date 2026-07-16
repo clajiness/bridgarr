@@ -65,6 +65,7 @@ RSpec.describe Jackett::TorznabCaps do
 
     expect(result).not_to be_success
     expect(result.message).to eq("Jackett responded, but Bridgarr could not read the Torznab caps.")
+    expect(result.http_status).to eq(200)
   end
 
   it "fails when Jackett returns an unsuccessful response" do

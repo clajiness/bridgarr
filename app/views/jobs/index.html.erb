@@ -1,0 +1,166 @@
+<% content_for :title, "Jobs" %>
+
+<div class="space-y-8">
+  <div>
+    <h1 class="text-3xl font-semibold text-slate-950">Jobs</h1>
+    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+      Read-only Solid Queue activity, recurring schedules, recent run times, and worker heartbeats.
+    </p>
+  </div>
+
+  <% unless @queue_dashboard.available? %>
+    <section class="rounded-md border border-red-200 bg-red-50 px-5 py-4">
+      <h2 class="text-sm font-semibold text-red-900">Queue information unavailable</h2>
+      <p class="mt-1 text-sm leading-6 text-red-800"><%= @queue_dashboard.error %></p>
+    </section>
+  <% else %>
+    <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">Active workers</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-950"><%= @queue_dashboard.active_worker_count %></p>
+      </div>
+      <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">Queued</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-950"><%= @queue_dashboard.queued_count %></p>
+      </div>
+      <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">Scheduled</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-950"><%= @queue_dashboard.scheduled_count %></p>
+      </div>
+      <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">Blocked</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-950"><%= @queue_dashboard.blocked_count %></p>
+      </div>
+      <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">Running</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-950"><%= @queue_dashboard.running_count %></p>
+      </div>
+      <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">Failed</p>
+        <p class="mt-3 text-2xl font-semibold text-slate-950"><%= @queue_dashboard.failed_count %></p>
+      </div>
+    </section>
+
+    <section class="space-y-4">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-950">Recurring schedules</h2>
+        <p class="mt-1 text-sm leading-6 text-slate-600">
+          Future times are calculated from each configured schedule. Past runs follow Solid Queue's existing finished-job retention window.
+        </p>
+      </div>
+
+      <% if @queue_dashboard.recurring_tasks.any? %>
+        <% @queue_dashboard.recurring_tasks.each do |task| %>
+          <article class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="font-semibold text-slate-950"><%= task.label %></h3>
+                  <span class="inline-flex rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"><%= task.registered ? "Registered" : "Configured" %></span>
+                </div>
+                <p class="mt-2 font-mono text-xs text-slate-600"><%= task.handler %></p>
+                <p class="mt-1 text-xs text-slate-500"><%= task.schedule %> · <%= task.queue_name %> queue</p>
+              </div>
+            </div>
+
+            <div class="grid gap-px bg-slate-200 lg:grid-cols-2">
+              <div class="bg-white px-5 py-4">
+                <h4 class="text-xs font-semibold uppercase text-slate-500">Future runs</h4>
+                <% if task.next_runs.any? %>
+                  <ol class="mt-3 space-y-2 text-sm text-slate-700">
+                    <% task.next_runs.each do |run_at| %>
+                      <li><%= format_server_timestamp(run_at) %></li>
+                    <% end %>
+                  </ol>
+                <% else %>
+                  <p class="mt-3 text-sm text-slate-500">No future times could be calculated.</p>
+                <% end %>
+              </div>
+
+              <div class="bg-white px-5 py-4">
+                <h4 class="text-xs font-semibold uppercase text-slate-500">Past runs</h4>
+                <% if task.past_runs.any? %>
+                  <div class="mt-3 overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                      <thead class="text-left text-xs font-semibold text-slate-500">
+                        <tr><th class="pb-2 pr-4">Run time</th><th class="pb-2 pr-4">Status</th><th class="pb-2">Finished</th></tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100">
+                        <% task.past_runs.each do |run| %>
+                          <tr>
+                            <td class="py-2 pr-4 whitespace-nowrap text-slate-700"><%= format_server_timestamp(run.run_at) %></td>
+                            <td class="py-2 pr-4"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= queue_job_status_classes(run.status) %>"><%= queue_job_status_label(run.status) %></span></td>
+                            <td class="py-2 whitespace-nowrap text-slate-500"><%= run.finished_at.present? ? format_server_timestamp(run.finished_at) : "—" %></td>
+                          </tr>
+                          <% if run.error.present? %><tr><td colspan="3" class="pb-2 text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= truncate(run.error, length: 180) %></td></tr><% end %>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% else %>
+                  <p class="mt-3 text-sm text-slate-500">No retained runs yet.</p>
+                <% end %>
+              </div>
+            </div>
+          </article>
+        <% end %>
+      <% else %>
+        <div class="rounded-md border border-stone-200 bg-white px-6 py-10 text-center shadow-sm">
+          <p class="text-sm font-medium text-slate-700">No recurring tasks are registered or configured for this environment.</p>
+        </div>
+      <% end %>
+    </section>
+
+    <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-5 py-4">
+        <h2 class="text-xl font-semibold text-slate-950">Recent jobs</h2>
+        <p class="mt-1 text-sm text-slate-600">The latest <%= QueueDashboard::Overview::RECENT_JOB_LIMIT %> retained jobs across all queues.</p>
+      </div>
+      <% if @queue_dashboard.recent_jobs.any? %>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-stone-100 text-left text-xs font-semibold uppercase text-slate-600">
+              <tr><th class="px-4 py-3">Job</th><th class="px-4 py-3">Queue</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Enqueued</th><th class="px-4 py-3">Scheduled for</th><th class="px-4 py-3">Finished</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <% @queue_dashboard.recent_jobs.each do |job| %>
+                <tr>
+                  <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= job.class_name %><span class="ml-1 text-slate-400">#<%= job.id %></span></td>
+                  <td class="px-4 py-3 text-slate-700"><%= job.queue_name %></td>
+                  <td class="px-4 py-3"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= queue_job_status_classes(job.status) %>"><%= queue_job_status_label(job.status) %></span></td>
+                  <td class="px-4 py-3 whitespace-nowrap text-slate-500"><%= format_server_timestamp(job.enqueued_at) %></td>
+                  <td class="px-4 py-3 whitespace-nowrap text-slate-500"><%= queue_job_scheduled_time(job) %></td>
+                  <td class="px-4 py-3 whitespace-nowrap text-slate-500"><%= job.finished_at.present? ? format_server_timestamp(job.finished_at) : "—" %></td>
+                </tr>
+                <% if job.error.present? %><tr><td colspan="6" class="px-4 pb-3 text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= truncate(job.error, length: 240) %></td></tr><% end %>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="px-6 py-10 text-center"><p class="text-sm font-medium text-slate-700">No retained jobs yet.</p></div>
+      <% end %>
+    </section>
+
+    <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-5 py-4">
+        <h2 class="text-xl font-semibold text-slate-950">Queue processes</h2>
+      </div>
+      <% if @queue_dashboard.processes.any? %>
+        <div class="divide-y divide-slate-200">
+          <% @queue_dashboard.processes.each do |process| %>
+            <div class="grid gap-2 px-5 py-4 sm:grid-cols-[1fr_auto]">
+              <div>
+                <p class="font-medium text-slate-950"><%= process.kind.titleize %> · <%= process.name %></p>
+                <p class="mt-1 text-xs text-slate-500"><%= process.hostname.presence || "Unknown host" %> · heartbeat <%= format_server_timestamp(process.last_heartbeat_at) %></p>
+              </div>
+              <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= process.active ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800" %>"><%= process.active ? "Active" : "Stale" %></span>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="px-6 py-10 text-center"><p class="text-sm font-medium text-slate-700">No queue processes are registered.</p></div>
+      <% end %>
+    </section>
+  <% end %>
+</div>

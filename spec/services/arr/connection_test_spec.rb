@@ -62,6 +62,7 @@ RSpec.describe Arr::ConnectionTest do
 
     expect(result).not_to be_success
     expect(result.message).to eq("The app responded, but Bridgarr could not read its status response.")
+    expect(result.http_status).to eq(200)
   end
 
   it "requires an app base URL" do

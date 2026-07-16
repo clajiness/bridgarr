@@ -17,6 +17,10 @@ module Dashboard
       @readiness ||= Readiness.new
     end
 
+    def external_services_health
+      @external_services_health ||= HealthChecks::Snapshot.new(now:)
+    end
+
     def arr_apps_count
       ArrApp.count
     end
@@ -114,7 +118,7 @@ module Dashboard
     end
 
     def attention_count
-      failed_assignments_count + unsynced_assignments_count + (latest_sync_run_needs_attention? ? 1 : 0)
+      failed_assignments_count + unsynced_assignments_count + external_services_health.attention_count + (latest_sync_run_needs_attention? ? 1 : 0)
     end
 
     def needs_attention?

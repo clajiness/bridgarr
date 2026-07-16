@@ -199,6 +199,24 @@ RSpec.describe "Arr apps", type: :request do
     expect(arr_app.last_error).to eq("App returned HTTP 401. Check the URL and API key.")
   end
 
+  it "redacts secrets from failed app connection flashes" do
+    arr_app
+    result = Arr::ConnectionTest::Result.new(
+      success?: false,
+      message: "GET /api?apikey=visible-secret Authorization: Bearer auth-secret failed",
+      error: "GET /api?apikey=visible-secret Authorization: Bearer auth-secret failed",
+      http_status: nil,
+      app_name: nil,
+      version: nil
+    )
+    allow(Arr::ConnectionTest).to receive(:call).and_return(result)
+
+    post test_connection_arr_app_path(arr_app)
+
+    expect(flash[:alert]).to include("apikey=[REDACTED]", "Bearer [REDACTED]")
+    expect(flash[:alert]).not_to include("visible-secret", "auth-secret")
+  end
+
   it "renders the edit app page" do
     arr_app
 

@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   root "dashboard#index"
   get "readiness", to: "dashboard#readiness", as: :readiness
+  post "health_checks", to: "dashboard#check_all", as: :health_checks
 
   resource :settings, only: %i[ show update ] do
     post :test_jackett
@@ -18,6 +19,7 @@ Rails.application.routes.draw do
     post :abandon, on: :member
   end
   resource :proxy_activity, only: :show
+  resources :jobs, only: :index
   resources :arr_apps do
     post :test_connections, on: :collection
     post :test_connection, on: :member

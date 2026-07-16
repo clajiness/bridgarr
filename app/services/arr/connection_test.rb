@@ -27,7 +27,7 @@ module Arr
     rescue Faraday::Error => e
       failure("Could not connect to app: #{e.message}")
     rescue JSON::ParserError
-      failure("The app responded, but Bridgarr could not read its status response.")
+      failure("The app responded, but Bridgarr could not read its status response.", http_status: response&.status)
     end
 
     private

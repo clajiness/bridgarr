@@ -40,20 +40,22 @@ class ArrAppsController < ApplicationController
   end
 
   def test_connection
+    started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     result = Arr::ConnectionTest.call(base_url: @arr_app.base_url, api_key: @arr_app.api_key)
-    @arr_app.record_connection_test_result(result)
+    @arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
 
     if result.success?
       redirect_to arr_app_test_redirect_path, notice: "#{@arr_app.name} connection works."
     else
-      redirect_to arr_app_test_redirect_path, alert: result.message
+      redirect_to arr_app_test_redirect_path, alert: Secrets::Redactor.call(result.message)
     end
   end
 
   def test_connections
     results = ArrApp.order(:name).map do |arr_app|
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       result = Arr::ConnectionTest.call(base_url: arr_app.base_url, api_key: arr_app.api_key)
-      arr_app.record_connection_test_result(result)
+      arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
       result
     end
 
@@ -75,5 +77,9 @@ class ArrAppsController < ApplicationController
 
     def arr_app_test_redirect_path
       params[:return_to] == "index" ? arr_apps_path : @arr_app
+    end
+
+    def elapsed_ms(started_at)
+      ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
     end
 end
