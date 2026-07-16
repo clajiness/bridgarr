@@ -10,14 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_07_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_15_120000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"
     t.string "base_url"
     t.datetime "created_at", null: false
     t.boolean "enabled"
+    t.integer "last_duration_ms"
     t.text "last_error"
+    t.integer "last_http_status"
     t.string "last_status"
     t.datetime "last_tested_at"
     t.string "name"
@@ -45,7 +47,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_07_170000) do
     t.datetime "created_at", null: false
     t.boolean "enabled"
     t.string "jackett_id"
+    t.integer "last_duration_ms"
     t.text "last_error"
+    t.integer "last_http_status"
     t.string "last_status"
     t.datetime "last_tested_at"
     t.string "name"

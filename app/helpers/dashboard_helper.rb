@@ -13,8 +13,18 @@ module DashboardHelper
     [
       dashboard.latest_sync_run_needs_attention? ? "latest sync run" : nil,
       dashboard.failed_assignments_count.positive? ? pluralize(dashboard.failed_assignments_count, "failed assignment") : nil,
-      dashboard.unsynced_assignments_count.positive? ? pluralize(dashboard.unsynced_assignments_count, "pending sync") : nil
+      dashboard.unsynced_assignments_count.positive? ? pluralize(dashboard.unsynced_assignments_count, "pending sync") : nil,
+      dashboard.external_services_health.attention_count.positive? ? pluralize(dashboard.external_services_health.attention_count, "service health issue") : nil
     ].compact
+  end
+
+  def external_service_path(item)
+    case item.kind
+    when :jackett then settings_path
+    when :arr_app then arr_app_path(item.record)
+    when :indexer then indexer_path(item.record)
+    else root_path
+    end
   end
 
   def dashboard_readiness_summary(readiness)

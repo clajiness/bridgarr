@@ -67,6 +67,21 @@ RSpec.describe "Settings", type: :request do
     expect(Setting.fetch_value(Setting::JACKETT_LAST_ERROR_KEY)).to eq("")
   end
 
+  it "redacts secrets from failed Jackett connection flashes" do
+    result = Jackett::ConnectionTest::Result.new(
+      success?: false,
+      message: "GET /api?apikey=visible-secret Authorization: Bearer auth-secret failed",
+      error: "GET /api?apikey=visible-secret Authorization: Bearer auth-secret failed",
+      http_status: nil
+    )
+    allow(Jackett::ConnectionTest).to receive(:call).and_return(result)
+
+    post test_jackett_settings_path
+
+    expect(flash[:alert]).to include("apikey=[REDACTED]", "Bearer [REDACTED]")
+    expect(flash[:alert]).not_to include("visible-secret", "auth-secret")
+  end
+
   it "shows the saved Jackett connection status" do
     Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "ok")
     Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, "2026-07-04T12:00:00Z")

@@ -9,11 +9,13 @@ class ArrApp < ApplicationRecord
 
   normalizes :base_url, with: ->(base_url) { base_url.to_s.strip.delete_suffix("/") }
 
-  def record_connection_test_result(result, tested_at: Time.current)
+  def record_connection_test_result(result, tested_at: Time.current, duration_ms: nil)
     update!(
       last_status: result.success? ? "ok" : "error",
       last_error: Secrets::Redactor.call(result.error),
-      last_tested_at: tested_at
+      last_tested_at: tested_at,
+      last_http_status: result.http_status,
+      last_duration_ms: duration_ms
     )
   end
 end

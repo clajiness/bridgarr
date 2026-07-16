@@ -10,11 +10,20 @@
     </div>
     <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
       <dt class="font-medium text-slate-500">Last status</dt>
-      <dd class="sm:col-span-2"><%= indexer.last_status.presence || "Not tested" %></dd>
+      <% health_status = record_health_status(indexer) %>
+      <dd class="sm:col-span-2"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(health_status) %>"><%= health_status_label(health_status) %></span></dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Last checked</dt>
+      <dd class="sm:col-span-2"><%= indexer.last_tested_at.present? ? format_server_timestamp(indexer.last_tested_at) : "Never" %></dd>
+    </div>
+    <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
+      <dt class="font-medium text-slate-500">Response</dt>
+      <dd class="sm:col-span-2"><%= indexer.last_http_status.present? ? "HTTP #{indexer.last_http_status} · " : "" %><%= health_duration(indexer.last_duration_ms) %></dd>
     </div>
     <div class="grid gap-1 px-4 py-3 sm:grid-cols-3">
       <dt class="font-medium text-slate-500">Last error</dt>
-      <dd class="sm:col-span-2"><%= indexer.last_error.presence || "None" %></dd>
+      <dd class="sm:col-span-2 [overflow-wrap:anywhere]"><%= sanitized_health_error(indexer.last_error).presence || "None" %></dd>
     </div>
   </dl>
 </div>

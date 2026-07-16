@@ -40,14 +40,19 @@
                 </span>
               </td>
               <td class="px-4 py-3">
-                <% if arr_app.last_status.present? %>
+                <% health_status = record_health_status(arr_app) %>
+                <% if health_status != "unknown" || arr_app.last_tested_at.present? %>
                   <div class="min-w-40 space-y-2">
-                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", arr_app.last_status == "ok" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800") %>">
-                      <%= arr_app.last_status == "ok" ? "Connected" : "Failed" %>
+                    <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", health_status_classes(health_status)) %>">
+                      <%= health_status_label(health_status) %>
                     </span>
                     <% if arr_app.last_tested_at.present? %>
                       <p class="text-xs leading-5 text-slate-500"><%= format_server_timestamp(arr_app.last_tested_at) %></p>
+                    <% else %>
+                      <p class="text-xs leading-5 text-slate-500">Not tested</p>
                     <% end %>
+                    <p class="text-xs leading-5 text-slate-500"><% if arr_app.last_http_status.present? %>HTTP <%= arr_app.last_http_status %> · <% end %><%= health_duration(arr_app.last_duration_ms) %></p>
+                    <% if arr_app.last_error.present? %><p class="max-w-sm text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= sanitized_health_error(arr_app.last_error) %></p><% end %>
                   </div>
                 <% else %>
                   <span class="text-sm text-slate-500">Not tested</span>

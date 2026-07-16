@@ -60,10 +60,13 @@
             <% if @jackett_last_tested_at.present? %>
               <p class="text-sm leading-6 text-slate-600">Last tested <%= format_server_timestamp(@jackett_last_tested_at) %></p>
             <% end %>
+            <% if @jackett_last_http_status.present? || @jackett_last_duration_ms.present? %>
+              <p class="text-sm leading-6 text-slate-600"><% if @jackett_last_http_status.present? %>HTTP <%= @jackett_last_http_status %> · <% end %><%= health_duration(Integer(@jackett_last_duration_ms, exception: false)) %></p>
+            <% end %>
           </div>
 
           <% if @jackett_last_error.present? %>
-            <p class="mt-3 text-sm leading-6 text-red-800"><%= @jackett_last_error %></p>
+            <p class="mt-3 text-sm leading-6 text-red-800 [overflow-wrap:anywhere]"><%= sanitized_health_error(@jackett_last_error) %></p>
           <% end %>
         <% else %>
           <p class="text-sm text-slate-600">Jackett has not been tested yet.</p>

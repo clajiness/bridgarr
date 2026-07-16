@@ -40,6 +40,55 @@
     </div>
   </section>
 
+  <% external_health = @dashboard.external_services_health %>
+  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-base font-semibold text-slate-950">External services health</h2>
+        <p class="mt-1 text-sm leading-6 text-slate-600">
+          <% if external_health.last_completed_at.present? %>
+            Last completed <%= format_server_timestamp(external_health.last_completed_at) %><% if !external_health.incomplete_run? && !external_health.last_run_duration_ms.nil? %> in <%= health_duration(external_health.last_run_duration_ms) %><% end %>.
+          <% else %>
+            No automated health check has completed yet.
+          <% end %>
+        </p>
+        <% if external_health.last_run_error.present? %>
+          <p class="mt-1 text-sm leading-6 text-red-800 [overflow-wrap:anywhere]">Last run failed<% unless external_health.last_run_duration_ms.nil? %> after <%= health_duration(external_health.last_run_duration_ms) %><% end %>: <%= external_health.last_run_error %></p>
+        <% elsif external_health.incomplete_run? %>
+          <p class="mt-1 text-sm leading-6 text-red-800">A run started <%= format_server_timestamp(external_health.last_started_at) %> but did not record completion.</p>
+        <% end %>
+      </div>
+      <%= button_to "Check all now", health_checks_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+    </div>
+
+    <div class="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="bg-white px-5 py-4"><p class="text-xs font-semibold uppercase text-slate-500">Healthy</p><p class="mt-2 text-xl font-semibold text-slate-950"><%= external_health.healthy_count %></p></div>
+      <div class="bg-white px-5 py-4"><p class="text-xs font-semibold uppercase text-slate-500">Failed</p><p class="mt-2 text-xl font-semibold text-slate-950"><%= external_health.failed_count %></p></div>
+      <div class="bg-white px-5 py-4"><p class="text-xs font-semibold uppercase text-slate-500">Unknown</p><p class="mt-2 text-xl font-semibold text-slate-950"><%= external_health.unknown_count %></p></div>
+      <div class="bg-white px-5 py-4"><p class="text-xs font-semibold uppercase text-slate-500">Stale</p><p class="mt-2 text-xl font-semibold text-slate-950"><%= external_health.stale_count %></p></div>
+    </div>
+
+    <div class="divide-y divide-slate-200">
+      <% external_health.items.each do |item| %>
+        <%= link_to external_service_path(item), class: "grid gap-2 px-5 py-4 hover:bg-stone-50 sm:grid-cols-[minmax(0,1fr)_auto]" do %>
+          <div class="min-w-0">
+            <p class="font-medium text-slate-950"><%= item.label %></p>
+            <p class="mt-1 text-xs text-slate-500">
+              <%= item.kind.to_s.humanize %>
+              <% if item.last_tested_at.present? %> · checked <%= format_server_timestamp(item.last_tested_at) %><% end %>
+              <% if item.last_http_status.present? %> · HTTP <%= item.last_http_status %><% end %>
+              <% unless item.last_duration_ms.nil? %> · <%= health_duration(item.last_duration_ms) %><% end %>
+            </p>
+            <% if item.last_error.present? && item.status.in?(%w[error unknown stale]) %>
+              <p class="mt-2 text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= item.last_error %></p>
+            <% end %>
+          </div>
+          <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(item.status) %>"><%= health_status_label(item.status) %></span>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
   <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
     <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div>

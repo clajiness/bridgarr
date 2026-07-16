@@ -26,7 +26,7 @@ needed for a useful homelab trial:
 - Optional bridged Torznab search and download proxying through Bridgarr
 - Proxy activity, sync run history, and dashboard health summaries
 
-Authentication, multi-user permissions, scheduled health checks, and deeper
+Authentication, multi-user permissions, and deeper
 production hardening are still future work. Run Bridgarr on a trusted private
 network for now.
 
@@ -186,6 +186,22 @@ bin/jobs
 Bulk sync uses the job system. If jobs stay queued forever, make sure a Solid
 Queue worker is running.
 
+The read-only **Jobs** screen shows registered queue processes, current queue
+counts, recent retained jobs, recurring-task history, and the next five times
+for each recurring schedule. Past runs follow Solid Queue's existing retention
+window; Bridgarr does not create a separate job-history table.
+
+## Health Checks
+
+Bridgarr schedules a full external-services health check every 30 minutes. A
+working Solid Queue worker is required for scheduled checks and for the
+dashboard's **Check all now** action, which only enqueues the background job.
+
+The cycle checks Jackett plus enabled applications and enabled imported
+indexers. Indexer checks call each indexer's Torznab capabilities endpoint; they
+do not issue real searches. Disabled applications and indexers are skipped.
+Results older than 90 minutes are shown as stale on the dashboard.
+
 ## Proxy Activity
 
 For bridged assignments, Bridgarr records recent Torznab proxy requests so you
@@ -262,7 +278,6 @@ can manage configured apps and indexers.
 
 Likely follow-up work:
 
-- scheduled app and indexer health checks
 - clearer readiness and troubleshooting flows
 - retention controls for sync/proxy history
 - more compatibility checks before syncing indexers to apps

@@ -21,6 +21,16 @@ RSpec.describe Jackett::ConnectionTest do
     end
   end
 
+  class FailingConnection
+    def initialize(error)
+      @error = error
+    end
+
+    def get(*)
+      raise @error
+    end
+  end
+
   it "connects to the Jackett Torznab caps endpoint" do
     connection = FakeConnection.new(Response.new(status: 200, body: "<caps></caps>"))
 
@@ -60,6 +70,28 @@ RSpec.describe Jackett::ConnectionTest do
 
     expect(result).not_to be_success
     expect(result.message).to eq("Jackett responded, but Bridgarr did not receive Torznab capabilities.")
+  end
+
+  it "turns timeouts into connection failures" do
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      connection: FailingConnection.new(Faraday::TimeoutError.new("execution expired"))
+    )
+
+    expect(result).not_to be_success
+    expect(result.error).to include("Could not connect to Jackett", "execution expired")
+  end
+
+  it "turns unreachable hosts into connection failures" do
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      connection: FailingConnection.new(Faraday::ConnectionFailed.new("host unreachable"))
+    )
+
+    expect(result).not_to be_success
+    expect(result.error).to include("Could not connect to Jackett", "host unreachable")
   end
 
   it "requires a Jackett URL" do

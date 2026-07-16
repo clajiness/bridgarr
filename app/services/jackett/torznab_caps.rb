@@ -26,7 +26,7 @@ module Jackett
     rescue Faraday::Error => e
       failure("Could not connect to Jackett: #{e.message}")
     rescue Nokogiri::XML::SyntaxError
-      failure("Jackett responded, but Bridgarr could not read the Torznab caps.")
+      failure("Jackett responded, but Bridgarr could not read the Torznab caps.", http_status: response&.status)
     end
 
     private

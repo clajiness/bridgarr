@@ -22,6 +22,7 @@
             <th class="px-4 py-3">Jackett ID</th>
             <th class="px-4 py-3">Apps</th>
             <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Health</th>
             <th class="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
@@ -35,6 +36,15 @@
                 <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", indexer.enabled? ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-100 text-slate-600") %>">
                   <%= indexer.enabled? ? "Enabled" : "Disabled" %>
                 </span>
+              </td>
+              <td class="px-4 py-3">
+                <% health_status = record_health_status(indexer) %>
+                <div class="min-w-40 space-y-2">
+                  <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(health_status) %>"><%= health_status_label(health_status) %></span>
+                  <% if indexer.last_tested_at.present? %><p class="text-xs text-slate-500"><%= format_server_timestamp(indexer.last_tested_at) %></p><% end %>
+                  <% if indexer.last_http_status.present? || !indexer.last_duration_ms.nil? %><p class="text-xs text-slate-500"><% if indexer.last_http_status.present? %>HTTP <%= indexer.last_http_status %> · <% end %><%= health_duration(indexer.last_duration_ms) %></p><% end %>
+                  <% if indexer.last_error.present? %><p class="max-w-sm text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= sanitized_health_error(indexer.last_error) %></p><% end %>
+                </div>
               </td>
               <td class="px-4 py-3 text-right">
                 <%= link_to "Edit", edit_indexer_path(indexer), class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
