@@ -190,6 +190,7 @@
                   <%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %>
                   <span class="text-slate-400">&rarr;</span>
                   <%= link_to assignment.arr_app.name, assignment.arr_app, class: "hover:underline" %>
+                  <%= render "indexer_apps/custom_settings_badge", assignment: %>
                 </p>
                 <% if assignment.last_error.present? %>
                   <p class="mt-1 text-xs leading-5 text-red-800"><%= assignment.last_error %></p>

@@ -42,7 +42,12 @@
           <% @assignments.each do |assignment| %>
             <% active_sync_run_item = assignment.active_sync_run_item %>
             <tr>
-              <td class="px-4 py-3 font-medium text-slate-950"><%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %></td>
+              <td class="px-4 py-3 font-medium text-slate-950">
+                <div class="flex flex-wrap items-center gap-2">
+                  <%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %>
+                  <%= render "indexer_apps/custom_settings_badge", assignment: %>
+                </div>
+              </td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= assignment.indexer.jackett_id %></td>
               <td class="px-4 py-3">
                 <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", assignment_connection_mode_classes(assignment)) %>">

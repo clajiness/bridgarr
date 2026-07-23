@@ -20,4 +20,24 @@ RSpec.describe ApplicationHelper, type: :helper do
       expect(format_server_timestamp("2026-07-06T02:35:53Z")).to eq("2026-07-05 21:35:53 CDT")
     end
   end
+
+  describe "#assignment_custom_settings_description" do
+    it "describes each setting that differs from the assignment defaults" do
+      assignment = IndexerApp.new(
+        connection_mode: "bridged",
+        category_mode: "custom",
+        custom_categories: "2000,8000"
+      )
+
+      expect(assignment_custom_settings_description(assignment))
+        .to eq("Custom assignment settings: Bridged connection; Custom categories: 2000, 8000")
+    end
+
+    it "describes assignments that intentionally send no categories" do
+      assignment = IndexerApp.new(connection_mode: "direct", category_mode: "none")
+
+      expect(assignment_custom_settings_description(assignment))
+        .to eq("Custom assignment settings: Categories disabled")
+    end
+  end
 end
