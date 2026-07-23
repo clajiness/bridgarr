@@ -48,18 +48,23 @@ RSpec.describe SyncRun, type: :model do
     expect(queued_item.reload).to have_attributes(status: "failed", error: "No worker was running.")
   end
 
-  it "counts skipped items separately from failures" do
+  it "counts not-applicable items without degrading a successful run" do
     sync_run = described_class.create!(status: "running", started_at: Time.current)
     successful_item = create_sync_run_item(sync_run:)
     skipped_item = create_sync_run_item(sync_run:)
 
     successful_item.update!(status: "succeeded", finished_at: Time.current)
-    skipped_item.update!(status: "skipped", finished_at: Time.current, error: "No compatible categories.")
+    skipped_item.update!(
+      status: "skipped",
+      finished_at: Time.current,
+      error: "No compatible categories.",
+      error_kind: "incompatible_categories"
+    )
 
     sync_run.refresh_status!
 
     expect(sync_run).to have_attributes(
-      status: "partial",
+      status: "succeeded",
       total_count: 2,
       success_count: 1,
       failure_count: 0,
@@ -67,15 +72,20 @@ RSpec.describe SyncRun, type: :model do
     )
   end
 
-  it "marks a fully skipped run as skipped" do
+  it "marks a fully not-applicable run as succeeded" do
     sync_run = described_class.create!(status: "running", started_at: Time.current)
     skipped_item = create_sync_run_item(sync_run:)
 
-    skipped_item.update!(status: "skipped", finished_at: Time.current, error: "No compatible categories.")
+    skipped_item.update!(
+      status: "skipped",
+      finished_at: Time.current,
+      error: "No compatible categories.",
+      error_kind: "incompatible_categories"
+    )
     sync_run.refresh_status!
 
     expect(sync_run).to have_attributes(
-      status: "skipped",
+      status: "succeeded",
       total_count: 1,
       success_count: 0,
       failure_count: 0,
@@ -112,7 +122,12 @@ RSpec.describe SyncRun, type: :model do
     sync_run = described_class.create!(status: "running", started_at: Time.current)
     7.times { create_sync_run_item(sync_run:).update!(status: "succeeded", finished_at: Time.current) }
     10.times { create_sync_run_item(sync_run:).update!(status: "failed", finished_at: Time.current, error: "Nope") }
-    create_sync_run_item(sync_run:).update!(status: "skipped", finished_at: Time.current, error: "No compatible categories.")
+    create_sync_run_item(sync_run:).update!(
+      status: "skipped",
+      finished_at: Time.current,
+      error: "No compatible categories.",
+      error_kind: "incompatible_categories"
+    )
 
     sync_run.refresh_status!
 

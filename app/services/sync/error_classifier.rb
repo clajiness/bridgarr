@@ -95,7 +95,7 @@ module Sync
         when "category_mismatch"
           "The indexer responded, but returned releases did not match the selected categories."
         when "incompatible_categories"
-          "This assignment was skipped because the app defaults do not overlap with this indexer."
+          "This assignment is not applicable because the app defaults do not overlap with this indexer."
         when "authentication"
           "Authentication failed. Check the relevant API key or credentials."
         when "invalid_configuration"

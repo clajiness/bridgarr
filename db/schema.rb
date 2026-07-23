@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_23_220000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key"
     t.string "app_type"

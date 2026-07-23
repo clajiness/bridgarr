@@ -48,8 +48,22 @@ RSpec.describe "Sync runs", type: :request do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
     indexer_app = IndexerApp.create!(arr_app:, indexer:)
-    sync_run = SyncRun.create!(total_count: 1)
-    sync_run.sync_run_items.create!(indexer_app:, indexer_name: "EZTV", arr_app_name: "Sonarr")
+    sync_run = SyncRun.create!(
+      status: "succeeded",
+      total_count: 1,
+      skipped_count: 1,
+      started_at: Time.current,
+      finished_at: Time.current
+    )
+    sync_run.sync_run_items.create!(
+      indexer_app:,
+      indexer_name: "EZTV",
+      arr_app_name: "Sonarr",
+      status: "skipped",
+      error: "No compatible default categories were found for EZTV.",
+      error_kind: "incompatible_categories",
+      finished_at: Time.current
+    )
 
     get sync_run_path(sync_run)
 
@@ -57,7 +71,8 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).to include("Bulk sync")
     expect(response.body).to include("EZTV")
     expect(response.body).to include("Sonarr")
-    expect(response.body).to include("Skipped")
+    expect(response.body).to include("Not applicable")
+    expect(response.body).to include("This assignment is not applicable because the app defaults do not overlap with this indexer.")
   end
 
   it "paginates assignments in a sync run" do

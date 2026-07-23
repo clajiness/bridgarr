@@ -49,7 +49,7 @@ class SyncRun < ApplicationRecord
     if unfinished
       attributes[:status] = started_at.present? ? "running" : "queued"
     else
-      attributes[:status] = final_status(successes:, failures:, skipped:, mismatches:)
+      attributes[:status] = final_status(successes:, failures:, mismatches:)
       attributes[:finished_at] = Time.current
     end
 
@@ -89,10 +89,9 @@ class SyncRun < ApplicationRecord
 
   private
 
-    def final_status(successes:, failures:, skipped:, mismatches:)
-      return "succeeded" if failures.zero? && skipped.zero? && mismatches.zero?
+    def final_status(successes:, failures:, mismatches:)
+      return "succeeded" if failures.zero? && mismatches.zero?
       return "mismatched" if failures.zero? && mismatches.positive?
-      return "skipped" if successes.zero? && failures.zero? && skipped.positive?
       return "failed" if successes.zero?
 
       "partial"
