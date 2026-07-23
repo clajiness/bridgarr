@@ -31,7 +31,8 @@ RSpec.describe "Dashboard", type: :request do
       indexer:,
       enabled: true,
       remote_indexer_id: 42,
-      last_status: "ok"
+      last_status: "ok",
+      last_synced_at: Time.current
     )
 
     get root_path

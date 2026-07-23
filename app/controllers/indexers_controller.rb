@@ -3,7 +3,12 @@ class IndexersController < ApplicationController
   before_action :set_arr_apps, only: %i[ new edit create update ]
 
   def index
-    @indexers = Indexer.includes(:arr_apps).order(:name)
+    @indexers_page = Pagination::Page.new(
+      collection: Indexer.includes(:arr_apps).order(:name),
+      page: params[:page],
+      per_page: params[:per_page]
+    )
+    @indexers = @indexers_page.records
   end
 
   def discover

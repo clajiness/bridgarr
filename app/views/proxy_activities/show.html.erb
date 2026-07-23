@@ -70,7 +70,7 @@
     <div class="border-b border-slate-200 px-5 py-4">
       <h2 class="text-base font-semibold text-slate-950">Requests</h2>
       <p class="mt-1 text-sm leading-6 text-slate-600">
-        Showing <%= pluralize(@proxy_requests.size, "request") %> for the selected filters.
+        <%= pluralize(@proxy_requests_page.total_count, "request") %> match the selected filters.
       </p>
     </div>
 
@@ -129,6 +129,16 @@
           </tbody>
         </table>
       </div>
+      <%= render "shared/pagination",
+        pagination: @proxy_requests_page,
+        item_name: "request",
+        path: proxy_activity_path,
+        preserved_params: {
+          status: @status_filter,
+          timeframe: @timeframe,
+          indexer_id: @indexer_id,
+          request_type: @request_type
+        } %>
     <% else %>
       <div class="px-6 py-12 text-center">
         <p class="text-sm font-medium text-slate-700">No proxy requests match those filters.</p>

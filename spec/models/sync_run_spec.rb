@@ -83,6 +83,31 @@ RSpec.describe SyncRun, type: :model do
     )
   end
 
+  it "counts category mismatches separately from failures" do
+    sync_run = described_class.create!(status: "running", started_at: Time.current)
+    successful_item = create_sync_run_item(sync_run:)
+    mismatched_item = create_sync_run_item(sync_run:)
+
+    successful_item.update!(status: "succeeded", finished_at: Time.current)
+    mismatched_item.update!(
+      status: "mismatched",
+      finished_at: Time.current,
+      error: "No releases matched the configured categories.",
+      error_kind: "category_mismatch"
+    )
+
+    sync_run.refresh_status!
+
+    expect(sync_run).to have_attributes(
+      status: "mismatched",
+      total_count: 2,
+      success_count: 1,
+      failure_count: 0,
+      mismatch_count: 1,
+      skipped_count: 0
+    )
+  end
+
   it "reconciles succeeded, failed, and skipped terminal totals" do
     sync_run = described_class.create!(status: "running", started_at: Time.current)
     7.times { create_sync_run_item(sync_run:).update!(status: "succeeded", finished_at: Time.current) }

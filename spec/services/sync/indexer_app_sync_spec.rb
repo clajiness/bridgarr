@@ -159,6 +159,25 @@ RSpec.describe Sync::IndexerAppSync do
     expect(assignment.last_error).to eq("EZTV does not expose Radarr-compatible Torznab categories.")
   end
 
+  it "records category mismatches without treating them as failures" do
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: false,
+        skipped?: false,
+        remote_indexer_id: nil,
+        message: "Query successful, but no results in the configured categories were returned from your indexer.",
+        error: "Query successful, but no results in the configured categories were returned from your indexer."
+      )
+    )
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result).not_to be_success
+    expect(result).not_to be_skipped
+    expect(assignment.reload.last_status).to eq("mismatch")
+    expect(assignment.last_error).to include("no results in the configured categories")
+  end
+
   it "syncs assignments even if their hidden enabled flag is false" do
     assignment.update!(enabled: false)
     client = FakeGenericTorznabClient.new(

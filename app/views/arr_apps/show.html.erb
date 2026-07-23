@@ -26,7 +26,7 @@
       <%= link_to "Manage assignments", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
     </div>
 
-    <% if @arr_app.indexer_apps.any? %>
+    <% if @assignments.any? %>
       <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
           <tr>
@@ -39,7 +39,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
-          <% @arr_app.indexer_apps.includes(:indexer).order("indexers.name").each do |assignment| %>
+          <% @assignments.each do |assignment| %>
             <% active_sync_run_item = assignment.active_sync_run_item %>
             <tr>
               <td class="px-4 py-3 font-medium text-slate-950"><%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %></td>
@@ -85,6 +85,12 @@
           <% end %>
         </tbody>
       </table>
+      <%= render "shared/pagination",
+        pagination: @assignments_page,
+        item_name: "assigned indexer",
+        path: arr_app_path(@arr_app),
+        page_param: :assignment_page,
+        per_page_param: :assignment_per_page %>
     <% else %>
       <div class="px-6 py-12 text-center">
         <p class="text-sm font-medium text-slate-700">No indexers assigned to this app yet.</p>

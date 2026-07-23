@@ -20,6 +20,7 @@
             <th class="px-4 py-3">Assignments</th>
             <th class="px-4 py-3">Succeeded</th>
             <th class="px-4 py-3">Failed</th>
+            <th class="px-4 py-3">Mismatches</th>
             <th class="px-4 py-3">Skipped</th>
             <th class="px-4 py-3 text-right">Actions</th>
           </tr>
@@ -36,6 +37,7 @@
               <td class="px-4 py-3 text-slate-700"><%= sync_run.total_count %></td>
               <td class="px-4 py-3 text-slate-700"><%= sync_run.success_count %></td>
               <td class="px-4 py-3 text-slate-700"><%= sync_run.failure_count %></td>
+              <td class="px-4 py-3 text-slate-700"><%= sync_run.mismatch_count %></td>
               <td class="px-4 py-3 text-slate-700"><%= sync_run.skipped_count %></td>
               <td class="px-4 py-3 text-right">
                 <div class="flex flex-wrap justify-end gap-3">
@@ -49,6 +51,7 @@
           <% end %>
         </tbody>
       </table>
+      <%= render "shared/pagination", pagination: @sync_runs_page, item_name: "sync run", path: sync_runs_path %>
     <% else %>
       <div class="px-6 py-12 text-center">
         <p class="text-sm font-medium text-slate-700">No sync runs yet.</p>

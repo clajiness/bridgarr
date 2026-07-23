@@ -1,0 +1,46 @@
+<% preserved_params = local_assigns.fetch(:preserved_params, {}).compact_blank %>
+<% page_param = local_assigns.fetch(:page_param, :page) %>
+<% per_page_param = local_assigns.fetch(:per_page_param, :per_page) %>
+
+<div class="flex flex-col gap-4 border-t border-slate-200 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+  <div>
+    <p class="text-sm text-slate-600">
+      Showing <%= pagination.first_item_number %>–<%= pagination.last_item_number %> of <%= pluralize(pagination.total_count, item_name) %>.
+    </p>
+    <% if pagination.total_pages > 1 %>
+      <p class="mt-1 text-xs text-slate-500">Page <%= pagination.current_page %> of <%= pagination.total_pages %></p>
+    <% end %>
+  </div>
+
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+    <%= form_with url: path, method: :get, class: "flex items-end gap-2" do %>
+      <% preserved_params.each do |key, value| %>
+        <%= hidden_field_tag key, value %>
+      <% end %>
+      <div>
+        <%= label_tag per_page_param, "#{item_name.to_s.pluralize.titleize} per page", class: "block text-xs font-semibold text-slate-600" %>
+        <%= select_tag per_page_param, options_for_select(Pagination::Page::PAGE_SIZE_OPTIONS, pagination.per_page), class: "mt-1 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm" %>
+      </div>
+      <%= submit_tag "Apply", class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+    <% end %>
+
+    <% if pagination.total_pages > 1 %>
+      <nav class="flex items-center gap-2" aria-label="<%= item_name.to_s.pluralize.titleize %> pagination">
+        <% previous_params = preserved_params.merge(page_param => pagination.current_page - 1, per_page_param => pagination.per_page) %>
+        <% next_params = preserved_params.merge(page_param => pagination.current_page + 1, per_page_param => pagination.per_page) %>
+
+        <% if pagination.previous_page? %>
+          <%= link_to "Previous", "#{path}?#{previous_params.to_query}", class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+        <% else %>
+          <span class="cursor-not-allowed rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-slate-400" aria-disabled="true">Previous</span>
+        <% end %>
+
+        <% if pagination.next_page? %>
+          <%= link_to "Next", "#{path}?#{next_params.to_query}", class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+        <% else %>
+          <span class="cursor-not-allowed rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-slate-400" aria-disabled="true">Next</span>
+        <% end %>
+      </nav>
+    <% end %>
+  </div>
+</div>

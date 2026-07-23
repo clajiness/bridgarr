@@ -1,11 +1,21 @@
 class SyncRunsController < ApplicationController
   def index
-    @sync_runs = SyncRun.recent.limit(25)
+    @sync_runs_page = Pagination::Page.new(
+      collection: SyncRun.recent,
+      page: params[:page],
+      per_page: params[:per_page]
+    )
+    @sync_runs = @sync_runs_page.records
   end
 
   def show
     @sync_run = SyncRun.find(params.expect(:id))
-    @sync_run_items = @sync_run.sync_run_items.includes(indexer_app: %i[indexer arr_app]).ordered
+    @sync_run_items_page = Pagination::Page.new(
+      collection: @sync_run.sync_run_items.includes(indexer_app: %i[indexer arr_app]).ordered,
+      page: params[:item_page],
+      per_page: params[:item_per_page]
+    )
+    @sync_run_items = @sync_run_items_page.records
   end
 
   def create

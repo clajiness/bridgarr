@@ -63,14 +63,19 @@ RSpec.describe "Health checks", type: :request do
       last_tested_at: now - 2.hours
     )
 
-    get root_path
+    get health_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("External services health", "Check all now", "Failing Sonarr", "Stale Indexer")
-    expect(response.body).to include("HTTP 401", "125 ms", "1.3 s", "2 service health issues")
+    expect(response.body).to include("HTTP 401", "125 ms", "1.3 s")
     expect(response.body).to include("apikey=[REDACTED]", "Bearer [REDACTED]")
     expect(response.body).not_to include("visible-secret", "auth-secret")
     expect(response.body).not_to include("Disabled Failure")
+
+    get root_path
+
+    expect(response.body).to include("2 services need attention", "View health")
+    expect(response.body).not_to include("Failing Sonarr", "Stale Indexer", "HTTP 401")
   end
 
   it "shows an incomplete run and sanitized orchestration failure" do
@@ -78,7 +83,7 @@ RSpec.describe "Health checks", type: :request do
     Setting.write_value(Setting::HEALTH_CHECKS_LAST_STARTED_AT_KEY, started_at.iso8601)
     Setting.write_value(Setting::HEALTH_CHECKS_LAST_ERROR_KEY, "Failed?apikey=visible-secret Authorization: Bearer auth-secret")
 
-    get root_path
+    get health_path
 
     expect(response.body).to include("Last run failed:", "apikey=[REDACTED]", "Bearer [REDACTED]")
     expect(response.body).not_to include("visible-secret", "auth-secret")
@@ -88,8 +93,24 @@ RSpec.describe "Health checks", type: :request do
     started_at = 10.minutes.ago
     Setting.write_value(Setting::HEALTH_CHECKS_LAST_STARTED_AT_KEY, started_at.iso8601)
 
-    get root_path
+    get health_path
 
     expect(response.body).to include("A run started", "but did not record completion")
+  end
+
+  it "paginates the external service list" do
+    12.times do |index|
+      Indexer.create!(
+        name: "Health-#{index.to_s.rjust(2, "0")}",
+        jackett_id: "health-#{index}",
+        enabled: true
+      )
+    end
+
+    get health_path(page: 2, per_page: 10)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–13 of 13 services", "Health-09", "Health-10", "Health-11")
+    expect(response.body).not_to include("Health-00")
   end
 end

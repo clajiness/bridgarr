@@ -66,6 +66,29 @@ RSpec.describe QueueDashboard::Overview do
     expect(overview.recent_jobs).to be_empty
   end
 
+  it "paginates retained jobs with an allowed page size" do
+    now = Time.current.change(usec: 0)
+    jobs = 15.times.map do |index|
+      create_job(class_name: "PaginatedJob#{index}", scheduled_at: now + index.seconds).tap do |job|
+        job.update_column(:created_at, now + index.seconds)
+      end
+    end
+
+    overview = described_class.new(now:, page: 2, per_page: 10)
+
+    expect(overview).to have_attributes(
+      current_page: 2,
+      per_page: 10,
+      total_job_count: 15,
+      total_pages: 2,
+      first_job_number: 11,
+      last_job_number: 15
+    )
+    expect(overview).to be_previous_page
+    expect(overview).not_to be_next_page
+    expect(overview.recent_jobs.map(&:id)).to eq(jobs.reverse.drop(10).map(&:id))
+  end
+
   private
 
     def create_job(class_name:, scheduled_at:)

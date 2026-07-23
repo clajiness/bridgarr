@@ -5,6 +5,8 @@ module SyncRunsHelper
       "border-amber-200 bg-amber-50 text-amber-900"
     when "failed", "partial"
       "border-red-200 bg-red-50 text-red-800"
+    when "mismatched"
+      "border-amber-200 bg-amber-50 text-amber-900"
     when "skipped"
       "border-stone-200 bg-stone-50 text-slate-700"
     when "running", "retrying"
@@ -15,6 +17,8 @@ module SyncRunsHelper
   end
 
   def sync_run_status_label(status)
+    return "Mismatch" if status == "mismatched"
+
     status.to_s.titleize
   end
 

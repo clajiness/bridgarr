@@ -53,6 +53,7 @@
           <% end %>
         </tbody>
       </table>
+      <%= render "shared/pagination", pagination: @indexers_page, item_name: "indexer", path: indexers_path %>
     <% else %>
       <div class="px-6 py-12 text-center">
         <p class="text-sm font-medium text-slate-700">Add your first Jackett indexer and let Bridgarr tie the stack together.</p>

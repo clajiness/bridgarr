@@ -49,16 +49,26 @@ RSpec.describe "Jobs", type: :request do
       failed_count: 1,
       recurring_tasks: [ task ],
       recent_jobs: [ job ],
-      processes: [ process ]
+      processes: [ process ],
+      total_job_count: 75,
+      first_job_number: 26,
+      last_job_number: 50,
+      per_page: 25,
+      total_pages: 3,
+      current_page: 2,
+      previous_page?: true,
+      next_page?: true
     )
-    allow(QueueDashboard::Overview).to receive(:new).and_return(dashboard)
+    expect(QueueDashboard::Overview).to receive(:new).with(page: "2", per_page: "25").and_return(dashboard)
 
-    get jobs_path
+    get jobs_path(page: 2, per_page: 25)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Jobs", "Recurring schedules", "Future runs", "Past runs", "Recent jobs", "Queue processes")
+    expect(response.body).to match(/Past runs.*Future runs/m)
     expect(response.body).to include("Scheduled health checks", "HealthChecks::RunJob", "every 30 minutes", "queue-host")
     expect(response.body).to include(format_server_timestamp(now + 30.minutes), format_server_timestamp(now - 30.minutes))
+    expect(response.body).to include("Showing 26–50 of 75 retained jobs", "Jobs per page", "Page 2 of 3", "Previous", "Next")
     expect(response.body).to include("apikey=[REDACTED]")
     expect(response.body).not_to include("visible-secret")
     expect(response.body).not_to include("Retry", "Discard", "Delete")

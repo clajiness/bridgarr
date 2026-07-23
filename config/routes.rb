@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   root "dashboard#index"
   get "readiness", to: "dashboard#readiness", as: :readiness
+  get "health", to: "dashboard#health", as: :health
   post "health_checks", to: "dashboard#check_all", as: :health_checks
 
   resource :settings, only: %i[ show update ] do

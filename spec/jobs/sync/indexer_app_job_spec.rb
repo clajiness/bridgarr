@@ -188,8 +188,8 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
 
     described_class.perform_now(sync_run_item.id)
 
-    expect(sync_run_item.reload).to have_attributes(status: "failed", attempt_count: 1, error_kind: "category_mismatch", retryable: false)
-    expect(sync_run.reload).to have_attributes(status: "failed", failure_count: 1)
+    expect(sync_run_item.reload).to have_attributes(status: "mismatched", attempt_count: 1, error_kind: "category_mismatch", retryable: false)
+    expect(sync_run.reload).to have_attributes(status: "mismatched", failure_count: 0, mismatch_count: 1)
     expect(enqueued_indexer_app_jobs).to be_empty
   end
 

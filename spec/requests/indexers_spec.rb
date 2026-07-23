@@ -32,6 +32,21 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("Discover from Jackett")
   end
 
+  it "paginates the indexer catalog" do
+    12.times do |index|
+      Indexer.create!(
+        name: "Catalog-#{index.to_s.rjust(2, "0")}",
+        jackett_id: "catalog-#{index}"
+      )
+    end
+
+    get indexers_path(page: 2, per_page: 10)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–12 of 12 indexers", "Catalog-10", "Catalog-11")
+    expect(response.body).not_to include("Catalog-00")
+  end
+
   it "previews configured Jackett indexers for import" do
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")

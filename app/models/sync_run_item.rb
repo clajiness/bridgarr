@@ -1,6 +1,6 @@
 class SyncRunItem < ApplicationRecord
   ACTIVE_STATUSES = %w[queued running retrying].freeze
-  TERMINAL_STATUSES = %w[succeeded failed skipped].freeze
+  TERMINAL_STATUSES = %w[succeeded failed skipped mismatched].freeze
   STATUSES = (ACTIVE_STATUSES + TERMINAL_STATUSES).freeze
 
   belongs_to :sync_run
@@ -63,6 +63,10 @@ class SyncRunItem < ApplicationRecord
     status == "skipped"
   end
 
+  def mismatched?
+    status == "mismatched"
+  end
+
   def mark_running!
     now = Time.current
 
@@ -84,7 +88,7 @@ class SyncRunItem < ApplicationRecord
     classification = sanitized_error.present? ? Sync::ErrorClassifier.call(sanitized_error, skipped: result.skipped?) : nil
 
     update!(
-      status: sync_status_for(result),
+      status: sync_status_for(result, classification:),
       finished_at:,
       error: sanitized_error,
       error_kind: classification&.kind,
@@ -110,9 +114,10 @@ class SyncRunItem < ApplicationRecord
 
   private
 
-    def sync_status_for(result)
+    def sync_status_for(result, classification:)
       return "succeeded" if result.success?
       return "skipped" if result.skipped?
+      return "mismatched" if classification&.kind == "category_mismatch"
 
       "failed"
     end

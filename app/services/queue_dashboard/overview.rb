@@ -1,6 +1,7 @@
 module QueueDashboard
   class Overview
-    RECENT_JOB_LIMIT = 50
+    DEFAULT_PAGE_SIZE = 50
+    PAGE_SIZE_OPTIONS = [ 10, 25, 50, 100 ].freeze
     TASK_HISTORY_LIMIT = 10
     FUTURE_RUN_COUNT = 5
 
@@ -9,10 +10,15 @@ module QueueDashboard
     Job = Data.define(:id, :class_name, :queue_name, :status, :enqueued_at, :scheduled_at, :finished_at, :error)
     Process = Data.define(:kind, :name, :hostname, :last_heartbeat_at, :active)
 
-    attr_reader :now, :error
+    attr_reader :now, :error, :current_page, :per_page, :total_job_count, :total_pages
 
-    def initialize(now: Time.current)
+    def initialize(now: Time.current, page: 1, per_page: DEFAULT_PAGE_SIZE)
       @now = now
+      @requested_page = positive_integer(page) || 1
+      @per_page = allowed_page_size(per_page)
+      @current_page = @requested_page
+      @total_job_count = 0
+      @total_pages = 1
       load_queue_data
     end
 
@@ -54,6 +60,24 @@ module QueueDashboard
 
     def active_worker_count
       processes.count { |process| process.kind == "worker" && process.active }
+    end
+
+    def previous_page?
+      current_page > 1
+    end
+
+    def next_page?
+      current_page < total_pages
+    end
+
+    def first_job_number
+      return 0 if total_job_count.zero?
+
+      ((current_page - 1) * per_page) + 1
+    end
+
+    def last_job_number
+      [ current_page * per_page, total_job_count ].min
     end
 
     private
@@ -121,12 +145,29 @@ module QueueDashboard
       end
 
       def load_recent_jobs
-        jobs = SolidQueue::Job
+        scope = SolidQueue::Job
           .includes(*JOB_EXECUTION_ASSOCIATIONS)
-          .order(created_at: :desc)
-          .limit(RECENT_JOB_LIMIT)
+          .order(created_at: :desc, id: :desc)
+
+        @total_job_count = scope.count
+        @total_pages = [ (@total_job_count.to_f / per_page).ceil, 1 ].max
+        @current_page = [ @requested_page, @total_pages ].min
+
+        jobs = scope
+          .offset((current_page - 1) * per_page)
+          .limit(per_page)
 
         @recent_jobs = jobs.map { |job| build_job(job) }
+      end
+
+      def positive_integer(value)
+        integer = Integer(value, exception: false)
+        integer if integer&.positive?
+      end
+
+      def allowed_page_size(value)
+        requested_size = positive_integer(value)
+        PAGE_SIZE_OPTIONS.include?(requested_size) ? requested_size : DEFAULT_PAGE_SIZE
       end
 
       def load_recurring_tasks

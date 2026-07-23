@@ -88,6 +88,22 @@ RSpec.describe "Arr apps", type: :request do
     expect(response.body).to include("arr_app")
   end
 
+  it "paginates assigned indexers on the app page" do
+    12.times do |index|
+      indexer = Indexer.create!(
+        name: "Assigned-#{index.to_s.rjust(2, "0")}",
+        jackett_id: "assigned-#{index}"
+      )
+      IndexerApp.create!(arr_app:, indexer:)
+    end
+
+    get arr_app_path(arr_app, assignment_page: 2, assignment_per_page: 10)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–12 of 12 assigned indexers", "Assigned-10", "Assigned-11")
+    expect(response.body).not_to include("Assigned-00")
+  end
+
   it "syncs an indexer assignment from the app page" do
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
     assignment = IndexerApp.create!(arr_app:, indexer:)

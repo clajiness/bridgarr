@@ -65,19 +65,6 @@
 
             <div class="grid gap-px bg-slate-200 lg:grid-cols-2">
               <div class="bg-white px-5 py-4">
-                <h4 class="text-xs font-semibold uppercase text-slate-500">Future runs</h4>
-                <% if task.next_runs.any? %>
-                  <ol class="mt-3 space-y-2 text-sm text-slate-700">
-                    <% task.next_runs.each do |run_at| %>
-                      <li><%= format_server_timestamp(run_at) %></li>
-                    <% end %>
-                  </ol>
-                <% else %>
-                  <p class="mt-3 text-sm text-slate-500">No future times could be calculated.</p>
-                <% end %>
-              </div>
-
-              <div class="bg-white px-5 py-4">
                 <h4 class="text-xs font-semibold uppercase text-slate-500">Past runs</h4>
                 <% if task.past_runs.any? %>
                   <div class="mt-3 overflow-x-auto">
@@ -101,6 +88,19 @@
                   <p class="mt-3 text-sm text-slate-500">No retained runs yet.</p>
                 <% end %>
               </div>
+
+              <div class="bg-white px-5 py-4">
+                <h4 class="text-xs font-semibold uppercase text-slate-500">Future runs</h4>
+                <% if task.next_runs.any? %>
+                  <ol class="mt-3 space-y-2 text-sm text-slate-700">
+                    <% task.next_runs.each do |run_at| %>
+                      <li><%= format_server_timestamp(run_at) %></li>
+                    <% end %>
+                  </ol>
+                <% else %>
+                  <p class="mt-3 text-sm text-slate-500">No future times could be calculated.</p>
+                <% end %>
+              </div>
             </div>
           </article>
         <% end %>
@@ -112,9 +112,25 @@
     </section>
 
     <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-5 py-4">
-        <h2 class="text-xl font-semibold text-slate-950">Recent jobs</h2>
-        <p class="mt-1 text-sm text-slate-600">The latest <%= QueueDashboard::Overview::RECENT_JOB_LIMIT %> retained jobs across all queues.</p>
+      <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 class="text-xl font-semibold text-slate-950">Recent jobs</h2>
+          <p class="mt-1 text-sm text-slate-600">
+            <% if @queue_dashboard.total_job_count.positive? %>
+              Showing <%= @queue_dashboard.first_job_number %>–<%= @queue_dashboard.last_job_number %> of <%= @queue_dashboard.total_job_count %> retained jobs across all queues.
+            <% else %>
+              Retained jobs across all queues.
+            <% end %>
+          </p>
+        </div>
+
+        <%= form_with url: jobs_path, method: :get, class: "flex items-end gap-2" do |form| %>
+          <div>
+            <%= form.label :per_page, "Jobs per page", class: "block text-xs font-semibold text-slate-600" %>
+            <%= form.select :per_page, options_for_select(QueueDashboard::Overview::PAGE_SIZE_OPTIONS, @queue_dashboard.per_page), {}, class: "mt-1 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm" %>
+          </div>
+          <%= form.submit "Apply", class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+        <% end %>
       </div>
       <% if @queue_dashboard.recent_jobs.any? %>
         <div class="overflow-x-auto">
@@ -139,6 +155,25 @@
         </div>
       <% else %>
         <div class="px-6 py-10 text-center"><p class="text-sm font-medium text-slate-700">No retained jobs yet.</p></div>
+      <% end %>
+
+      <% if @queue_dashboard.total_pages > 1 %>
+        <div class="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm text-slate-600">Page <%= @queue_dashboard.current_page %> of <%= @queue_dashboard.total_pages %></p>
+          <nav class="flex items-center gap-2" aria-label="Recent jobs pagination">
+            <% if @queue_dashboard.previous_page? %>
+              <%= link_to "Previous", jobs_path(page: @queue_dashboard.current_page - 1, per_page: @queue_dashboard.per_page), class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+            <% else %>
+              <span class="cursor-not-allowed rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-slate-400" aria-disabled="true">Previous</span>
+            <% end %>
+
+            <% if @queue_dashboard.next_page? %>
+              <%= link_to "Next", jobs_path(page: @queue_dashboard.current_page + 1, per_page: @queue_dashboard.per_page), class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+            <% else %>
+              <span class="cursor-not-allowed rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-slate-400" aria-disabled="true">Next</span>
+            <% end %>
+          </nav>
+        </div>
       <% end %>
     </section>
 
