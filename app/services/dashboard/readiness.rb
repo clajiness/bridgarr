@@ -90,8 +90,8 @@ module Dashboard
         Item.new(
           key: :sync,
           label: "Sync",
-          description: "Sync enabled assignments to the selected apps.",
-          complete: active_assignments.exists? && blocking_assignments.none?,
+          description: "Attempt a sync for each enabled assignment.",
+          complete: active_assignments.exists? && unattempted_assignments.none?,
           action_label: "Open sync"
         )
       end
@@ -105,12 +105,8 @@ module Dashboard
         active_assignments.where(connection_mode: "bridged")
       end
 
-      def blocking_assignments
-        active_assignments
-          .where(
-            "indexer_apps.last_status = :error OR (indexer_apps.last_status IS NULL AND indexer_apps.remote_indexer_id IS NULL)",
-            error: "error"
-          )
+      def unattempted_assignments
+        active_assignments.where(last_synced_at: nil)
       end
   end
 end

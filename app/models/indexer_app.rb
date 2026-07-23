@@ -96,6 +96,7 @@ class IndexerApp < ApplicationRecord
     def sync_status_for(result)
       return "ok" if result.success?
       return "skipped" if result.skipped?
+      return "mismatch" if Sync::ErrorClassifier.call(result.error).kind == "category_mismatch"
 
       "error"
     end

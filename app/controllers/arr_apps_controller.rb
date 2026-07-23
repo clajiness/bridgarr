@@ -6,6 +6,12 @@ class ArrAppsController < ApplicationController
   end
 
   def show
+    @assignments_page = Pagination::Page.new(
+      collection: @arr_app.indexer_apps.includes(:indexer).order("indexers.name"),
+      page: params[:assignment_page],
+      per_page: params[:assignment_per_page]
+    )
+    @assignments = @assignments_page.records
   end
 
   def new

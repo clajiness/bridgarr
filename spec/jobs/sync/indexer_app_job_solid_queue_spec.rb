@@ -103,7 +103,7 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
 
     perform_next_ready_execution
 
-    expect(first_item.reload).to have_attributes(status: "failed", error_kind: "category_mismatch")
+    expect(first_item.reload).to have_attributes(status: "mismatched", error_kind: "category_mismatch")
     expect(ready_indexer_executions.count).to eq(1)
     expect(blocked_indexer_executions.count).to eq(0)
 

@@ -16,8 +16,13 @@ class ProxyActivitiesController < ApplicationController
     @request_types = ProxyRequest.distinct.order(:request_type).pluck(:request_type).compact_blank
 
     @proxy_scope = filtered_scope
-    @proxy_requests = @proxy_scope.includes(:indexer).recent
     @proxy_activity_stats = stats_for(@proxy_scope)
+    @proxy_requests_page = Pagination::Page.new(
+      collection: @proxy_scope.includes(:indexer).recent,
+      page: params[:page],
+      per_page: params[:per_page]
+    )
+    @proxy_requests = @proxy_requests_page.records
   end
 
   private

@@ -1,5 +1,5 @@
 class SyncRun < ApplicationRecord
-  STATUSES = %w[queued running succeeded failed partial skipped].freeze
+  STATUSES = %w[queued running succeeded failed partial skipped mismatched].freeze
   MODES = %w[bulk assignment].freeze
 
   has_many :sync_run_items, dependent: :destroy
@@ -20,7 +20,7 @@ class SyncRun < ApplicationRecord
   end
 
   def complete?
-    %w[succeeded failed partial skipped].include?(status)
+    %w[succeeded failed partial skipped mismatched].include?(status)
   end
 
   def mark_running!
@@ -35,19 +35,21 @@ class SyncRun < ApplicationRecord
     successes = items.where(status: "succeeded").count
     failures = items.where(status: "failed").count
     skipped = items.where(status: "skipped").count
+    mismatches = items.where(status: "mismatched").count
     unfinished = items.active.exists?
 
     attributes = {
       total_count: total,
       success_count: successes,
       failure_count: failures,
-      skipped_count: skipped
+      skipped_count: skipped,
+      mismatch_count: mismatches
     }
 
     if unfinished
       attributes[:status] = started_at.present? ? "running" : "queued"
     else
-      attributes[:status] = final_status(successes:, failures:, skipped:)
+      attributes[:status] = final_status(successes:, failures:, skipped:, mismatches:)
       attributes[:finished_at] = Time.current
     end
 
@@ -77,6 +79,7 @@ class SyncRun < ApplicationRecord
         failure_count: sync_run_items.where(status: "failed").count,
         success_count: sync_run_items.where(status: "succeeded").count,
         skipped_count: sync_run_items.where(status: "skipped").count,
+        mismatch_count: sync_run_items.where(status: "mismatched").count,
         total_count: sync_run_items.count,
         finished_at: Time.current,
         error: sanitized_message
@@ -86,8 +89,9 @@ class SyncRun < ApplicationRecord
 
   private
 
-    def final_status(successes:, failures:, skipped:)
-      return "succeeded" if failures.zero? && skipped.zero?
+    def final_status(successes:, failures:, skipped:, mismatches:)
+      return "succeeded" if failures.zero? && skipped.zero? && mismatches.zero?
+      return "mismatched" if failures.zero? && mismatches.positive?
       return "skipped" if successes.zero? && failures.zero? && skipped.positive?
       return "failed" if successes.zero?
 

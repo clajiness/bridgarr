@@ -28,7 +28,8 @@ RSpec.describe Dashboard::Readiness do
       indexer:,
       enabled: true,
       remote_indexer_id: 12,
-      last_status: "ok"
+      last_status: "ok",
+      last_synced_at: Time.current
     )
 
     readiness = described_class.new
@@ -55,7 +56,8 @@ RSpec.describe Dashboard::Readiness do
       indexer:,
       enabled: true,
       last_status: "skipped",
-      last_error: "EZTV does not expose Radarr-compatible Torznab categories."
+      last_error: "EZTV does not expose Radarr-compatible Torznab categories.",
+      last_synced_at: Time.current
     )
 
     readiness = described_class.new
@@ -82,7 +84,8 @@ RSpec.describe Dashboard::Readiness do
       enabled: true,
       connection_mode: "bridged",
       remote_indexer_id: 12,
-      last_status: "ok"
+      last_status: "ok",
+      last_synced_at: Time.current
     )
 
     readiness = described_class.new
@@ -93,7 +96,7 @@ RSpec.describe Dashboard::Readiness do
     expect(bridgarr_url_item.description).to eq("Set the URL apps use when assignments run in bridged mode.")
   end
 
-  it "treats failed assignments as blocking sync readiness" do
+  it "treats attempted failed assignments as complete for setup readiness" do
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
     Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "ok")
@@ -111,11 +114,12 @@ RSpec.describe Dashboard::Readiness do
       indexer:,
       enabled: true,
       remote_indexer_id: 12,
-      last_status: "error"
+      last_status: "error",
+      last_synced_at: Time.current
     )
 
     sync_item = described_class.new.items.find { |item| item.key == :sync }
 
-    expect(sync_item.complete).to be(false)
+    expect(sync_item.complete).to be(true)
   end
 end
