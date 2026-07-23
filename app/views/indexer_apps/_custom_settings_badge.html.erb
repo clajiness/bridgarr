@@ -1,0 +1,6 @@
+<% if assignment.custom_settings? %>
+  <% description = assignment_custom_settings_description(assignment) %>
+  <span class="inline-flex rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700" title="<%= description %>" aria-label="<%= description %>">
+    Custom
+  </span>
+<% end %>

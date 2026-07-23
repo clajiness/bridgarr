@@ -179,6 +179,18 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("Connection")
     expect(response.body).to include("Direct")
     expect(response.body).to include("Sync")
+    expect(response.body).not_to include("Custom assignment settings:")
+  end
+
+  it "marks assignments with custom settings" do
+    indexer
+    indexer.indexer_apps.first.update!(category_mode: "custom", custom_categories: "8000")
+
+    get indexer_path(indexer)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Custom")
+    expect(response.body).to include("Custom assignment settings: Custom categories: 8000")
   end
 
   it "filters proxy activity to failed requests" do

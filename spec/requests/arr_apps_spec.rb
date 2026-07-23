@@ -81,6 +81,8 @@ RSpec.describe "Arr apps", type: :request do
     expect(response.body).to include("eztv")
     expect(response.body).to include("Connection")
     expect(response.body).to include("Bridged")
+    expect(response.body).to include("Custom")
+    expect(response.body).to include("Custom assignment settings: Bridged connection")
     expect(response.body).to include("42")
     expect(response.body).to include("Synced")
     expect(response.body).to include(sync_indexer_app_path(assignment))

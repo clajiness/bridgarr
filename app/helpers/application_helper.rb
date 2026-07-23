@@ -30,6 +30,19 @@ module ApplicationHelper
     "border-stone-200 bg-stone-50 text-slate-700"
   end
 
+  def assignment_custom_settings_description(assignment)
+    settings = []
+    settings << "Bridged connection" if assignment.connection_mode_bridged?
+
+    if assignment.category_mode_custom?
+      settings << "Custom categories: #{assignment.custom_category_ids.join(", ")}"
+    elsif assignment.category_mode_none?
+      settings << "Categories disabled"
+    end
+
+    "Custom assignment settings: #{settings.join("; ")}"
+  end
+
   def assignment_error_summary(assignment)
     return nil if assignment.last_error.blank?
 

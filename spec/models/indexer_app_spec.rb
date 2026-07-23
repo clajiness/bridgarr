@@ -105,4 +105,22 @@ RSpec.describe IndexerApp, type: :model do
 
     expect(assignment).to be_connection_mode_bridged
   end
+
+  it "recognizes assignments using default settings" do
+    assignment = described_class.create!(arr_app:, indexer:)
+
+    expect(assignment).not_to be_custom_settings
+  end
+
+  it "recognizes assignments using custom categories" do
+    assignment = described_class.create!(arr_app:, indexer:, category_mode: "custom", custom_categories: "8000")
+
+    expect(assignment).to be_custom_settings
+  end
+
+  it "recognizes assignments using a non-default connection mode" do
+    assignment = described_class.create!(arr_app:, indexer:, connection_mode: "bridged")
+
+    expect(assignment).to be_custom_settings
+  end
 end

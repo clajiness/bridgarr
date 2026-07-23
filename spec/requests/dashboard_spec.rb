@@ -100,6 +100,8 @@ RSpec.describe "Dashboard", type: :request do
       arr_app: sonarr,
       indexer:,
       enabled: true,
+      category_mode: "custom",
+      custom_categories: "8000",
       last_status: "error",
       last_error: "Could not sync categories"
     )
@@ -155,6 +157,7 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("latest sync run, 1 failed assignment, and 1 pending sync need attention")
     expect(response.body).to include("Partial")
     expect(response.body).to include("Could not sync categories")
+    expect(response.body).to include("Custom assignment settings: Custom categories: 8000")
     expect(response.body).to include("Pending sync")
     expect(response.body).to include("Sync attention")
     expect(response.body).to include("Recent failed or pending indexer assignments.")

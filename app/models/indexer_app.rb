@@ -31,6 +31,10 @@ class IndexerApp < ApplicationRecord
     custom_category_ids.any?
   end
 
+  def custom_settings?
+    !connection_mode_direct? || !category_mode_auto?
+  end
+
   def active_sync_run_item
     sync_run_items.active.order(created_at: :desc).first
   end
