@@ -18,7 +18,7 @@ module ApplicationHelper
   def assignment_status_label(assignment)
     return "Failed" if assignment.last_status == "error"
     return "Mismatch" if assignment.last_status == "mismatch"
-    return "Skipped" if assignment.last_status == "skipped"
+    return "Not applicable" if assignment.last_status == "skipped"
     return "Synced" if assignment.remote_indexer_id.present?
 
     "Pending sync"

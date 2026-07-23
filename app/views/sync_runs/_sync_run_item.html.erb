@@ -15,7 +15,7 @@
   </td>
   <td class="px-4 py-3">
     <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(sync_run_item.status)) %>">
-      <%= sync_run_status_label(sync_run_item.status) %>
+      <%= sync_run_item_status_label(sync_run_item) %>
     </span>
     <% if sync_run_item.attempt_count.positive? %>
       <p class="mt-1 text-xs leading-5 text-slate-500">Attempt <%= sync_run_item.attempt_count %> of <%= sync_run_item.max_attempts %></p>

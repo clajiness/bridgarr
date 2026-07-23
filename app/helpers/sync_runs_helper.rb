@@ -18,8 +18,15 @@ module SyncRunsHelper
 
   def sync_run_status_label(status)
     return "Mismatch" if status == "mismatched"
+    return "Not applicable" if status == "skipped"
 
     status.to_s.titleize
+  end
+
+  def sync_run_item_status_label(sync_run_item)
+    return "Not applicable" if sync_run_item.skipped?
+
+    sync_run_status_label(sync_run_item.status)
   end
 
   def sync_error_kind_label(error_kind)

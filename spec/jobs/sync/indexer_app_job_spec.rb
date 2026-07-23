@@ -70,7 +70,7 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
     expect(sync_run.reload).to have_attributes(status: "failed", success_count: 0, failure_count: 1, skipped_count: 0)
   end
 
-  it "marks skipped assignments without failing the sync run" do
+  it "marks incompatible assignments as not applicable without degrading the sync run" do
     arr_app = ArrApp.create!(name: "Radarr", app_type: "radarr", base_url: "http://localhost:7878", api_key: "radarr-api-key")
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
     indexer_app = IndexerApp.create!(arr_app:, indexer:)
@@ -93,7 +93,7 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
       error_kind: "incompatible_categories",
       retryable: false
     )
-    expect(sync_run.reload).to have_attributes(status: "skipped", success_count: 0, failure_count: 0, skipped_count: 1)
+    expect(sync_run.reload).to have_attributes(status: "succeeded", success_count: 0, failure_count: 0, skipped_count: 1)
   end
 
   it "redacts and classifies exception messages before storing them" do
