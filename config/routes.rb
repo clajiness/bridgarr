@@ -1,4 +1,12 @@
 Rails.application.routes.draw do
+  devise_for :users,
+    skip: :registrations,
+    controllers: {
+      sessions: "users/sessions",
+      passwords: "users/passwords"
+    }
+  get "setup", to: "admin_setups#new", as: :new_admin_setup
+
   root "dashboard#index"
   get "readiness", to: "dashboard#readiness", as: :readiness
   get "health", to: "dashboard#health", as: :health
@@ -6,6 +14,7 @@ Rails.application.routes.draw do
 
   resource :settings, only: %i[ show update ] do
     post :test_jackett
+    post :rotate_proxy_api_key
   end
   resources :indexers do
     collection do

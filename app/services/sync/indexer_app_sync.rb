@@ -23,6 +23,7 @@ module Sync
         bridgarr_base_url: Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY),
         jackett_base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
         jackett_api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
+        proxy_api_key: Setting.proxy_api_key,
         jackett_id: indexer.jackett_id,
         remote_indexer_id: indexer_app.remote_indexer_id,
         connection_mode: indexer_app.connection_mode,

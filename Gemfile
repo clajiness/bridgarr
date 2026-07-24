@@ -19,6 +19,9 @@ gem "tailwindcss-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
+# Conventional local administrator authentication and session management.
+gem "devise", "~> 5.0"
+
 # HTTP/XML clients used by the Jackett and Torznab integration layers.
 gem "faraday"
 gem "nokogiri"

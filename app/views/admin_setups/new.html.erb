@@ -1,0 +1,23 @@
+<% content_for :title, "Administrator provisioning required" %>
+
+<div class="mx-auto max-w-lg">
+  <section class="rounded-md border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+    <div class="rounded-md bg-stone-950 p-4">
+      <%= render "shared/brand" %>
+    </div>
+
+    <div class="mt-8">
+      <p class="text-sm font-semibold uppercase tracking-wide text-amber-700">Provisioning required</p>
+      <h1 class="mt-2 text-3xl font-semibold text-slate-950">Create the local administrator from the server</h1>
+      <p class="mt-3 text-sm leading-6 text-slate-600">
+        Bridgarr does not accept administrator credentials over an unauthenticated web request. Run the privileged command below from the directory containing your Compose file.
+      </p>
+    </div>
+
+    <pre class="mt-6 overflow-x-auto rounded-md bg-stone-950 p-4 text-sm text-amber-100"><code>docker compose exec bridgarr bin/rails bridgarr:admin:create</code></pre>
+
+    <p class="mt-4 text-sm leading-6 text-slate-600">
+      The command prompts for the administrator email and password. Reload this page after it succeeds.
+    </p>
+  </section>
+</div>

@@ -23,7 +23,7 @@ require 'rspec/rails'
 # directory. Alternatively, in the individual `*_spec.rb` files, manually
 # require only the support files necessary.
 #
-# Rails.root.glob('spec/support/**/*.rb').sort_by(&:to_s).each { |f| require f }
+Rails.root.glob("spec/support/**/*.rb").sort_by(&:to_s).each { |file| require file }
 
 # Ensures that the test database schema matches the current schema file.
 # If there are pending migrations it will invoke `db:test:prepare` to
@@ -35,6 +35,25 @@ rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
 RSpec.configure do |config|
+  config.include Devise::Test::IntegrationHelpers, type: :request
+  config.include ActiveSupport::Testing::TimeHelpers, type: :system
+
+  config.before do
+    Rails.cache.clear
+  end
+
+  config.before(:each, type: :request) do |example|
+    next if example.metadata[:skip_authentication]
+
+    user = User.create!(
+      email: "admin@example.com",
+      password: "correct-horse-battery-staple",
+      password_confirmation: "correct-horse-battery-staple",
+      local_admin_slot: User::LOCAL_ADMIN_SLOT
+    )
+    sign_in(user)
+  end
+
   config.before(:suite) do
     Rails.application.eager_load!
 

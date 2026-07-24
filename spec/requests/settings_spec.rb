@@ -92,6 +92,42 @@ RSpec.describe "Settings", type: :request do
     expect(response.body).to include(Time.iso8601("2026-07-04T12:00:00Z").localtime.strftime("%Y-%m-%d %H:%M:%S %Z"))
   end
 
+  it "rotates the bridged proxy API key" do
+    Setting.write_value(Setting::PROXY_API_KEY_KEY, "old-proxy-key")
+    Setting.write_value(Setting::PROXY_API_KEY_VERSION_KEY, 1)
+    allow(SecureRandom).to receive(:hex).and_call_original
+    allow(SecureRandom).to receive(:hex).with(32).and_return("new-proxy-key")
+
+    post rotate_proxy_api_key_settings_path
+
+    expect(response).to redirect_to(settings_path)
+    expect(Setting.fetch_value(Setting::PROXY_API_KEY_KEY)).to eq("new-proxy-key")
+    expect(Setting.proxy_api_key_version).to eq(2)
+    expect(flash[:notice]).to include("Sync all bridged assignments")
+  end
+
+  it "warns when bridged assignments require the new proxy key" do
+    arr_app = ArrApp.create!(
+      name: "Main Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr:8989",
+      api_key: "arr-api-key"
+    )
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      connection_mode: "bridged",
+      remote_indexer_id: 42,
+      proxy_api_key_version: 1
+    )
+    Setting.write_value(Setting::PROXY_API_KEY_VERSION_KEY, 2)
+
+    get settings_path
+
+    expect(response.body).to include("proxy API key changed")
+  end
+
   def preserve_env(*keys)
     original = keys.to_h { |key| [ key, ENV[key] ] }
     yield

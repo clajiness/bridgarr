@@ -91,5 +91,25 @@
         </div>
       </dl>
     </section>
+
+    <section class="rounded-md border border-stone-200 bg-white p-6 shadow-sm lg:col-span-2">
+      <h2 class="text-xl font-semibold text-slate-950">Bridged proxy authentication</h2>
+      <p class="mt-2 text-sm leading-6 text-slate-600">
+        Bridgarr automatically supplies a private API key when it syncs bridged indexers. The key is not used for direct Jackett connections.
+      </p>
+
+      <% if @proxy_resync_required %>
+        <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          The proxy API key changed. Search and download requests from bridged assignments will fail until every existing bridged assignment is synced again.
+        </p>
+      <% end %>
+
+      <div class="mt-5">
+        <%= button_to "Rotate proxy API key",
+          rotate_proxy_api_key_settings_path,
+          class: "rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-stone-50",
+          form: { data: { turbo_confirm: "Rotate the proxy API key? Bridged assignments must be synced again before they can search or download." } } %>
+      </div>
+    </section>
   </div>
 </div>

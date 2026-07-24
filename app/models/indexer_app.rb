@@ -15,12 +15,15 @@ class IndexerApp < ApplicationRecord
   validate :custom_categories_are_present_for_custom_mode
 
   def record_sync_result(result, synced_at: Time.current)
-    update!(
+    attributes = {
       remote_indexer_id: result.remote_indexer_id || remote_indexer_id,
       last_synced_at: synced_at,
       last_status: sync_status_for(result),
       last_error: Secrets::Redactor.call(result.error)
-    )
+    }
+    attributes[:proxy_api_key_version] = Setting.proxy_api_key_version if result.success? && connection_mode_bridged?
+
+    update!(attributes)
   end
 
   def custom_category_ids
@@ -68,6 +71,7 @@ class IndexerApp < ApplicationRecord
     def normalize_settings
       self.connection_mode = connection_mode.presence || "direct"
       self.category_mode = category_mode.presence || "auto"
+      self.proxy_api_key_version = nil if connection_mode_direct?
 
       raw_categories = custom_categories.to_s.strip
       if raw_categories.blank?

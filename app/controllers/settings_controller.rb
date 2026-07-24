@@ -27,6 +27,12 @@ class SettingsController < ApplicationController
     end
   end
 
+  def rotate_proxy_api_key
+    Setting.rotate_proxy_api_key!
+
+    redirect_to settings_path, notice: "Proxy API key rotated. Sync all bridged assignments to apply the new key."
+  end
+
   private
 
     def load_settings
@@ -38,6 +44,7 @@ class SettingsController < ApplicationController
       @jackett_last_tested_at = Setting.fetch_value(Setting::JACKETT_LAST_TESTED_AT_KEY)
       @jackett_last_http_status = Setting.fetch_value(Setting::JACKETT_LAST_HTTP_STATUS_KEY)
       @jackett_last_duration_ms = Setting.fetch_value(Setting::JACKETT_LAST_DURATION_MS_KEY)
+      @proxy_resync_required = Setting.proxy_resync_required?
       @build_info = Bridgarr::BuildInfo.current
     end
 

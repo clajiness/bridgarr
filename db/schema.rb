@@ -10,20 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_23_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_24_170500) do
   create_table "arr_apps", force: :cascade do |t|
-    t.string "api_key"
-    t.string "app_type"
-    t.string "base_url"
+    t.string "api_key", null: false
+    t.string "app_type", null: false
+    t.string "base_url", null: false
     t.datetime "created_at", null: false
-    t.boolean "enabled"
+    t.boolean "enabled", default: true, null: false
     t.integer "last_duration_ms"
     t.text "last_error"
     t.integer "last_http_status"
     t.string "last_status"
     t.datetime "last_tested_at"
-    t.string "name"
+    t.string "name", null: false
     t.datetime "updated_at", null: false
+    t.index ["app_type"], name: "index_arr_apps_on_app_type"
   end
 
   create_table "indexer_apps", force: :cascade do |t|
@@ -32,28 +33,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_220000) do
     t.string "connection_mode", default: "direct", null: false
     t.datetime "created_at", null: false
     t.text "custom_categories"
-    t.boolean "enabled"
+    t.boolean "enabled", default: true, null: false
     t.integer "indexer_id", null: false
     t.text "last_error"
     t.string "last_status"
     t.datetime "last_synced_at"
+    t.integer "proxy_api_key_version"
     t.integer "remote_indexer_id"
     t.datetime "updated_at", null: false
     t.index ["arr_app_id"], name: "index_indexer_apps_on_arr_app_id"
+    t.index ["indexer_id", "arr_app_id"], name: "index_indexer_apps_on_indexer_id_and_arr_app_id", unique: true
     t.index ["indexer_id"], name: "index_indexer_apps_on_indexer_id"
   end
 
   create_table "indexers", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.boolean "enabled"
-    t.string "jackett_id"
+    t.boolean "enabled", default: true, null: false
+    t.string "jackett_id", null: false
     t.integer "last_duration_ms"
     t.text "last_error"
     t.integer "last_http_status"
     t.string "last_status"
     t.datetime "last_tested_at"
-    t.string "name"
+    t.string "name", null: false
     t.datetime "updated_at", null: false
+    t.index ["jackett_id"], name: "index_indexers_on_jackett_id", unique: true
   end
 
   create_table "proxy_requests", force: :cascade do |t|
@@ -77,9 +81,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_220000) do
 
   create_table "settings", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.string "key"
+    t.string "key", null: false
     t.datetime "updated_at", null: false
     t.text "value"
+    t.index ["key"], name: "index_settings_on_key", unique: true
   end
 
   create_table "sync_run_items", force: :cascade do |t|
@@ -121,6 +126,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_23_220000) do
     t.datetime "updated_at", null: false
     t.index ["mode"], name: "index_sync_runs_on_mode"
     t.index ["status", "created_at"], name: "index_sync_runs_on_status_and_created_at"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "email", default: "", null: false
+    t.string "encrypted_password", default: "", null: false
+    t.integer "failed_attempts", default: 0, null: false
+    t.integer "local_admin_slot"
+    t.datetime "locked_at"
+    t.datetime "reset_password_sent_at"
+    t.string "reset_password_token"
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["local_admin_slot"], name: "index_users_on_local_admin_slot", unique: true
+    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.check_constraint "local_admin_slot IS NULL OR local_admin_slot = 1", name: "users_local_admin_slot_is_one"
   end
 
   add_foreign_key "indexer_apps", "arr_apps"
