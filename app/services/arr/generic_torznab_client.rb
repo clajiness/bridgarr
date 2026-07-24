@@ -8,8 +8,6 @@ module Arr
     REQUEST_TIMEOUT_SECONDS = ENV.fetch("ARR_INDEXER_SYNC_TIMEOUT_SECONDS", 150).to_i
     TIMEOUT_ADOPTION_ATTEMPTS = 4
     TIMEOUT_ADOPTION_INTERVAL_SECONDS = 0.75
-    PROXY_API_KEY = "bridgarr"
-
     def self.call(**attributes)
       new(**attributes).call
     end
@@ -20,6 +18,7 @@ module Arr
       bridgarr_base_url:,
       jackett_base_url:,
       jackett_api_key:,
+      proxy_api_key: nil,
       jackett_id:,
       remote_indexer_id: nil,
       connection_mode: "direct",
@@ -33,6 +32,7 @@ module Arr
       @bridgarr_base_url = bridgarr_base_url.to_s.strip.delete_suffix("/")
       @jackett_base_url = jackett_base_url.to_s.strip.delete_suffix("/")
       @jackett_api_key = jackett_api_key.to_s.strip
+      @proxy_api_key = proxy_api_key.to_s.strip
       @jackett_id = jackett_id
       @remote_indexer_id = remote_indexer_id
       @connection_mode = connection_mode.to_s.presence || "direct"
@@ -44,6 +44,7 @@ module Arr
 
     def call
       return failure("Bridgarr URL is missing.") if connection_mode_bridged? && bridgarr_base_url.blank?
+      return failure("Bridgarr proxy API key is missing.") if connection_mode_bridged? && proxy_api_key.blank?
       return failure("Jackett URL is missing.") if jackett_base_url.blank?
       return failure("Jackett API key is missing.") if jackett_api_key.blank?
 
@@ -90,6 +91,7 @@ module Arr
         :bridgarr_base_url,
         :jackett_base_url,
         :jackett_api_key,
+        :proxy_api_key,
         :jackett_id,
         :remote_indexer_id,
         :connection_mode,
@@ -220,7 +222,7 @@ module Arr
       end
 
       def torznab_api_key
-        connection_mode_bridged? ? PROXY_API_KEY : jackett_api_key
+        connection_mode_bridged? ? proxy_api_key : jackett_api_key
       end
 
       def connection_mode_bridged?
@@ -228,7 +230,11 @@ module Arr
       end
 
       def sync_existing_indexer(remote_indexer, message)
-        return success(remote_indexer.fetch("id"), nil, message) unless remote_indexer_configurable?(remote_indexer)
+        unless remote_indexer_configurable?(remote_indexer)
+          return failure("The existing bridged indexer did not return configurable fields, so Bridgarr could not verify its proxy API key.") if connection_mode_bridged?
+
+          return success(remote_indexer.fetch("id"), nil, message)
+        end
 
         schema_failure = load_torznab_schema
         return schema_failure if schema_failure

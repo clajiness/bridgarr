@@ -30,6 +30,7 @@ RSpec.describe Jackett::TorznabProxy do
       base_url: "http://localhost:9117/",
       bridgarr_base_url: "http://bridgarr.example",
       api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       query_params: { "t" => "search", "q" => "foo", "apikey" => "arr-placeholder-key" },
       connection:
@@ -72,12 +73,13 @@ RSpec.describe Jackett::TorznabProxy do
       base_url: "http://localhost:9117/",
       bridgarr_base_url: "http://bridgarr.example/",
       api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       query_params: { "t" => "search" },
       connection:
     )
     document = Nokogiri::XML(result.body)
-    rewritten_url = "http://bridgarr.example/torznab/eztv/download?file=release.torrent&path=abc123"
+    rewritten_url = "http://bridgarr.example/torznab/eztv/download?apikey=proxy-api-key&file=release.torrent&path=abc123"
 
     expect(document.at_xpath("//item/link").text).to eq(rewritten_url)
     expect(document.at_xpath("//item/enclosure")["url"]).to eq(rewritten_url)
@@ -89,6 +91,7 @@ RSpec.describe Jackett::TorznabProxy do
       base_url: "",
       bridgarr_base_url: "http://bridgarr.example",
       api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       query_params: {}
     )
@@ -106,6 +109,7 @@ RSpec.describe Jackett::TorznabProxy do
       base_url: "http://localhost:9117",
       bridgarr_base_url: "http://bridgarr.example",
       api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       query_params: {},
       connection:
@@ -124,6 +128,7 @@ RSpec.describe Jackett::TorznabProxy do
       base_url: "http://localhost:9117",
       bridgarr_base_url: "http://bridgarr.example",
       api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "1337x",
       query_params: { "t" => "tvsearch" },
       connection:

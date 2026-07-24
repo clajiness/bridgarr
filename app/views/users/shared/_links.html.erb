@@ -1,0 +1,9 @@
+<div class="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+  <% if controller_name != "sessions" %>
+    <%= link_to "Return to sign in", new_session_path(resource_name), class: "font-medium text-amber-700 hover:text-amber-600" %>
+  <% end %>
+
+  <% if devise_mapping.recoverable? && controller_name != "passwords" %>
+    <%= link_to "Forgot your password?", new_password_path(resource_name), class: "font-medium text-amber-700 hover:text-amber-600" %>
+  <% end %>
+</div>

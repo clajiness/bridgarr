@@ -28,21 +28,30 @@
       <div class="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <%= render "shared/brand" %>
 
-        <nav class="flex flex-wrap gap-2 text-sm font-medium">
-          <% [
-            [ "Dashboard", root_path ],
-            [ "Apps", arr_apps_path ],
-            [ "Indexers", indexers_path ],
-            [ "Settings", settings_path ],
-            [ "Jobs", jobs_path ],
-            [ "Sync", sync_runs_path ]
-          ].each do |label, path| %>
-            <%= link_to label, path, class: class_names(
-              "rounded-md px-3 py-2 transition",
-              current_page?(path) ? "bg-amber-300 text-stone-950" : "text-stone-300 hover:bg-stone-800 hover:text-amber-100"
-            ) %>
-          <% end %>
-        </nav>
+        <% if user_signed_in? %>
+          <div class="flex flex-col gap-3 sm:items-end">
+            <nav class="flex flex-wrap gap-2 text-sm font-medium">
+              <% [
+                [ "Dashboard", root_path ],
+                [ "Apps", arr_apps_path ],
+                [ "Indexers", indexers_path ],
+                [ "Settings", settings_path ],
+                [ "Jobs", jobs_path ],
+                [ "Sync", sync_runs_path ]
+              ].each do |label, path| %>
+                <%= link_to label, path, class: class_names(
+                  "rounded-md px-3 py-2 transition",
+                  current_page?(path) ? "bg-amber-300 text-stone-950" : "text-stone-300 hover:bg-stone-800 hover:text-amber-100"
+                ) %>
+              <% end %>
+            </nav>
+
+            <div class="flex items-center gap-3 text-xs text-stone-400">
+              <span><%= current_user.email %></span>
+              <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "font-semibold text-amber-200 hover:text-amber-100" %>
+            </div>
+          </div>
+        <% end %>
       </div>
     </header>
 

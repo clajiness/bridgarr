@@ -8,14 +8,15 @@ module Jackett
     OPEN_TIMEOUT_SECONDS = 5
     READ_TIMEOUT_SECONDS = ENV.fetch("JACKETT_TORZNAB_TIMEOUT_SECONDS", 120).to_i
 
-    def self.call(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection: nil)
-      new(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection:).call
+    def self.call(base_url:, bridgarr_base_url:, api_key:, proxy_api_key:, jackett_id:, query_params:, connection: nil)
+      new(base_url:, bridgarr_base_url:, api_key:, proxy_api_key:, jackett_id:, query_params:, connection:).call
     end
 
-    def initialize(base_url:, bridgarr_base_url:, api_key:, jackett_id:, query_params:, connection: nil)
+    def initialize(base_url:, bridgarr_base_url:, api_key:, proxy_api_key:, jackett_id:, query_params:, connection: nil)
       @base_url = base_url.to_s.strip.delete_suffix("/")
       @bridgarr_base_url = bridgarr_base_url.to_s.strip.delete_suffix("/")
       @api_key = api_key.to_s.strip
+      @proxy_api_key = proxy_api_key.to_s.strip
       @jackett_id = jackett_id.to_s.strip
       @query_params = query_params.to_h
       @connection = connection
@@ -41,7 +42,7 @@ module Jackett
 
     private
 
-      attr_reader :base_url, :bridgarr_base_url, :api_key, :jackett_id, :query_params, :connection
+      attr_reader :base_url, :bridgarr_base_url, :api_key, :proxy_api_key, :jackett_id, :query_params, :connection
 
       def http
         @http ||= connection || Faraday.new(url: base_url) do |faraday|
@@ -103,7 +104,9 @@ module Jackett
         uri = URI.parse(url.to_s)
         return url unless jackett_download_url?(uri)
 
-        query_params = Rack::Utils.parse_nested_query(uri.query).except("jackett_apikey", "apikey")
+        query_params = Rack::Utils.parse_nested_query(uri.query)
+          .except("jackett_apikey", "apikey")
+          .merge("apikey" => proxy_api_key)
         query = query_params.to_query
         bridgarr_url = "#{bridgarr_base_url}/torznab/#{CGI.escape(jackett_id)}/download"
         query.present? ? "#{bridgarr_url}?#{query}" : bridgarr_url

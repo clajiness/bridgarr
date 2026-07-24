@@ -1,4 +1,9 @@
 class TorznabProxyController < ApplicationController
+  skip_before_action :redirect_to_admin_setup
+  skip_before_action :authenticate_user!
+
+  before_action :authenticate_proxy_api_key!
+
   def show
     jackett_id = params.expect(:jackett_id)
     started_at = monotonic_time
@@ -6,6 +11,7 @@ class TorznabProxyController < ApplicationController
       base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
       bridgarr_base_url: Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY),
       api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
+      proxy_api_key: Setting.proxy_api_key,
       jackett_id:,
       query_params: request.query_parameters
     )
@@ -29,6 +35,16 @@ class TorznabProxyController < ApplicationController
   end
 
   private
+
+    def authenticate_proxy_api_key!
+      provided_token = params[:apikey].to_s
+      expected_token = Setting.proxy_api_key
+
+      return if provided_token.bytesize == expected_token.bytesize &&
+        ActiveSupport::SecurityUtils.secure_compare(provided_token, expected_token)
+
+      head :unauthorized
+    end
 
     def record_proxy_request(jackett_id:, result:, started_at:, request_type:)
       ProxyActivity::Recorder.call(

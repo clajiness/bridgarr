@@ -39,6 +39,8 @@ RSpec.describe Sync::IndexerAppSync do
     Setting.write_value(Setting::BRIDGARR_BASE_URL_KEY, "http://localhost:3000")
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
+    Setting.write_value(Setting::PROXY_API_KEY_KEY, "proxy-api-key")
+    Setting.write_value(Setting::PROXY_API_KEY_VERSION_KEY, 1)
   end
 
   it "syncs one assignment and records the remote indexer ID" do
@@ -64,6 +66,7 @@ RSpec.describe Sync::IndexerAppSync do
       bridgarr_base_url: "http://localhost:3000",
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       remote_indexer_id: nil,
       connection_mode: "direct",
@@ -102,6 +105,25 @@ RSpec.describe Sync::IndexerAppSync do
     described_class.call(indexer_app: assignment, client:)
 
     expect(client.calls.first).to include(connection_mode: "bridged")
+  end
+
+  it "records the current proxy key version after a successful bridged resynchronization" do
+    assignment.update!(connection_mode: "bridged", remote_indexer_id: 42)
+    client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer updated.",
+        error: nil
+      )
+    )
+
+    expect(Setting).to be_proxy_resync_required
+
+    described_class.call(indexer_app: assignment, client:)
+
+    expect(assignment.reload.proxy_api_key_version).to eq(1)
+    expect(Setting).not_to be_proxy_resync_required
   end
 
   it "records sync failures" do

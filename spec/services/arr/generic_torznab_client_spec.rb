@@ -138,6 +138,7 @@ RSpec.describe Arr::GenericTorznabClient do
       bridgarr_base_url: "http://localhost:3000/",
       jackett_base_url: "http://localhost:9117/",
       jackett_api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       connection:,
       caps_client: FakeTorznabCapsClient
@@ -215,6 +216,7 @@ RSpec.describe Arr::GenericTorznabClient do
       bridgarr_base_url: "http://localhost:3000/",
       jackett_base_url: "http://localhost:9117/",
       jackett_api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       connection_mode: "bridged",
       connection:,
@@ -225,7 +227,7 @@ RSpec.describe Arr::GenericTorznabClient do
 
     expect(result).to be_success
     expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:3000/torznab/eztv")
-    expect(fields.fetch("apiKey").fetch("value")).to eq("bridgarr")
+    expect(fields.fetch("apiKey").fetch("value")).to eq("proxy-api-key")
   end
 
   it "requires a Bridgarr URL for bridged indexers" do
@@ -240,6 +242,7 @@ RSpec.describe Arr::GenericTorznabClient do
       bridgarr_base_url: "",
       jackett_base_url: "http://localhost:9117/",
       jackett_api_key: "jackett-api-key",
+      proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       connection_mode: "bridged",
       connection:,
@@ -543,6 +546,32 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(result).to be_success
     expect(result.remote_indexer_id).to eq(42)
     expect(result.message).to eq("Generic Torznab indexer is already synced.")
+    expect(connection.post_path).to be_nil
+  end
+
+  it "fails closed when a bridged indexer does not expose fields needed to verify the rotated key" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ { id: 42, name: "EZTV" } ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      proxy_api_key: "rotated-proxy-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection_mode: "bridged",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to include("could not verify its proxy API key")
     expect(connection.post_path).to be_nil
   end
 
