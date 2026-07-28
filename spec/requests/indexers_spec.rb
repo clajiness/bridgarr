@@ -15,13 +15,21 @@ RSpec.describe "Indexers", type: :request do
   end
 
   it "renders the indexers index" do
-    indexer
+    indexer.update!(
+      last_status: "ok",
+      last_tested_at: Time.current,
+      last_http_status: 200,
+      last_duration_ms: 750
+    )
 
     get indexers_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("First Indexer")
     expect(response.body).to include("Discover from Jackett")
+    expect(response.body).to include("Check all now")
+    expect(response.body).to include("Operational")
+    expect(response.body).to include("Live search")
   end
 
   it "renders the empty indexers state" do
@@ -169,7 +177,13 @@ RSpec.describe "Indexers", type: :request do
   end
 
   it "shows an indexer" do
-    indexer
+    indexer.update!(
+      last_status: "error",
+      last_error: "Jackett live search failed: tracker unavailable",
+      last_tested_at: Time.zone.local(2026, 7, 28, 17, 0, 0),
+      last_http_status: 500,
+      last_duration_ms: 1_250
+    )
 
     get indexer_path(indexer)
 
@@ -179,6 +193,9 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("Connection")
     expect(response.body).to include("Direct")
     expect(response.body).to include("Sync")
+    expect(response.body).to include("Operational status")
+    expect(response.body).to include("Live search response")
+    expect(response.body).to include("Jackett live search failed: tracker unavailable")
     expect(response.body).not_to include("Custom assignment settings:")
   end
 

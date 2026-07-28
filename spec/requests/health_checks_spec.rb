@@ -53,6 +53,15 @@ RSpec.describe "Health checks", type: :request do
       last_http_status: 200,
       last_duration_ms: 1_250
     )
+    Indexer.create!(
+      name: "Operational Indexer",
+      jackett_id: "operational-indexer",
+      enabled: true,
+      last_status: "ok",
+      last_tested_at: now,
+      last_http_status: 200,
+      last_duration_ms: 750
+    )
     ArrApp.create!(
       name: "Disabled Failure",
       app_type: "radarr",
@@ -66,7 +75,8 @@ RSpec.describe "Health checks", type: :request do
     get health_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("External services health", "Check all now", "Failing Sonarr", "Stale Indexer")
+    expect(response.body).to include("External services health", "Check all now", "Failing Sonarr", "Stale Indexer", "Operational Indexer")
+    expect(response.body).to include("Operational")
     expect(response.body).to include("HTTP 401", "125 ms", "1.3 s")
     expect(response.body).to include("apikey=[REDACTED]", "Bearer [REDACTED]")
     expect(response.body).not_to include("visible-secret", "auth-secret")

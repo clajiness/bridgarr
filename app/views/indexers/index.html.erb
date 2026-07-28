@@ -8,6 +8,7 @@
     </div>
 
     <div class="flex flex-wrap gap-3">
+      <%= button_to "Check all now", health_checks_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <%= link_to "Discover from Jackett", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <%= link_to "New indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
     </div>
@@ -40,8 +41,8 @@
               <td class="px-4 py-3">
                 <% health_status = record_health_status(indexer) %>
                 <div class="min-w-40 space-y-2">
-                  <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(health_status) %>"><%= health_status_label(health_status) %></span>
-                  <% if indexer.last_tested_at.present? %><p class="text-xs text-slate-500"><%= format_server_timestamp(indexer.last_tested_at) %></p><% end %>
+                  <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(health_status) %>"><%= health_status_label(health_status, operational: true) %></span>
+                  <% if indexer.last_tested_at.present? %><p class="text-xs text-slate-500">Live search · <%= format_server_timestamp(indexer.last_tested_at) %></p><% end %>
                   <% if indexer.last_http_status.present? || !indexer.last_duration_ms.nil? %><p class="text-xs text-slate-500"><% if indexer.last_http_status.present? %>HTTP <%= indexer.last_http_status %> · <% end %><%= health_duration(indexer.last_duration_ms) %></p><% end %>
                   <% if indexer.last_error.present? %><p class="max-w-sm text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= sanitized_health_error(indexer.last_error) %></p><% end %>
                 </div>
