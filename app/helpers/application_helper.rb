@@ -49,9 +49,9 @@ module ApplicationHelper
     Sync::ErrorClassifier.call(assignment.last_error, skipped: assignment.last_status == "skipped").summary
   end
 
-  def health_status_label(status)
+  def health_status_label(status, operational: false)
     {
-      "ok" => "Healthy",
+      "ok" => operational ? "Operational" : "Healthy",
       "error" => "Failed",
       "unknown" => "Unknown",
       "stale" => "Stale",

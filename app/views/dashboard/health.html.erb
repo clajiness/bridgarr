@@ -6,7 +6,7 @@
       <p class="text-sm font-medium text-slate-500">System</p>
       <h1 class="mt-1 text-3xl font-semibold text-slate-950">External services health</h1>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-        Connection health for Jackett, enabled apps, and enabled indexers.
+        Connection health for Jackett and enabled apps, plus live-search health for enabled indexers.
       </p>
     </div>
 
@@ -54,7 +54,7 @@
               <p class="mt-2 text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= item.last_error %></p>
             <% end %>
           </div>
-          <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(item.status) %>"><%= health_status_label(item.status) %></span>
+          <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(item.status) %>"><%= health_status_label(item.status, operational: item.kind == :indexer) %></span>
         <% end %>
       <% end %>
     </div>

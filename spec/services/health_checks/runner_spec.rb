@@ -9,7 +9,7 @@ RSpec.describe HealthChecks::Runner do
   end
   let(:jackett_test) { class_double(Jackett::ConnectionTest) }
   let(:arr_test) { class_double(Arr::ConnectionTest) }
-  let(:indexer_test) { class_double(Jackett::TorznabCaps) }
+  let(:indexer_test) { class_double(Jackett::IndexerOperationalTest) }
 
   subject(:runner) do
     described_class.new(jackett_test:, arr_test:, indexer_test:, wall_clock:, monotonic_clock:)
@@ -151,6 +151,6 @@ RSpec.describe HealthChecks::Runner do
     end
 
     def indexer_result(success:, http_status:, error: nil)
-      Jackett::TorznabCaps::Result.new(success?: success, category_ids: [], message: error || "OK", error:, http_status:)
+      Jackett::IndexerOperationalTest::Result.new(success?: success, item_count: success ? 1 : 0, message: error || "OK", error:, http_status:)
     end
 end

@@ -12,7 +12,7 @@ module HealthChecks
     def initialize(
       jackett_test: Jackett::ConnectionTest,
       arr_test: Arr::ConnectionTest,
-      indexer_test: Jackett::TorznabCaps,
+      indexer_test: Jackett::IndexerOperationalTest,
       wall_clock: -> { Time.current },
       monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
     )
