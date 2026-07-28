@@ -5,7 +5,7 @@ module Jackett
     Result = Data.define(:success?, :item_count, :message, :error, :http_status)
 
     OPEN_TIMEOUT_SECONDS = 5
-    READ_TIMEOUT_SECONDS = ENV.fetch("JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS", 30).to_i
+    READ_TIMEOUT_SECONDS = Rails.configuration.x.jackett_indexer_health_timeout_seconds
     ERROR_DETAIL_LIMIT = 500
 
     def self.call(base_url:, api_key:, jackett_id:, connection: nil)
@@ -43,7 +43,8 @@ module Jackett
     rescue Faraday::TimeoutError, Net::ReadTimeout
       failure("Jackett did not complete the live search for #{jackett_id} within #{READ_TIMEOUT_SECONDS} seconds.")
     rescue Faraday::Error => e
-      failure("Could not connect to Jackett: #{e.message}")
+      detail = bounded_detail(e.message)
+      failure([ "Could not connect to Jackett", detail ].compact.join(": "))
     rescue Nokogiri::XML::SyntaxError
       failure("Jackett responded, but Bridgarr could not read the live-search response.", http_status: response&.status)
     end
@@ -78,8 +79,8 @@ module Jackett
 
       def torznab_failure(document, http_status:)
         error = torznab_error(document)
-        code = error["code"].presence
-        description = error["description"].presence || error.text.presence || "Jackett returned an unspecified Torznab error."
+        code = bounded_detail(error["code"])
+        description = bounded_detail(error["description"]) || bounded_detail(error.text) || "Jackett returned an unspecified Torznab error."
         prefix = code.present? ? "Jackett live search failed with Torznab error #{code}" : "Jackett live search failed"
 
         failure("#{prefix}: #{description}", http_status:)
@@ -113,7 +114,7 @@ module Jackett
       def xml_error_detail(text)
         document = Nokogiri::XML(text) { |config| config.nonet }
         if (error = torznab_error(document))
-          error["description"].presence || error.text.presence
+          bounded_detail(error["description"]) || bounded_detail(error.text)
         end
       rescue Nokogiri::XML::SyntaxError
         nil
@@ -124,7 +125,7 @@ module Jackett
         return unless json.is_a?(Hash)
 
         value = json.values_at("message", "Message", "error", "Error").find { |candidate| candidate.is_a?(String) && candidate.present? }
-        value&.truncate(ERROR_DETAIL_LIMIT)
+        bounded_detail(value)
       rescue JSON::ParserError
         nil
       end
@@ -132,7 +133,11 @@ module Jackett
       def plain_error_detail(text)
         return if text.start_with?("<")
 
-        text.squish.truncate(ERROR_DETAIL_LIMIT)
+        bounded_detail(text)
+      end
+
+      def bounded_detail(value)
+        Secrets::Redactor.call(value).to_s.squish.truncate(ERROR_DETAIL_LIMIT).presence
       end
 
       def failure(message, http_status: nil)

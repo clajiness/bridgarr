@@ -79,6 +79,30 @@ RSpec.describe Jackett::IndexerOperationalTest do
     )
   end
 
+  it "bounds an oversized Torznab error description returned with HTTP 200" do
+    useful_beginning = "Tracker challenge detected while signing in."
+    oversized_detail = "#{useful_beginning} #{"x" * (described_class::ERROR_DETAIL_LIMIT * 2)}"
+    connection = FakeOperationalConnection.new(
+      response: OperationalResponse.new(
+        status: 200,
+        body: %(<error code="100" description="#{oversized_detail}" />)
+      )
+    )
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:
+    )
+    stored_detail = result.error.delete_prefix("Jackett live search failed with Torznab error 100: ")
+
+    expect(result).not_to be_success
+    expect(stored_detail).to start_with(useful_beginning)
+    expect(stored_detail.length).to eq(described_class::ERROR_DETAIL_LIMIT)
+    expect(stored_detail).to end_with("...")
+  end
+
   it "fails when the live search returns valid RSS without releases" do
     connection = FakeOperationalConnection.new(
       response: OperationalResponse.new(
@@ -136,6 +160,30 @@ RSpec.describe Jackett::IndexerOperationalTest do
     expect(result.http_status).to eq(500)
   end
 
+  it "bounds an oversized Torznab error description from an unsuccessful HTTP response" do
+    useful_beginning = "Indexer is disabled after repeated tracker failures."
+    oversized_detail = "#{useful_beginning} #{"y" * (described_class::ERROR_DETAIL_LIMIT * 2)}"
+    connection = FakeOperationalConnection.new(
+      response: OperationalResponse.new(
+        status: 429,
+        body: %(<error code="429" description="#{oversized_detail}" />)
+      )
+    )
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:
+    )
+    stored_detail = result.error.delete_prefix("Jackett returned HTTP 429 while running the live search. ")
+
+    expect(result).not_to be_success
+    expect(stored_detail).to start_with(useful_beginning)
+    expect(stored_detail.length).to eq(described_class::ERROR_DETAIL_LIMIT)
+    expect(stored_detail).to end_with("...")
+  end
+
   it "includes a plain-text error detail when Jackett returns one" do
     connection = FakeOperationalConnection.new(
       response: OperationalResponse.new(status: 429, body: "Indexer is disabled due to recent failures.")
@@ -169,5 +217,57 @@ RSpec.describe Jackett::IndexerOperationalTest do
       "Jackett did not complete the live search for slow-indexer within #{described_class::READ_TIMEOUT_SECONDS} seconds."
     )
     expect(result.http_status).to be_nil
+  end
+
+  it "redacts and bounds Faraday exception details before persistence" do
+    useful_beginning = "Request failed at http://jackett.test/api?apikey=visible-secret."
+    redacted_beginning = "Request failed at http://jackett.test/api?apikey=[REDACTED]"
+    oversized_detail = "#{useful_beginning} #{"z" * (described_class::ERROR_DETAIL_LIMIT * 2)}"
+    connection = FakeOperationalConnection.new(error: Faraday::ConnectionFailed.new(oversized_detail))
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:
+    )
+    stored_detail = result.error.delete_prefix("Could not connect to Jackett: ")
+
+    expect(stored_detail).to start_with(redacted_beginning)
+    expect(stored_detail).not_to include("visible-secret")
+    expect(stored_detail.length).to eq(described_class::ERROR_DETAIL_LIMIT)
+
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer.record_health_check_result(result)
+
+    expect(indexer.reload.last_error).to include("apikey=[REDACTED]")
+    expect(indexer.last_error).not_to include("visible-secret")
+  end
+
+  it "redacts a secret that crosses the detail cutoff before truncating it" do
+    secret = "boundary-secret-" * 5
+    oversized_detail = "#{"x" * 470}?apikey=#{secret} trailing diagnostic context"
+    secret_start = oversized_detail.index(secret)
+    expect(secret_start).to be < described_class::ERROR_DETAIL_LIMIT
+    expect(secret_start + secret.length).to be > described_class::ERROR_DETAIL_LIMIT
+
+    connection = FakeOperationalConnection.new(error: Faraday::ConnectionFailed.new(oversized_detail))
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:
+    )
+    normalized_detail = result.error.delete_prefix("Could not connect to Jackett: ")
+
+    expect(normalized_detail).to include("apikey=[REDACTED]")
+    expect(normalized_detail).not_to include("boundary-secret")
+    expect(normalized_detail.length).to be <= described_class::ERROR_DETAIL_LIMIT
+
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer.record_health_check_result(result)
+
+    expect(indexer.reload.last_error).to include("apikey=[REDACTED]")
+    expect(indexer.last_error).not_to include("boundary-secret")
   end
 end
