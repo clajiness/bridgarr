@@ -2,7 +2,7 @@ module Bridgarr
   module HealthCheckConfiguration
     class ConfigurationError < StandardError; end
 
-    DEFAULT_INDEXER_TIMEOUT_SECONDS = 30
+    DEFAULT_INDEXER_TIMEOUT_SECONDS = 120
     CANONICAL_POSITIVE_INTEGER = /\A[1-9][0-9]*\z/
 
     module_function

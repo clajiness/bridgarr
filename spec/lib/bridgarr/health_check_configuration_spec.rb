@@ -10,8 +10,8 @@ RSpec.describe Bridgarr::HealthCheckConfiguration do
       ENV["JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS"] = original_value if original_value
     end
 
-    it "defaults to 30 seconds and accepts a positive integer" do
-      expect(described_class.jackett_indexer_timeout_seconds).to eq(30)
+    it "defaults to 120 seconds and accepts a positive integer" do
+      expect(described_class.jackett_indexer_timeout_seconds).to eq(120)
       expect(described_class.jackett_indexer_timeout_seconds("45")).to eq(45)
     end
 
