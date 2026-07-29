@@ -67,7 +67,7 @@ services:
       SOLID_QUEUE_IN_PUMA: "true"
       ARR_INDEXER_SYNC_TIMEOUT_SECONDS: "150"
       JACKETT_TORZNAB_TIMEOUT_SECONDS: "120"
-      JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS: "30"
+      JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS: "120"
     volumes:
       - bridgarr_storage:/rails/storage
     restart: unless-stopped
@@ -322,7 +322,7 @@ bridged search or download traffic again. Direct assignments remain unaffected.
 | `SOLID_QUEUE_IN_PUMA` | Docker image: `true` | Runs the Solid Queue supervisor inside the web container. Puma treats an unset value as `false` outside the image. |
 | `ARR_INDEXER_SYNC_TIMEOUT_SECONDS` | `150` | Timeout while Bridgarr waits for an *arr app to create/test a managed indexer. |
 | `JACKETT_TORZNAB_TIMEOUT_SECONDS` | `120` | Timeout while Bridgarr waits for Jackett Torznab responses. |
-| `JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS` | `30` | Timeout for each uncached live search used to check indexer health. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
+| `JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS` | `120` | Timeout for each uncached live search used to check indexer health. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
 | `AUTH_SESSION_TIMEOUT_MINUTES` | `30` | Inactivity timeout in minutes. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
 | `ASSUME_SSL` | `false` | Tell Rails that a directly connected TLS-terminating proxy already handled HTTPS. |
 | `FORCE_SSL` | `false` | Redirect to HTTPS, enable HSTS, and mark cookies secure; `/up` is excluded from redirects. |
