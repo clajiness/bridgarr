@@ -31,6 +31,7 @@
             <div>
               <p class="font-medium text-slate-950"><%= item.label %></p>
               <p class="mt-1 text-sm leading-6 text-slate-600"><%= item.description %></p>
+              <% unless item.complete %><p class="mt-2 text-xs leading-5 text-slate-500"><span class="font-semibold text-slate-700">Why it matters:</span> <%= item.why %></p><% end %>
             </div>
             <span class="<%= class_names("inline-flex w-fit rounded-md border px-2 py-1 text-xs font-semibold", dashboard_readiness_status_classes(item)) %>">
               <%= dashboard_readiness_status_label(item) %>

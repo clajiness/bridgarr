@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_24_170500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_06_120100) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key", null: false
     t.string "app_type", null: false
@@ -35,21 +35,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_24_170500) do
     t.text "custom_categories"
     t.boolean "enabled", default: true, null: false
     t.integer "indexer_id", null: false
+    t.datetime "last_applied_at"
+    t.string "last_applied_digest"
+    t.string "last_desired_digest"
     t.text "last_error"
+    t.datetime "last_inspected_at"
+    t.string "last_plan_state"
+    t.string "last_remote_digest"
     t.string "last_status"
     t.datetime "last_synced_at"
     t.integer "proxy_api_key_version"
     t.integer "remote_indexer_id"
     t.datetime "updated_at", null: false
     t.index ["arr_app_id"], name: "index_indexer_apps_on_arr_app_id"
+    t.index ["enabled"], name: "index_indexer_apps_on_enabled"
     t.index ["indexer_id", "arr_app_id"], name: "index_indexer_apps_on_indexer_id_and_arr_app_id", unique: true
     t.index ["indexer_id"], name: "index_indexer_apps_on_indexer_id"
+    t.index ["last_plan_state"], name: "index_indexer_apps_on_last_plan_state"
   end
 
   create_table "indexers", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
+    t.boolean "jackett_configured"
     t.string "jackett_id", null: false
+    t.datetime "jackett_last_seen_at"
+    t.datetime "jackett_missing_since"
+    t.string "jackett_name"
+    t.string "jackett_source_digest"
+    t.string "jackett_state", default: "unknown", null: false
     t.integer "last_duration_ms"
     t.text "last_error"
     t.integer "last_http_status"
@@ -58,6 +72,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_24_170500) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["jackett_id"], name: "index_indexers_on_jackett_id", unique: true
+    t.index ["jackett_missing_since"], name: "index_indexers_on_jackett_missing_since"
+    t.index ["jackett_state"], name: "index_indexers_on_jackett_state"
   end
 
   create_table "proxy_requests", force: :cascade do |t|
@@ -99,6 +115,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_24_170500) do
     t.datetime "last_attempt_at"
     t.integer "max_attempts", default: 2, null: false
     t.datetime "next_retry_at"
+    t.text "plan_changes"
+    t.string "plan_digest"
+    t.string "planned_action"
     t.boolean "retryable", default: false, null: false
     t.datetime "started_at"
     t.string "status", default: "queued", null: false

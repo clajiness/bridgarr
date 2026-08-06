@@ -1,5 +1,6 @@
 class Indexer < ApplicationRecord
   JACKETT_ID_FORMAT = /\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/
+  JACKETT_STATES = %w[unknown unchanged renamed changed disabled missing].freeze
 
   has_many :indexer_apps, dependent: :destroy
   has_many :arr_apps, through: :indexer_apps
@@ -8,8 +9,11 @@ class Indexer < ApplicationRecord
   validates :name, :jackett_id, presence: true
   validates :jackett_id, uniqueness: true
   validates :jackett_id, format: { with: JACKETT_ID_FORMAT, message: "must be a Jackett ID or Jackett Torznab URL" }
+  validates :jackett_state, inclusion: { in: JACKETT_STATES }
 
   normalizes :jackett_id, with: ->(jackett_id) { Jackett::IndexerIdParser.call(jackett_id) }
+
+  scope :with_jackett_changes, -> { where(jackett_state: %w[renamed changed disabled missing]) }
 
   def record_health_check_result(result, tested_at: Time.current, duration_ms: nil)
     update!(

@@ -18,8 +18,11 @@ class IndexersController < ApplicationController
     )
 
     if result.success?
+      Jackett::InventoryReconciler.call(records: result.indexers)
       @jackett_indexers = result.indexers
-      @existing_jackett_ids = Indexer.where(jackett_id: @jackett_indexers.map(&:jackett_id)).pluck(:jackett_id)
+      @existing_by_jackett_id = Indexer.where(jackett_id: @jackett_indexers.map(&:jackett_id)).index_by(&:jackett_id)
+      @missing_indexers = Indexer.where(jackett_state: "missing").order(:name)
+      @arr_apps = ArrApp.where(enabled: true).order(:name)
     else
       redirect_to indexers_path, alert: result.message
     end
@@ -29,11 +32,17 @@ class IndexersController < ApplicationController
     result = Jackett::IndexerImport.call(
       base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
       api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY),
-      jackett_ids: selected_jackett_ids
+      jackett_ids: selected_jackett_ids,
+      arr_app_ids: params.fetch(:arr_app_ids, []),
+      connection_mode: params[:connection_mode],
+      category_mode: params[:category_mode],
+      custom_categories: params[:custom_categories],
+      sync_now: params[:sync_now]
     )
 
     if result.success?
-      redirect_to indexers_path, notice: result.message
+      destination = result.sync_run ? sync_run_path(result.sync_run) : indexer_apps_path
+      redirect_to destination, notice: result.message
     else
       redirect_to indexers_path, alert: result.message
     end

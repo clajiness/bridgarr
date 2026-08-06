@@ -79,7 +79,7 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("Already imported")
     expect(response.body).to include("New Indexer")
     expect(response.body).to include("Ready to import")
-    expect(response.body).to include("Import selected indexers")
+    expect(response.body).to include("Import and create assignments")
     expect(response.body).to include("jackett_ids[]")
   end
 
@@ -114,11 +114,16 @@ RSpec.describe "Indexers", type: :request do
 
     post import_from_jackett_indexers_path, params: { jackett_ids: [ "first-indexer", "second-indexer" ] }
 
-    expect(response).to redirect_to(indexers_path)
+    expect(response).to redirect_to(indexer_apps_path)
     expect(Jackett::IndexerImport).to have_received(:call).with(
       base_url: "http://localhost:9117",
       api_key: "jackett-api-key",
-      jackett_ids: [ "first-indexer", "second-indexer" ]
+      jackett_ids: [ "first-indexer", "second-indexer" ],
+      arr_app_ids: [],
+      connection_mode: nil,
+      category_mode: nil,
+      custom_categories: nil,
+      sync_now: nil
     )
     expect(flash[:notice]).to eq("2 indexers imported, 1 already present.")
   end

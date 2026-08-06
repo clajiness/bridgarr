@@ -1,7 +1,7 @@
 module Secrets
   class Redactor
     REDACTED = "[REDACTED]"
-    SENSITIVE_KEY_PATTERN = /api[-_]?key|apikey|jackett[-_]?api[-_]?key|token|access[-_]?token|auth[-_]?token/i
+    SENSITIVE_KEY_PATTERN = /(?:[a-z0-9]+[-_])*(?:api[-_]?key|apikey|token|password|passwd|secret|cookie)|session[-_]?id/i
 
     def self.call(value)
       new(value).call
@@ -26,6 +26,7 @@ module Secrets
           .gsub(query_parameter_pattern) { "#{Regexp.last_match(1)}#{Regexp.last_match(2)}=#{REDACTED}" }
           .gsub(json_value_pattern) { "#{Regexp.last_match(1)}#{Regexp.last_match(2)}#{Regexp.last_match(1)}#{Regexp.last_match(3)}#{Regexp.last_match(4)}#{REDACTED}#{Regexp.last_match(4)}" }
           .gsub(hash_value_pattern) { "#{Regexp.last_match(1)}#{Regexp.last_match(2)}#{REDACTED}#{Regexp.last_match(2)}" }
+          .gsub(key_value_pattern) { "#{Regexp.last_match(1)}#{Regexp.last_match(2)}#{Regexp.last_match(3)}#{REDACTED}" }
           .gsub(authorization_header_pattern) { "#{Regexp.last_match(1)}#{Regexp.last_match(2)} #{REDACTED}" }
           .gsub(api_key_header_pattern) { "#{Regexp.last_match(1)}#{REDACTED}" }
       end
@@ -40,6 +41,10 @@ module Secrets
 
       def hash_value_pattern
         /((?:#{SENSITIVE_KEY_PATTERN.source})["']?\s*=>\s*)(["']?)([^,"'}\s]+)\2/i
+      end
+
+      def key_value_pattern
+        /(^|[\s,;])(#{SENSITIVE_KEY_PATTERN.source})(\s*[:=]\s*)([^\s,;\]\)"'<>]+)/i
       end
 
       def authorization_header_pattern

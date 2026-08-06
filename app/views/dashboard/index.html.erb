@@ -1,243 +1,111 @@
 <% content_for :title, "Dashboard" %>
 
-<div class="space-y-8">
-  <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+<div class="space-y-6">
+  <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
       <h1 class="text-3xl font-semibold text-slate-950">Dashboard</h1>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-        Monitor Bridgarr health, sync status, and proxy activity from one place.
-      </p>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">A focused view of the assignments Bridgarr manages across your applications.</p>
     </div>
 
     <div class="flex flex-wrap gap-3">
+      <%= link_to "Preview changes", preview_indexer_apps_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <%= button_to "Sync all", sync_runs_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
-      <%= link_to "Add indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+      <%= link_to "Discover indexers", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
     </div>
   </section>
 
-  <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
-      <p class="text-sm font-medium text-slate-500">Jackett</p>
-      <p class="mt-3 text-2xl font-semibold text-stone-950"><%= @dashboard.jackett_configured? ? "Configured" : "Missing" %></p>
+  <section class="flex flex-col gap-3 rounded-md border px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between <%= dashboard_operational_classes(@dashboard) %>">
+    <div>
+      <h2 class="font-semibold text-slate-950"><%= dashboard_operational_title(@dashboard) %></h2>
+      <p class="mt-1 text-sm leading-6 text-slate-600"><%= dashboard_operational_summary(@dashboard) %></p>
     </div>
-
-    <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
-      <p class="text-sm font-medium text-slate-500">Apps</p>
-      <p class="mt-3 text-2xl font-semibold text-stone-950"><%= @dashboard.enabled_arr_apps_count %> enabled</p>
-      <p class="mt-1 text-xs text-slate-500"><%= pluralize(@dashboard.arr_apps_count, "total app") %></p>
-    </div>
-
-    <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
-      <p class="text-sm font-medium text-slate-500">Indexers</p>
-      <p class="mt-3 text-2xl font-semibold text-stone-950"><%= @dashboard.enabled_indexers_count %> enabled</p>
-      <p class="mt-1 text-xs text-slate-500"><%= pluralize(@dashboard.indexers_count, "total indexer") %></p>
-    </div>
-
-    <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
-      <p class="text-sm font-medium text-slate-500">Assignments</p>
-      <p class="mt-3 text-2xl font-semibold text-stone-950"><%= @dashboard.enabled_assignments_count %> enabled</p>
-      <p class="mt-1 text-xs text-slate-500"><%= pluralize(@dashboard.assignments_count, "total assignment") %></p>
+    <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
+      <% unless @dashboard.readiness.complete? %><%= link_to "Setup", readiness_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
+      <% if @dashboard.external_services_health.attention_count.positive? || @dashboard.health_checks_pending? %><%= link_to "Health", health_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
+      <% if @dashboard.latest_sync_run_needs_attention? || @dashboard.latest_sync_run_active? %><%= link_to "Sync run", sync_run_path(@dashboard.latest_sync_run), class: "text-slate-700 hover:text-slate-950" %><% end %>
+      <% if @dashboard.jackett_changes_count.positive? %><%= link_to "Jackett changes", discover_indexers_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
+      <% if @dashboard.proxy_failures_count.positive? %><%= link_to "Proxy failures", proxy_activity_path(status: "failed"), class: "text-slate-700 hover:text-slate-950" %><% end %>
     </div>
   </section>
 
-  <% external_health = @dashboard.external_services_health %>
   <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-base font-semibold text-slate-950">External services health</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600">
-          <% if external_health.needs_attention? %>
-            <%= pluralize(external_health.attention_count, "service") %> need attention.
-          <% elsif external_health.unknown_count.positive? %>
-            <%= pluralize(external_health.unknown_count, "service") %> have not been checked.
-          <% elsif external_health.healthy_count.zero? %>
-            No external services are configured.
-          <% else %>
-            All <%= pluralize(external_health.healthy_count, "service") %> are healthy.
+    <div class="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+      <nav class="flex flex-wrap gap-2" aria-label="Assignment views">
+        <% Dashboard::Overview::FILTERS.each do |filter| %>
+          <%= link_to root_path(filter:, query: @dashboard.query.presence), class: class_names(
+            "rounded-md border px-3 py-2 text-sm font-semibold",
+            @dashboard.selected_filter == filter ? "border-slate-900 bg-slate-900 text-white" : "border-stone-300 bg-white text-slate-700 hover:bg-stone-50"
+          ) do %>
+            <%= dashboard_assignment_filter_label(filter) %>
+            <span class="ml-1 opacity-70"><%= @dashboard.assignment_filter_counts.fetch(filter) %></span>
           <% end %>
-          <% if external_health.last_completed_at.present? %>
-            Last checked <%= format_server_timestamp(external_health.last_completed_at) %>.
-          <% end %>
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <% health_badge_label, health_badge_classes =
-          if external_health.needs_attention?
-            [ "Review", "border-red-200 bg-red-50 text-red-800" ]
-          elsif external_health.unknown_count.positive?
-            [ "Unknown", "border-slate-200 bg-slate-100 text-slate-700" ]
-          elsif external_health.healthy_count.positive?
-            [ "Healthy", "border-amber-200 bg-amber-50 text-amber-900" ]
-          else
-            [ "Not configured", "border-slate-200 bg-slate-100 text-slate-700" ]
-          end %>
-        <span class="<%= class_names("inline-flex w-fit rounded-md border px-2 py-1 text-xs font-semibold", health_badge_classes) %>">
-          <%= health_badge_label %>
-        </span>
-        <%= link_to "View health", health_path, class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
-      </div>
-    </div>
-  </section>
+        <% end %>
+      </nav>
 
-  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-    <div class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-base font-semibold text-slate-950">Readiness</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600"><%= dashboard_readiness_summary(@dashboard.readiness) %></p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <span class="<%= class_names("inline-flex w-fit rounded-md border px-2 py-1 text-xs font-semibold", @dashboard.readiness.complete? ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-100 text-slate-700") %>">
-          <%= @dashboard.readiness.complete? ? "Ready" : "Setup" %>
-        </span>
-        <%= link_to "View setup", readiness_path, class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
-      </div>
-    </div>
-  </section>
-
-  <section class="<%= class_names("overflow-hidden rounded-md border bg-white shadow-sm", @dashboard.needs_attention? ? "border-red-200" : "border-stone-200") %>">
-    <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-base font-semibold text-slate-950">System status</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600"><%= dashboard_attention_summary(@dashboard) %></p>
-      </div>
-      <% if @dashboard.needs_attention? %>
-        <span class="inline-flex w-fit rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">
-          Review
-        </span>
-      <% else %>
-        <span class="inline-flex w-fit rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
-          Steady
-        </span>
+      <%= form_with url: root_path, method: :get, class: "flex w-full gap-2 lg:max-w-sm" do |form| %>
+        <%= form.hidden_field :filter, value: @dashboard.selected_filter %>
+        <%= form.search_field :query, value: @dashboard.query, placeholder: "Search indexer or app", aria: { label: "Search assignments" }, class: "min-w-0 flex-1 rounded-md border border-stone-300 px-3 py-2 text-sm" %>
+        <%= form.submit "Search", class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <% end %>
     </div>
 
-    <div class="grid gap-px bg-slate-200 lg:grid-cols-3">
-      <%= link_to sync_runs_path, class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
-        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Failed assignments</p>
-        <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.failed_assignments_count %></p>
-      <% end %>
-
-      <%= link_to indexers_path, class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
-        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Pending sync</p>
-        <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.unsynced_assignments_count %></p>
-      <% end %>
-
-      <%= link_to proxy_activity_path(status: "failed"), class: "bg-white px-5 py-4 hover:bg-stone-50" do %>
-        <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Proxy failures</p>
-        <p class="mt-2 text-xl font-semibold text-slate-950"><%= @dashboard.proxy_failures_count %></p>
-      <% end %>
-    </div>
-  </section>
-
-  <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-    <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-base font-semibold text-slate-950">Sync status</h2>
-        <p class="mt-1 text-sm leading-6 text-slate-600">Track bulk sync runs as Bridgarr updates managed indexers.</p>
-      </div>
-      <%= link_to "View sync runs", sync_runs_path, class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
-    </div>
-
-    <% if @dashboard.latest_sync_run.present? %>
-      <div class="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-5">
-        <div class="bg-white px-5 py-4">
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Status</p>
-          <p class="mt-2">
-            <span class="<%= class_names("inline-flex rounded-md border px-2 py-1 text-xs font-semibold", sync_run_status_classes(@dashboard.latest_sync_run.status)) %>">
-              <%= sync_run_status_label(@dashboard.latest_sync_run.status) %>
-            </span>
-          </p>
-        </div>
-        <div class="bg-white px-5 py-4">
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Assignments</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @dashboard.latest_sync_run.total_count %></p>
-        </div>
-        <div class="bg-white px-5 py-4">
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Succeeded</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @dashboard.latest_sync_run.success_count %></p>
-        </div>
-        <div class="bg-white px-5 py-4">
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Failed</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @dashboard.latest_sync_run.failure_count %></p>
-        </div>
-        <div class="bg-white px-5 py-4">
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Started</p>
-          <p class="mt-2 text-sm font-semibold text-slate-700"><%= format_server_timestamp(@dashboard.latest_sync_run.started_at || @dashboard.latest_sync_run.created_at) %></p>
-        </div>
+    <% if @dashboard.assignment_rows.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+            <tr>
+              <th class="px-4 py-3">Indexer</th>
+              <th class="px-4 py-3">Destination</th>
+              <th class="px-4 py-3">Desired state</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Last applied</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            <% @dashboard.assignment_rows.each do |row| %>
+              <% assignment = row.assignment %>
+              <tr class="align-top hover:bg-stone-50/70">
+                <td class="px-4 py-4">
+                  <%= link_to row.indexer.name, row.indexer, class: "font-semibold text-slate-950 hover:underline" %>
+                  <span class="mt-1 block font-mono text-xs text-slate-500"><%= row.indexer.jackett_id %></span>
+                </td>
+                <td class="px-4 py-4">
+                  <%= link_to row.arr_app.name, row.arr_app, class: "font-semibold text-slate-950 hover:underline" %>
+                  <span class="mt-1 block text-xs text-slate-500"><%= row.arr_app.app_type.titleize %></span>
+                </td>
+                <td class="px-4 py-4">
+                  <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= assignment.enabled? ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-100 text-slate-700' %>"><%= assignment.enabled? ? "Enabled" : "Disabled" %></span>
+                  <p class="mt-2 text-xs text-slate-500"><%= assignment.connection_mode.titleize %> · <%= assignment.category_mode.titleize %> categories</p>
+                </td>
+                <td class="max-w-xs px-4 py-4">
+                  <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= dashboard_assignment_status_classes(row.status) %>"><%= dashboard_assignment_status_label(row.status) %></span>
+                  <p class="mt-2 text-xs leading-5 text-slate-600"><%= row.detail %></p>
+                </td>
+                <td class="whitespace-nowrap px-4 py-4 text-slate-700"><%= row.last_applied_at ? format_server_timestamp(row.last_applied_at) : "Never" %></td>
+                <td class="px-4 py-4 text-right">
+                  <div class="flex flex-wrap justify-end gap-x-3 gap-y-2 text-xs font-semibold">
+                    <%= link_to "Preview", preview_indexer_apps_path(assignment_ids: [ assignment.id ]), class: "text-blue-700 hover:text-blue-900" %>
+                    <%= link_to "Sync", sync_indexer_app_path(assignment), data: { turbo_method: :post }, class: "text-slate-700 hover:text-slate-950" %>
+                    <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "dashboard"), class: "text-slate-700 hover:text-slate-950" %>
+                    <% if row.attention? || assignment.last_error.present? %><%= render "indexer_apps/diagnostic_button", assignment: %><% end %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
       </div>
     <% else %>
-      <div class="px-6 py-10 text-center">
-        <p class="text-sm font-medium text-slate-700">No sync runs yet.</p>
+      <div class="px-6 py-12 text-center">
+        <% if @dashboard.assignments_count.zero? %>
+          <p class="text-sm font-medium text-slate-700">No assignments yet.</p>
+          <p class="mt-2 text-sm text-slate-500"><%= link_to "Open the assignment matrix", indexer_apps_path, class: "font-semibold text-slate-700 underline" %> to connect an indexer to an application.</p>
+        <% else %>
+          <p class="text-sm font-medium text-slate-700">No assignments match this view.</p>
+          <%= link_to "Clear filters", root_path, class: "mt-2 inline-block text-sm font-semibold text-slate-700 underline" %>
+        <% end %>
       </div>
     <% end %>
-  </section>
-
-  <% show_sync_attention = @dashboard.failed_assignments.any? || @dashboard.unsynced_assignments.any? %>
-
-  <section class="<%= class_names("grid gap-4", show_sync_attention && "lg:grid-cols-2") %>">
-    <% if show_sync_attention %>
-      <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-        <div class="border-b border-slate-200 px-5 py-4">
-          <h2 class="text-base font-semibold text-slate-950">Sync attention</h2>
-          <p class="mt-1 text-sm leading-6 text-slate-600">Recent failed or pending indexer assignments.</p>
-        </div>
-
-        <div class="divide-y divide-slate-200">
-          <% (@dashboard.failed_assignments + @dashboard.unsynced_assignments).uniq.first(5).each do |assignment| %>
-            <div class="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-center">
-              <div>
-                <p class="font-medium text-slate-950">
-                  <%= link_to assignment.indexer.name, assignment.indexer, class: "hover:underline" %>
-                  <span class="text-slate-400">&rarr;</span>
-                  <%= link_to assignment.arr_app.name, assignment.arr_app, class: "hover:underline" %>
-                  <%= render "indexer_apps/custom_settings_badge", assignment: %>
-                </p>
-                <% if assignment.last_error.present? %>
-                  <p class="mt-1 text-xs leading-5 text-red-800"><%= assignment.last_error %></p>
-                <% elsif assignment.last_synced_at.present? %>
-                  <p class="mt-1 text-xs leading-5 text-slate-500">Last synced <%= format_server_timestamp(assignment.last_synced_at) %></p>
-                <% else %>
-                  <p class="mt-1 text-xs leading-5 text-slate-500">Ready for first sync.</p>
-                <% end %>
-              </div>
-              <span class="<%= class_names("inline-flex w-fit rounded-md border px-2 py-1 text-xs font-semibold", assignment_status_classes(assignment)) %>">
-                <%= assignment_status_label(assignment) %>
-              </span>
-            </div>
-          <% end %>
-        </div>
-      </div>
-    <% end %>
-
-    <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-      <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="text-base font-semibold text-slate-950">Proxy activity</h2>
-          <p class="mt-1 text-sm leading-6 text-slate-600">
-            Torznab traffic Bridgarr has handled in the last 24 hours.
-          </p>
-        </div>
-        <%= link_to "View all activity", proxy_activity_path, class: "text-sm font-semibold text-slate-700 hover:text-slate-950" %>
-      </div>
-
-      <div class="grid gap-px bg-slate-200 sm:grid-cols-4">
-        <%= link_to proxy_activity_path, class: "bg-white px-5 py-4 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400" do %>
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Requests</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @dashboard.proxy_activity_stats[:total] %></p>
-        <% end %>
-        <%= link_to proxy_activity_path(status: "failed"), class: "bg-white px-5 py-4 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400" do %>
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Failed</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @dashboard.proxy_activity_stats[:failed] %></p>
-        <% end %>
-        <%= link_to proxy_activity_path(request_type: "download"), class: "bg-white px-5 py-4 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400" do %>
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Downloads</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= @dashboard.proxy_activity_stats[:downloads] %></p>
-        <% end %>
-        <%= link_to proxy_activity_path, class: "bg-white px-5 py-4 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400" do %>
-          <p class="text-xs font-semibold uppercase tracking-normal text-slate-500">Avg duration</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950"><%= proxy_duration(@dashboard.proxy_activity_stats[:average_duration_ms]) %></p>
-        <% end %>
-      </div>
-    </div>
   </section>
 </div>

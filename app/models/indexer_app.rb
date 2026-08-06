@@ -1,18 +1,28 @@
 class IndexerApp < ApplicationRecord
   CONNECTION_MODES = %w[ direct bridged ].freeze
   CATEGORY_MODES = %w[ auto custom none ].freeze
+  PLAN_STATES = %w[create update unchanged conflict orphaned unreachable invalid].freeze
 
   belongs_to :indexer
   belongs_to :arr_app
   has_many :sync_run_items, dependent: :nullify
 
   before_validation :normalize_settings
+  before_update :mark_changed_desired_state
+  after_update_commit -> { broadcast_refresh_later_to "assignment_matrix" }
 
   validates :indexer_id, uniqueness: { scope: :arr_app_id }
   validates :connection_mode, inclusion: { in: CONNECTION_MODES }
   validates :category_mode, inclusion: { in: CATEGORY_MODES }
+  validates :last_plan_state, inclusion: { in: PLAN_STATES }, allow_nil: true
   validate :custom_categories_are_category_id_list
   validate :custom_categories_are_present_for_custom_mode
+
+  scope :with_enabled_parents, -> do
+    joins(:indexer, :arr_app).where(indexers: { enabled: true }, arr_apps: { enabled: true })
+  end
+  scope :enabled_assignments, -> { where(enabled: true) }
+  scope :disabled_assignments, -> { where(enabled: false) }
 
   def record_sync_result(result, synced_at: Time.current)
     attributes = {
@@ -21,7 +31,16 @@ class IndexerApp < ApplicationRecord
       last_status: sync_status_for(result),
       last_error: Secrets::Redactor.call(result.error)
     }
-    attributes[:proxy_api_key_version] = Setting.proxy_api_key_version if result.success? && connection_mode_bridged?
+    if result.success?
+      attributes[:last_applied_at] = synced_at
+      attributes[:last_plan_state] = "unchanged"
+      if result.respond_to?(:desired_digest) && result.desired_digest.present?
+        attributes[:last_applied_digest] = result.desired_digest
+        attributes[:last_desired_digest] = result.desired_digest
+        attributes[:last_remote_digest] = result.desired_digest
+      end
+      attributes[:proxy_api_key_version] = Setting.proxy_api_key_version if connection_mode_bridged?
+    end
 
     update!(attributes)
   end
@@ -44,6 +63,10 @@ class IndexerApp < ApplicationRecord
 
   def active_sync?
     active_sync_run_item.present?
+  end
+
+  def reconciliation_attention?
+    last_plan_state.in?(%w[conflict orphaned unreachable invalid])
   end
 
   def connection_mode_direct?
@@ -79,6 +102,17 @@ class IndexerApp < ApplicationRecord
       elsif valid_category_list_text?(raw_categories)
         self.custom_categories = raw_categories.scan(/\d+/).map(&:to_i).uniq.join(",")
       end
+    end
+
+    def mark_changed_desired_state
+      return unless will_save_change_to_enabled? ||
+        will_save_change_to_connection_mode? ||
+        will_save_change_to_category_mode? ||
+        will_save_change_to_custom_categories?
+
+      self.last_plan_state = remote_indexer_id.present? ? "update" : "create"
+      self.last_inspected_at = nil
+      self.last_desired_digest = nil
     end
 
     def custom_categories_are_category_id_list

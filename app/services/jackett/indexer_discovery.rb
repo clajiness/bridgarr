@@ -1,6 +1,12 @@
+require "digest"
+
 module Jackett
   class IndexerDiscovery
-    IndexerRecord = Data.define(:name, :jackett_id, :configured)
+    IndexerRecord = Struct.new(:name, :jackett_id, :configured, :fingerprint, keyword_init: true) do
+      def source_digest
+        fingerprint.presence || Digest::SHA256.hexdigest(JSON.generate(name:, jackett_id:, configured:))
+      end
+    end
     Result = Data.define(:success?, :indexers, :message, :error, :http_status)
 
     INDEXERS_PATH = "/api/v2.0/indexers/all/results/torznab/api"
@@ -20,7 +26,7 @@ module Jackett
       return failure("Add a Jackett API key before discovering indexers.") if api_key.blank?
       return failure("Jackett URL must start with http:// or https://.") unless valid_base_url?
 
-      response = http.get(INDEXERS_PATH, t: "indexers", configured: true, apikey: api_key)
+      response = http.get(INDEXERS_PATH, t: "indexers", apikey: api_key)
       return http_failure(response) unless response.success?
 
       indexers = parse_indexers(response.body)
@@ -60,19 +66,19 @@ module Jackett
           name = indexer.at_xpath("title")&.text
           configured = ActiveModel::Type::Boolean.new.cast(indexer["configured"])
 
-          next unless configured
           next if jackett_id.blank? || name.blank?
 
           IndexerRecord.new(
             name:,
             jackett_id:,
-            configured:
+            configured:,
+            fingerprint: Digest::SHA256.hexdigest(indexer.to_xml)
           )
         end
       end
 
       def success(indexers, http_status)
-        Result.new(success?: true, indexers:, message: "Found #{indexers.size} configured Jackett indexers.", error: nil, http_status:)
+        Result.new(success?: true, indexers:, message: "Found #{indexers.size} Jackett indexers.", error: nil, http_status:)
       end
 
       def http_failure(response)
@@ -80,6 +86,7 @@ module Jackett
       end
 
       def failure(message, http_status: nil)
+        message = Secrets::Redactor.call(message)
         Result.new(success?: false, indexers: [], message:, error: message, http_status:)
       end
   end

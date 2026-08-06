@@ -1,58 +1,102 @@
 <% content_for :title, "Discover indexers" %>
 
 <div class="space-y-6">
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+  <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      <h1 class="text-3xl font-semibold text-slate-950">Discover indexers</h1>
+      <p class="font-mono text-sm text-slate-500">guided setup</p>
+      <h1 class="mt-1 text-3xl font-semibold text-slate-950">Discover and assign indexers</h1>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-        Review configured Jackett indexers before importing missing records into Bridgarr.
+        Review Jackett changes, select destinations, create assignments, and optionally sync everything in one workflow.
       </p>
     </div>
-
     <%= link_to "Back", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
-  </div>
+  </section>
 
   <% if @jackett_indexers.any? %>
-    <%= form_with url: import_from_jackett_indexers_path, class: "overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm" do %>
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
-          <tr>
-            <th class="px-4 py-3">Import</th>
-            <th class="px-4 py-3">Name</th>
-            <th class="px-4 py-3">Jackett ID</th>
-            <th class="px-4 py-3">Import status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-          <% @jackett_indexers.each do |jackett_indexer| %>
-            <% already_present = @existing_jackett_ids.include?(jackett_indexer.jackett_id) %>
-            <tr>
-              <td class="px-4 py-3">
-                <%= check_box_tag "jackett_ids[]", jackett_indexer.jackett_id, !already_present, disabled: already_present, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
-              </td>
-              <td class="px-4 py-3 font-medium text-slate-950"><%= jackett_indexer.name %></td>
-              <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= jackett_indexer.jackett_id %></td>
-              <td class="px-4 py-3">
-                <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", already_present ? "border-slate-200 bg-slate-100 text-slate-600" : "border-amber-200 bg-amber-50 text-amber-900") %>">
-                  <%= already_present ? "Already imported" : "Ready to import" %>
-                </span>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
+    <%= form_with url: import_from_jackett_indexers_path, class: "space-y-6" do %>
+      <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-4 py-3">
+          <h2 class="font-semibold text-slate-950">1. Choose Jackett indexers</h2>
+          <p class="mt-1 text-sm text-slate-600">Selecting an existing changed indexer accepts its current Jackett name.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+              <tr><th class="px-4 py-3">Use</th><th class="px-4 py-3">Name</th><th class="px-4 py-3">Jackett ID</th><th class="px-4 py-3">Discovery state</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <% @jackett_indexers.each do |jackett_indexer| %>
+                <% existing = @existing_by_jackett_id[jackett_indexer.jackett_id] %>
+                <% state = existing&.jackett_state || (jackett_indexer.configured ? "new" : "disabled") %>
+                <% selectable = jackett_indexer.configured %>
+                <tr>
+                  <td class="px-4 py-3"><%= check_box_tag "jackett_ids[]", jackett_indexer.jackett_id, selectable && (existing.nil? || state != "unchanged"), disabled: !selectable, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %></td>
+                  <td class="px-4 py-3 font-medium text-slate-950">
+                    <%= jackett_indexer.name %>
+                    <% if existing && existing.name != jackett_indexer.name %><span class="mt-1 block text-xs font-normal text-slate-500">Previously <%= existing.name %></span><% end %>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= jackett_indexer.jackett_id %></td>
+                  <td class="px-4 py-3"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= state.in?(%w[new unchanged]) ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-800' %>"><%= if existing && state == "unchanged"; "Already imported · Unchanged"; elsif state == "new"; "Ready to import · New"; else; state.humanize; end %></span></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <div class="flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-end">
+      <section class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 class="font-semibold text-slate-950">2. Choose destination apps</h2>
+        <p class="mt-1 text-sm text-slate-600">Assignments are created or updated for every selected indexer and destination.</p>
+        <% if @arr_apps.any? %>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <% @arr_apps.each do |arr_app| %>
+              <label class="flex items-center gap-3 rounded-md border border-stone-200 px-3 py-3 text-sm text-slate-700 hover:border-amber-200 hover:bg-amber-50/40">
+                <%= check_box_tag "arr_app_ids[]", arr_app.id, false, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+                <span><strong class="block text-slate-950"><%= arr_app.name %></strong><span class="text-xs text-slate-500"><%= arr_app.app_type.titleize %></span></span>
+              </label>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><%= link_to "Add an Arr application", new_arr_app_path, class: "font-semibold underline" %> before creating assignments.</p>
+        <% end %>
+      </section>
+
+      <section class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 class="font-semibold text-slate-950">3. Configure desired state</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <div>
+            <%= label_tag :connection_mode, "Connection mode", class: "block text-sm font-medium text-slate-700" %>
+            <%= select_tag :connection_mode, options_for_select([["Direct (recommended)", "direct"], ["Bridged", "bridged"]]), class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
+          </div>
+          <div>
+            <%= label_tag :category_mode, "Category mode", class: "block text-sm font-medium text-slate-700" %>
+            <%= select_tag :category_mode, options_for_select([["Auto", "auto"], ["Custom", "custom"], ["None", "none"]]), class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
+          </div>
+          <div>
+            <%= label_tag :custom_categories, "Custom category IDs", class: "block text-sm font-medium text-slate-700" %>
+            <%= text_field_tag :custom_categories, nil, placeholder: "2000,2010,8000", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 font-mono text-sm" %>
+          </div>
+        </div>
+        <label class="mt-5 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <%= check_box_tag :sync_now, "1", true, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+          <span><strong class="block text-sm text-amber-950">Create assignments and sync immediately</strong><span class="mt-1 block text-xs leading-5 text-amber-900">The sync run will show queued, running, succeeded, failed, and no-op results.</span></span>
+        </label>
+      </section>
+
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <%= link_to "Cancel", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
-        <%= submit_tag "Import selected indexers", class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+        <%= submit_tag "Import and create assignments", class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
       </div>
     <% end %>
   <% else %>
-    <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
-      <div class="px-6 py-12 text-center">
-        <p class="text-sm font-medium text-slate-700">Jackett did not return any configured indexers.</p>
-        <p class="mt-2 text-sm leading-6 text-slate-600">Configure at least one indexer in Jackett, then discover again.</p>
-      </div>
-    </div>
+    <div class="rounded-md border border-stone-200 bg-white px-6 py-12 text-center shadow-sm"><p class="text-sm font-medium text-slate-700">Jackett did not return any indexers.</p></div>
+  <% end %>
+
+  <% if @missing_indexers.any? %>
+    <section class="rounded-md border border-red-200 bg-red-50 px-5 py-4">
+      <h2 class="font-semibold text-red-950">Missing from Jackett</h2>
+      <p class="mt-1 text-sm text-red-900">These imported indexers were not present in the latest inventory.</p>
+      <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-red-900"><% @missing_indexers.each do |indexer| %><li><%= link_to indexer.name, indexer, class: "font-semibold underline" %></li><% end %></ul>
+    </section>
   <% end %>
 </div>

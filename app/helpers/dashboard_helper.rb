@@ -1,21 +1,104 @@
 module DashboardHelper
-  def dashboard_attention_summary(dashboard)
-    if dashboard.needs_attention?
-      return dashboard_attention_parts(dashboard).to_sentence + " need attention."
-    end
+  def dashboard_operational_state(dashboard)
+    return :attention if dashboard.needs_attention?
+    return :syncing if dashboard.latest_sync_run_active?
+    return :setup unless dashboard.readiness.complete?
+    return :pending if dashboard.health_checks_pending?
 
-    return "Managed indexers look steady. Recent proxy failures are shown separately." if dashboard.proxy_failures_count.positive?
-
-    "Managed indexers look steady."
+    :healthy
   end
 
-  def dashboard_attention_parts(dashboard)
+  def dashboard_operational_title(dashboard)
+    {
+      attention: "Needs attention",
+      syncing: "Sync in progress",
+      setup: "Finish setup",
+      pending: "Health checks pending",
+      healthy: "All systems operational"
+    }.fetch(dashboard_operational_state(dashboard))
+  end
+
+  def dashboard_operational_summary(dashboard)
+    if dashboard.needs_attention?
+      parts = [
+        dashboard.attention_assignments_count.positive? ? pluralize(dashboard.attention_assignments_count, "assignment") : nil,
+        dashboard.external_services_health.attention_count.positive? ? pluralize(dashboard.external_services_health.attention_count, "service") : nil,
+        dashboard.jackett_changes_count.positive? ? pluralize(dashboard.jackett_changes_count, "Jackett change") : nil,
+        dashboard.proxy_failures_count.positive? ? pluralize(dashboard.proxy_failures_count, "proxy failure") : nil,
+        dashboard.latest_sync_run_needs_attention? ? "latest sync run" : nil
+      ].compact
+      return "Review #{parts.to_sentence}. #{dashboard_inventory_summary(dashboard)}"
+    end
+
+    if dashboard.latest_sync_run_active?
+      return "The latest sync run is #{dashboard.latest_sync_run.status}. #{dashboard_inventory_summary(dashboard)}"
+    end
+
+    if !dashboard.readiness.complete?
+      return "#{dashboard_readiness_summary(dashboard.readiness)} #{dashboard_inventory_summary(dashboard)}"
+    end
+
+    if dashboard.health_checks_pending?
+      return "#{pluralize(dashboard.external_services_health.unknown_count, 'service')} have not completed a health check. #{dashboard_inventory_summary(dashboard)}"
+    end
+
+    dashboard_inventory_summary(dashboard)
+  end
+
+  def dashboard_inventory_summary(dashboard)
     [
-      dashboard.latest_sync_run_needs_attention? ? "latest sync run" : nil,
-      dashboard.failed_assignments_count.positive? ? pluralize(dashboard.failed_assignments_count, "failed assignment") : nil,
-      dashboard.unsynced_assignments_count.positive? ? pluralize(dashboard.unsynced_assignments_count, "pending sync") : nil,
-      dashboard.external_services_health.attention_count.positive? ? pluralize(dashboard.external_services_health.attention_count, "service health issue") : nil
-    ].compact
+      pluralize(dashboard.indexers_count, "indexer"),
+      pluralize(dashboard.arr_apps_count, "app"),
+      pluralize(dashboard.assignments_count, "managed assignment")
+    ].join(" · ")
+  end
+
+  def dashboard_operational_classes(dashboard)
+    case dashboard_operational_state(dashboard)
+    when :attention then "border-red-200 bg-red-50"
+    when :syncing then "border-blue-200 bg-blue-50"
+    when :healthy then "border-amber-200 bg-amber-50"
+    else "border-stone-200 bg-white"
+    end
+  end
+
+  def dashboard_assignment_status_label(status)
+    {
+      "conflict" => "Conflict",
+      "orphaned" => "Orphaned",
+      "unreachable" => "Unreachable",
+      "invalid" => "Invalid",
+      "failed" => "Failed",
+      "mismatch" => "Mismatch",
+      "not_applicable" => "Not applicable",
+      "needs_apply" => "Needs apply",
+      "syncing" => "Syncing",
+      "unsynced" => "Unsynced",
+      "disabled" => "Disabled",
+      "healthy" => "Healthy"
+    }.fetch(status, status.to_s.humanize)
+  end
+
+  def dashboard_assignment_status_classes(status)
+    case status
+    when "conflict", "orphaned", "unreachable", "invalid", "failed"
+      "border-red-200 bg-red-50 text-red-800"
+    when "mismatch", "healthy"
+      "border-amber-200 bg-amber-50 text-amber-900"
+    when "needs_apply", "syncing"
+      "border-blue-200 bg-blue-50 text-blue-800"
+    else
+      "border-slate-200 bg-slate-100 text-slate-700"
+    end
+  end
+
+  def dashboard_assignment_filter_label(filter)
+    {
+      "all" => "All",
+      "attention" => "Needs attention",
+      "unsynced" => "Unsynced",
+      "disabled" => "Disabled"
+    }.fetch(filter)
   end
 
   def external_service_path(item)
@@ -34,6 +117,8 @@ module DashboardHelper
   end
 
   def dashboard_readiness_item_path(item)
+    return discover_indexers_path if item.key == :jackett_changes
+
     case item.key
     when :settings
       settings_path
@@ -41,8 +126,10 @@ module DashboardHelper
       arr_apps_path
     when :indexers
       indexers_path
+    when :assignments
+      indexer_apps_path(filter: item.filter)
     when :sync
-      sync_runs_path
+      indexer_apps_path(filter: item.filter)
     else
       root_path
     end

@@ -22,8 +22,16 @@ Rails.application.routes.draw do
       post :import_from_jackett
     end
   end
-  resources :indexer_apps, only: %i[ edit update ] do
+  resources :indexer_apps, only: %i[ index edit update destroy ] do
+    collection do
+      post :bulk_update
+      get :preview
+      post :apply_plan
+    end
     post :sync, on: :member
+    post :repair, on: :member
+    post :forget_remote, on: :member
+    get :diagnostic, on: :member
   end
   resources :sync_runs, only: %i[ index show create ] do
     post :abandon, on: :member

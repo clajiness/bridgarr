@@ -56,6 +56,71 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
     expect(sync_run.reload).to have_attributes(status: "succeeded", success_count: 1, failure_count: 0, skipped_count: 0)
   end
 
+  it "rechecks a preview-backed plan immediately before mutation" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(indexer_app:, plan_digest: "reviewed-plan", planned_action: "create")
+    plan_item = Sync::Plan::Item.new(
+      indexer_app:,
+      state: "create",
+      remote_indexer_id: nil,
+      changes: [],
+      message: "Create.",
+      desired_digest: "desired",
+      remote_digest: nil,
+      plan_digest: "reviewed-plan",
+      destructive: false
+    )
+    plan = Sync::Plan::Result.new(items: [ plan_item ], generated_at: Time.current)
+    result = Sync::IndexerAppSync::Result.new(
+      success?: true,
+      skipped?: false,
+      remote_indexer_id: 42,
+      message: "EZTV synced to Sonarr.",
+      error: nil
+    )
+    allow(Sync::Plan).to receive(:call).and_return(plan)
+    allow(Sync::PlanRecorder).to receive(:call)
+    allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(Sync::Plan).to have_received(:call).with(scope: kind_of(ActiveRecord::Relation))
+    expect(Sync::IndexerAppSync).to have_received(:call).with(indexer_app:)
+    expect(sync_run_item.reload.status).to eq("succeeded")
+  end
+
+  it "does not mutate when a preview-backed plan became stale in the queue" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(indexer_app:, plan_digest: "reviewed-plan", planned_action: "create")
+    plan_item = Sync::Plan::Item.new(
+      indexer_app:,
+      state: "create",
+      remote_indexer_id: nil,
+      changes: [],
+      message: "Create.",
+      desired_digest: "changed-desired",
+      remote_digest: nil,
+      plan_digest: "changed-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ plan_item ], generated_at: Time.current))
+    allow(Sync::PlanRecorder).to receive(:call)
+    allow(Sync::IndexerAppSync).to receive(:call)
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(Sync::IndexerAppSync).not_to have_received(:call)
+    expect(sync_run_item.reload).to have_attributes(status: "failed", planned_action: "create")
+    expect(sync_run_item.error).to include("plan changed before the job started")
+    expect(sync_run.reload.status).to eq("failed")
+  end
+
   it "fails the item when the assignment was removed before the job runs" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")

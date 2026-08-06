@@ -29,6 +29,18 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("Main Radarr")
   end
 
+  it "renders the centralized assignment matrix" do
+    assignment
+
+    get indexer_apps_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Assignment matrix")
+    expect(response.body).to include("LimeTorrents")
+    expect(response.body).to include("Main Radarr")
+    expect(response.body).to include("Enabled")
+  end
+
   it "updates assignment category settings" do
     patch indexer_app_path(assignment), params: {
       indexer_app: {
@@ -45,6 +57,49 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.custom_categories).to eq("2000,8000")
   end
 
+  it "disables an assignment without removing it" do
+    patch indexer_app_path(assignment), params: {
+      indexer_app: { enabled: false }
+    }
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(assignment.reload).not_to be_enabled
+    expect(IndexerApp.exists?(assignment.id)).to be(true)
+  end
+
+  it "creates assignments from selected matrix cells" do
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}" ],
+      bulk_action: "create"
+    }
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(IndexerApp.find_by(indexer:, arr_app:)).to be_enabled
+  end
+
+  it "does not preview every assignment when only unassigned cells were selected" do
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}" ],
+      bulk_action: "preview"
+    }
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(flash[:alert]).to include("do not have assignments yet")
+  end
+
+  it "rejects unknown matrix actions without changing assignments" do
+    assignment
+
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}" ],
+      bulk_action: "unknown"
+    }
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(flash[:alert]).to eq("Choose a valid bulk action.")
+    expect(assignment.reload).to be_enabled
+  end
+
   it "returns to the app page when editing from an app" do
     patch indexer_app_path(assignment), params: {
       return_to: "arr_app",
@@ -57,6 +112,16 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.reload.category_mode).to eq("none")
   end
 
+  it "returns to the dashboard when editing from the operational table" do
+    patch indexer_app_path(assignment), params: {
+      return_to: "dashboard",
+      indexer_app: { enabled: false }
+    }
+
+    expect(response).to redirect_to(root_path)
+    expect(assignment.reload).not_to be_enabled
+  end
+
   it "shows invalid custom category errors" do
     patch indexer_app_path(assignment), params: {
       indexer_app: {
@@ -67,5 +132,147 @@ RSpec.describe "Indexer app assignments", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(response.body).to include("must be a comma-separated list of positive category IDs")
+  end
+
+  it "downloads a redacted assignment diagnostic report" do
+    assignment.update!(last_status: "error", last_error: "HTTP 401 apikey=secret-value")
+
+    get diagnostic_indexer_app_path(assignment, format: :text)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.media_type).to eq("text/plain")
+    expect(response.body).to include("Bridgarr assignment diagnostic report")
+    expect(response.body).not_to include("secret-value")
+  end
+
+  it "renders a mutation-free reconciliation preview" do
+    item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "create",
+      remote_indexer_id: nil,
+      changes: [],
+      message: "A managed Generic Torznab indexer will be created.",
+      desired_digest: "desired",
+      remote_digest: nil,
+      plan_digest: "plan",
+      destructive: false
+    )
+    plan = Sync::Plan::Result.new(items: [ item ], generated_at: Time.current)
+    allow(Sync::Plan).to receive(:call).and_return(plan)
+
+    get preview_indexer_apps_path(assignment_ids: [ assignment.id ])
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Reconciliation preview")
+    expect(response.body).to include("No remote configuration was changed")
+    expect(response.body).to include("Apply selected plan")
+    expect(assignment.reload.last_plan_state).to eq("create")
+  end
+
+  it "does not expand an explicitly empty preview selection to every assignment" do
+    assignment
+    allow(Sync::Plan).to receive(:call).and_call_original
+
+    get preview_indexer_apps_path(assignment_ids: [ "invalid" ])
+
+    expect(response).to have_http_status(:ok)
+    expect(Sync::Plan).to have_received(:call) do |scope:|
+      expect(scope).to be_none
+    end
+    expect(response.body).not_to include("LimeTorrents")
+  end
+
+  it "rechecks and queues an explicitly reviewed reconciliation plan" do
+    item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "create",
+      remote_indexer_id: nil,
+      changes: [],
+      message: "Create.",
+      desired_digest: "desired",
+      remote_digest: nil,
+      plan_digest: "reviewed-plan",
+      destructive: false
+    )
+    plan = Sync::Plan::Result.new(items: [ item ], generated_at: Time.current)
+    allow(Sync::Plan).to receive(:call).and_return(plan)
+
+    post apply_plan_indexer_apps_path, params: {
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "reviewed-plan" }
+    }
+
+    sync_run = SyncRun.order(:id).last
+    expect(response).to redirect_to(sync_run_path(sync_run))
+    expect(sync_run.sync_run_items.first.plan_digest).to eq("reviewed-plan")
+  end
+
+  it "returns an empty apply submission to the matrix instead of expanding its scope" do
+    assignment
+    allow(Sync::Plan).to receive(:call).and_call_original
+
+    post apply_plan_indexer_apps_path
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(flash[:alert]).to include("No selected reconciliation changes")
+    expect(SyncRun.count).to eq(0)
+  end
+
+  it "refuses to repair an association when the remote conflict changed" do
+    conflict = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "conflict",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Conflict.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "conflict-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ conflict ], generated_at: Time.current))
+
+    post repair_indexer_app_path(assignment), params: { remote_indexer_id: 99 }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:alert]).to include("conflict changed")
+    expect(assignment.reload.remote_indexer_id).to be_nil
+  end
+
+  it "does not forget a remote association while its sync is active" do
+    assignment.update!(remote_indexer_id: 42)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    post forget_remote_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:alert]).to include("active assignment sync")
+    expect(assignment.reload.remote_indexer_id).to eq(42)
+  end
+
+  it "rechecks active sync state immediately before repairing an association" do
+    conflict = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "conflict",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Conflict.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "conflict-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call) do
+      sync_run = SyncRun.create!(status: "running", total_count: 1)
+      sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+      Sync::Plan::Result.new(items: [ conflict ], generated_at: Time.current)
+    end
+
+    post repair_indexer_app_path(assignment), params: { remote_indexer_id: 42 }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:alert]).to include("active assignment sync")
+    expect(assignment.reload.remote_indexer_id).to be_nil
   end
 end

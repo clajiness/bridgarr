@@ -38,4 +38,10 @@ module SyncRunsHelper
 
     Sync::ErrorClassifier.call(sync_run_item.error, skipped: sync_run_item.skipped?).summary
   end
+
+  def sync_error_recommendation(sync_run_item)
+    return nil if sync_run_item.error.blank?
+
+    Sync::ErrorClassifier.call(sync_run_item.error, skipped: sync_run_item.skipped?).recommendation
+  end
 end

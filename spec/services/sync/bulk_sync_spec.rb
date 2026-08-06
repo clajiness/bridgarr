@@ -67,6 +67,19 @@ RSpec.describe Sync::BulkSync do
     expect(Sync::BulkSyncJob).to have_been_enqueued.with(sync_run.id)
   end
 
+  it "finishes without enqueueing a coordinator when every assignment is already syncing" do
+    busy_assignment = create_assignment(indexer_name: "1337x", arr_app_name: "Sonarr")
+    existing_sync_run = SyncRun.create!(mode: "assignment", status: "running", total_count: 1)
+    existing_sync_run.sync_run_items.create!(indexer_app: busy_assignment, status: "running")
+
+    sync_run = described_class.call
+
+    expect(sync_run).to have_attributes(status: "skipped", total_count: 0)
+    expect(sync_run.finished_at).to be_present
+    expect(sync_run.sync_run_items).to be_empty
+    expect(Sync::BulkSyncJob).not_to have_been_enqueued
+  end
+
   def create_assignment(indexer_name:, arr_app_name:, indexer_enabled: true, assignment_enabled: true)
     arr_app = ArrApp.create!(
       name: arr_app_name,

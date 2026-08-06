@@ -24,11 +24,16 @@
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.started_at.present? ? format_server_timestamp(sync_run_item.started_at) : "Not started" %></td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.finished_at.present? ? format_server_timestamp(sync_run_item.finished_at) : "Not finished" %></td>
   <td class="<%= class_names("min-w-0 px-4 py-3 align-top", sync_run_item.failed? ? "text-red-800" : "text-slate-700") %>">
+    <% if sync_run_item.planned_action.present? %>
+      <p class="mb-1 text-xs font-semibold uppercase tracking-normal text-slate-500"><%= reconciliation_state_label(sync_run_item.planned_action) %></p>
+    <% end %>
     <% if sync_run_item.error.present? %>
       <% if sync_run_item.error_kind.present? %>
         <p class="mb-1 text-xs font-semibold uppercase tracking-normal text-slate-500"><%= sync_error_kind_label(sync_run_item.error_kind) %></p>
       <% end %>
       <p class="text-sm leading-6 [overflow-wrap:anywhere]"><%= sync_error_summary(sync_run_item) %></p>
+      <p class="mt-1 text-xs leading-5 text-slate-600"><%= sync_error_recommendation(sync_run_item) %></p>
+      <% if sync_run_item.indexer_app.present? %><div class="mt-2"><%= render "indexer_apps/diagnostic_button", assignment: sync_run_item.indexer_app %></div><% end %>
       <% if sync_run_item.retrying? && sync_run_item.next_retry_at.present? %>
         <p class="mt-1 text-xs leading-5 text-blue-700">Retry scheduled for <%= format_server_timestamp(sync_run_item.next_retry_at) %>.</p>
       <% end %>
@@ -37,7 +42,17 @@
         <p class="mt-2 max-h-40 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-stone-50 p-3 font-mono text-xs leading-5 text-slate-700 [overflow-wrap:anywhere]"><%= sync_run_item.error %></p>
       </details>
     <% else %>
-      None
+      <%= sync_run_item.planned_action == "unchanged" ? "No changes were required." : "Completed without an error." %>
+      <% if sync_run_item.planned_changes.any? %>
+        <details class="mt-2">
+          <summary class="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-950">Show planned field changes</summary>
+          <ul class="mt-2 space-y-1 text-xs leading-5 text-slate-600">
+            <% sync_run_item.planned_changes.each do |change| %>
+              <li><span class="font-semibold text-slate-800"><%= change["label"] %>:</span> <%= change["current"] %> → <%= change["desired"] %></li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
     <% end %>
   </td>
 </tr>
