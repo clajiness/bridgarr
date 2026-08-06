@@ -1,6 +1,6 @@
 module Sync
   class IndexerAppSync
-    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, keyword_init: true)
+    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, :action, :desired_digest, keyword_init: true)
 
     REMOTE_NAME_SUFFIX = " (Bridgarr)"
 
@@ -26,13 +26,19 @@ module Sync
         proxy_api_key: Setting.proxy_api_key,
         jackett_id: indexer.jackett_id,
         remote_indexer_id: indexer_app.remote_indexer_id,
+        enabled: indexer_app.enabled?,
         connection_mode: indexer_app.connection_mode,
         category_mode: indexer_app.category_mode,
         custom_category_ids: indexer_app.custom_category_ids
       )
 
       if result.success?
-        record(success(result.remote_indexer_id, result.message))
+        record(success(
+          result.remote_indexer_id,
+          result.message,
+          result.respond_to?(:action) ? result.action : nil,
+          result.respond_to?(:desired_digest) ? result.desired_digest : nil
+        ))
       elsif result.skipped?
         record(skipped(result.message))
       else
@@ -51,22 +57,24 @@ module Sync
         result
       end
 
-      def success(remote_indexer_id, client_message)
+      def success(remote_indexer_id, client_message, client_action, desired_digest)
         Result.new(
           success?: true,
           skipped?: false,
           remote_indexer_id:,
           message: success_message(client_message),
-          error: nil
+          error: nil,
+          action: client_action,
+          desired_digest:
         )
       end
 
       def skipped(message)
-        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message)
+        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, action: nil)
       end
 
       def failure(message)
-        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message)
+        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, action: nil)
       end
 
       def remote_indexer_name

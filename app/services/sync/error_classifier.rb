@@ -1,6 +1,6 @@
 module Sync
   class ErrorClassifier
-    Result = Data.define(:kind, :summary, :retryable?)
+    Result = Data.define(:kind, :summary, :recommendation, :retryable?)
 
     def self.call(message, skipped: false)
       new(message, skipped:).call
@@ -15,6 +15,12 @@ module Sync
       kind =
         if skipped || incompatible_categories?
           "incompatible_categories"
+        elsif stale_plan?
+          "stale_plan"
+        elsif remote_conflict?
+          "remote_conflict"
+        elsif orphaned?
+          "orphaned"
         elsif authentication?
           "authentication"
         elsif challenge_solver_timeout?
@@ -35,7 +41,7 @@ module Sync
           "unknown"
         end
 
-      Result.new(kind:, summary: summary_for(kind), retryable?: retryable?(kind))
+      Result.new(kind:, summary: summary_for(kind), recommendation: recommendation_for(kind), retryable?: retryable?(kind))
     end
 
     private
@@ -44,6 +50,18 @@ module Sync
 
       def incompatible_categories?
         message.match?(/no compatible default categories|does not expose .*compatible torznab categories/i)
+      end
+
+      def stale_plan?
+        message.match?(/reconciliation plan changed|reviewed assignment no longer exists|preview changed/i)
+      end
+
+      def remote_conflict?
+        message.match?(/overlapping unmanaged indexer|potentially overlapping indexer|repair the association/i)
+      end
+
+      def orphaned?
+        message.match?(/remote indexer id .* no longer exists|stale remote association/i)
       end
 
       def authentication?
@@ -98,6 +116,12 @@ module Sync
           "This assignment is not applicable because the app defaults do not overlap with this indexer."
         when "authentication"
           "Authentication failed. Check the relevant API key or credentials."
+        when "stale_plan"
+          "The reviewed reconciliation plan changed before Bridgarr could apply it."
+        when "remote_conflict"
+          "A remote indexer overlaps this assignment but is not safely associated with it."
+        when "orphaned"
+          "The assignment points to a remote indexer that no longer exists."
         when "invalid_configuration"
           "The indexer configuration was rejected or incomplete."
         when "network"
@@ -106,6 +130,31 @@ module Sync
           "The app reached the indexer, but validation search failed."
         else
           "The sync failed for an unknown reason."
+        end
+      end
+
+      def recommendation_for(kind)
+        case kind
+        when "challenge_solver_timeout", "timeout", "unavailable"
+          "Retry the assignment. If it fails again, test the Jackett indexer and increase timeouts only after confirming the upstream service is healthy."
+        when "category_mismatch", "incompatible_categories"
+          "Review the assignment's category mode and select compatible or custom categories."
+        when "authentication"
+          "Edit and retest the affected application or Jackett API key."
+        when "stale_plan"
+          "Preview reconciliation again, review the refreshed differences, and apply the new plan."
+        when "remote_conflict"
+          "Preview reconciliation and explicitly repair the remote association before syncing."
+        when "orphaned"
+          "Preview reconciliation, then forget the stale association or repair it to the correct remote indexer."
+        when "invalid_configuration"
+          "Open assignment settings, correct the rejected value, and preview reconciliation again."
+        when "network"
+          "Verify container DNS, hostnames, ports, and network routes, then retest the affected service."
+        when "search_failed"
+          "Test the indexer in Jackett and review the validation details returned by the destination application."
+        else
+          "Retry once, then copy the diagnostic report and include it when opening an issue."
         end
       end
   end

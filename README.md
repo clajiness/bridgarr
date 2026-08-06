@@ -22,6 +22,10 @@ needed for a useful homelab deployment:
 - Sonarr, Radarr, Lidarr, and compatible app records
 - App connection testing
 - Indexer-to-app assignments
+- Centralized assignment matrix with bookmarked operational filters
+- Read-only reconciliation previews with redacted field-level changes
+- Guided Jackett import, assignment creation, and optional immediate sync
+- Jackett rename, disabled, and missing-indexer detection
 - Managed Generic Torznab indexer sync
 - Bulk sync jobs with Solid Queue
 - Direct Jackett-backed app indexers by default
@@ -120,8 +124,9 @@ sure the mounted storage directory is writable by UID/GID `1000`.
    Bridgarr to manage.
 7. Open **Apps**, add your Sonarr/Radarr/Lidarr instances, and test each
    connection.
-8. Assign indexers to apps from either the app or indexer edit screens.
-9. Sync the assignments.
+8. Open **Assignments** to review the assignment matrix, or create assignments
+   directly during discovery.
+9. Preview reconciliation and apply the safe selected changes.
 10. In the *arr app, test the new `Indexer (Bridgarr)` Generic Torznab indexer.
 
 By default, managed *arr indexers point directly at Jackett. This keeps Jackett
@@ -132,6 +137,32 @@ For assignments where you want Bridgarr to record proxy activity or rewrite
 download links, edit the assignment and switch **Connection mode** from
 **Direct** to **Bridged**. Bridged assignments point the *arr app at Bridgarr,
 and Bridgarr forwards Torznab traffic to Jackett.
+
+## Setup and Reconciliation
+
+The assignment matrix is Bridgarr's desired-state workspace. Each cell has three
+distinct states:
+
+- **Unassigned** means Bridgarr does not manage that indexer in the destination.
+- **Enabled** means the assignment is managed and remote RSS, automatic, and
+  interactive searches should be enabled.
+- **Disabled** means the assignment remains managed, but those remote search
+  modes should be disabled.
+
+Removing an assignment is separate from disabling it. Removal deletes the
+Bridgarr-managed remote indexer when one is associated and requires explicit
+confirmation.
+
+Use **Preview** before applying changes. Bridgarr inspects each destination once
+and classifies assignments as create, update, unchanged, conflict, orphaned,
+unreachable, or invalid. Previewing does not change remote applications. Apply
+rechecks the plan and refuses a stale preview. Unmanaged overlaps and stale
+remote associations require an explicit repair or forget action.
+
+Successful applies record a digest of the normalized configuration that was
+verified or sent. Later previews use it to distinguish local desired-state
+changes from remote drift without persisting raw API keys. Failure views can
+copy a redacted diagnostic report suitable for a GitHub issue.
 
 ## Network Notes
 
@@ -321,6 +352,7 @@ bridged search or download traffic again. Direct assignments remain unaffected.
 | `TZ` | Docker image: `UTC` | Controls the process timezone used when Bridgarr renders timestamps; non-container deployments inherit the host default when unset. |
 | `SOLID_QUEUE_IN_PUMA` | Docker image: `true` | Runs the Solid Queue supervisor inside the web container. Puma treats an unset value as `false` outside the image. |
 | `ARR_INDEXER_SYNC_TIMEOUT_SECONDS` | `150` | Timeout while Bridgarr waits for an *arr app to create/test a managed indexer. |
+| `ARR_INDEXER_INSPECTION_TIMEOUT_SECONDS` | `15` | Timeout for read-only Arr inventory and schema inspection during reconciliation previews. |
 | `JACKETT_TORZNAB_TIMEOUT_SECONDS` | `120` | Timeout while Bridgarr waits for Jackett Torznab responses. |
 | `JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS` | `120` | Timeout for each uncached live search used to check indexer health. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
 | `AUTH_SESSION_TIMEOUT_MINUTES` | `30` | Inactivity timeout in minutes. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |

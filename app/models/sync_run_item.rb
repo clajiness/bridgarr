@@ -87,14 +87,26 @@ class SyncRunItem < ApplicationRecord
     sanitized_error = result.success? ? nil : Secrets::Redactor.call(result.error)
     classification = sanitized_error.present? ? Sync::ErrorClassifier.call(sanitized_error, skipped: result.skipped?) : nil
 
-    update!(
+    attributes = {
       status: sync_status_for(result, classification:),
       finished_at:,
       error: sanitized_error,
       error_kind: classification&.kind,
       retryable: classification&.retryable? || false,
       next_retry_at: nil
-    )
+    }
+    if planned_action.blank? && result.respond_to?(:action) && result.action.present?
+      attributes[:planned_action] = result.action
+    end
+
+    update!(attributes)
+  end
+
+  def planned_changes
+    parsed = JSON.parse(plan_changes.presence || "[]")
+    parsed.is_a?(Array) ? parsed : []
+  rescue JSON::ParserError
+    []
   end
 
   def record_retry!(error:, classification:, next_retry_at:)

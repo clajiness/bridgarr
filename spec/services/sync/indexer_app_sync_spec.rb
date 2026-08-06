@@ -200,7 +200,7 @@ RSpec.describe Sync::IndexerAppSync do
     expect(assignment.last_error).to include("no results in the configured categories")
   end
 
-  it "syncs assignments even if their hidden enabled flag is false" do
+  it "reconciles disabled assignments as disabled remote desired state" do
     assignment.update!(enabled: false)
     client = FakeGenericTorznabClient.new(
       FakeGenericTorznabClient::Result.new(
@@ -216,6 +216,7 @@ RSpec.describe Sync::IndexerAppSync do
     expect(result).to be_success
     expect(result.message).to eq("EZTV synced to Main Sonarr.")
     expect(client.calls.size).to eq(1)
+    expect(client.calls.first).to include(enabled: false)
   end
 
   it "does not append the Bridgarr suffix twice" do

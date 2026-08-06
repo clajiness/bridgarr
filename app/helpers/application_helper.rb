@@ -49,6 +49,12 @@ module ApplicationHelper
     Sync::ErrorClassifier.call(assignment.last_error, skipped: assignment.last_status == "skipped").summary
   end
 
+  def assignment_error_recommendation(assignment)
+    return nil if assignment.last_error.blank?
+
+    Sync::ErrorClassifier.call(assignment.last_error, skipped: assignment.last_status == "skipped").recommendation
+  end
+
   def health_status_label(status, operational: false)
     {
       "ok" => operational ? "Operational" : "Healthy",

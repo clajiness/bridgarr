@@ -1,0 +1,123 @@
+<% content_for :title, "Assignment matrix" %>
+
+<%= turbo_stream_from "assignment_matrix" %>
+
+<div class="space-y-6">
+  <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+      <p class="font-mono text-sm text-slate-500">desired state</p>
+      <h1 class="mt-1 text-3xl font-semibold text-slate-950">Assignment matrix</h1>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+        Assign Jackett indexers across apps, manage their desired state, and preview remote changes before applying them.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "Preview all", preview_indexer_apps_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+      <%= link_to "Discover indexers", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+    </div>
+  </section>
+
+  <%= form_with url: indexer_apps_path, method: :get, class: "flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end" do |form| %>
+    <div class="w-full sm:max-w-xs">
+      <%= form.label :filter, "Saved view", class: "block text-sm font-medium text-slate-700" %>
+      <%= form.select :filter, matrix_filter_options, { selected: params[:filter] }, class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
+    </div>
+    <%= form.submit "Apply filter", class: "rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
+    <% if params[:filter].present? %><%= link_to "Clear", indexer_apps_path, class: "px-3 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950" %><% end %>
+  <% end %>
+
+  <% if @indexers.any? && @arr_apps.any? %>
+    <%= form_with url: bulk_update_indexer_apps_path, class: "space-y-4" do |form| %>
+      <%= hidden_field_tag :filter, params[:filter] %>
+
+      <div class="overflow-x-auto rounded-md border border-stone-200 bg-white shadow-sm">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
+            <tr>
+              <th class="sticky left-0 z-10 min-w-52 bg-stone-100 px-4 py-3">Jackett indexer</th>
+              <% @arr_apps.each do |arr_app| %>
+                <th class="min-w-64 px-4 py-3">
+                  <%= link_to arr_app.name, arr_app, class: "hover:underline" %>
+                  <span class="mt-1 block font-normal normal-case text-slate-500"><%= arr_app.app_type.titleize %></span>
+                </th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            <% @indexers.each do |indexer| %>
+              <tr class="align-top">
+                <th class="sticky left-0 z-10 bg-white px-4 py-4 text-left">
+                  <%= link_to indexer.name, indexer, class: "font-semibold text-slate-950 hover:underline" %>
+                  <span class="mt-1 block font-mono text-xs font-normal text-slate-500"><%= indexer.jackett_id %></span>
+                  <% if indexer.jackett_state.in?(%w[renamed changed disabled missing]) %>
+                    <span class="mt-2 inline-flex rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800"><%= indexer.jackett_state.humanize %></span>
+                  <% end %>
+                </th>
+                <% @arr_apps.each do |arr_app| %>
+                  <% assignment = @assignments_by_cell[[indexer.id, arr_app.id]] %>
+                  <td class="px-4 py-4">
+                    <div class="flex items-start gap-3">
+                      <%= check_box_tag "cells[]", "#{indexer.id}:#{arr_app.id}", false, aria: { label: "Select #{indexer.name} for #{arr_app.name}" }, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+                      <div class="min-w-0 flex-1 space-y-2">
+                        <% if assignment %>
+                          <div class="flex flex-wrap gap-2">
+                            <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= assignment_enabled_classes(assignment) %>"><%= assignment.enabled? ? "Enabled" : "Disabled" %></span>
+                            <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= assignment_connection_mode_classes(assignment) %>"><%= assignment.connection_mode.titleize %></span>
+                            <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= reconciliation_state_classes(assignment.last_plan_state) %>"><%= reconciliation_state_label(assignment.last_plan_state) %></span>
+                          </div>
+                          <p class="text-xs leading-5 text-slate-600"><%= assignment_status_label(assignment) %><% if assignment.last_synced_at %> · <%= format_server_timestamp(assignment.last_synced_at) %><% end %></p>
+                          <% if assignment.last_error.present? %>
+                            <p class="text-xs leading-5 text-red-800"><%= assignment_error_summary(assignment) %></p>
+                            <p class="text-xs leading-5 text-slate-600"><%= assignment_error_recommendation(assignment) %></p>
+                            <%= render "indexer_apps/diagnostic_button", assignment: %>
+                          <% end %>
+                          <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
+                            <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "matrix"), class: "text-slate-700 hover:text-slate-950" %>
+                            <%= link_to "Preview", preview_indexer_apps_path(assignment_ids: [ assignment.id ]), class: "text-blue-700 hover:text-blue-900" %>
+                            <%= link_to "Remove", indexer_app_path(assignment), data: { turbo_method: :delete, turbo_confirm: "Remove this assignment and its managed remote indexer?" }, class: "text-red-700 hover:text-red-900" %>
+                          </div>
+                        <% else %>
+                          <span class="inline-flex rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-500">Unassigned</span>
+                          <p class="text-xs leading-5 text-slate-500">Select this cell and choose Create assignment.</p>
+                        <% end %>
+                      </div>
+                    </div>
+                  </td>
+                <% end %>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+        <div class="grid gap-3 md:grid-cols-4">
+          <div>
+            <%= label_tag :bulk_action, "Bulk action", class: "block text-sm font-medium text-slate-700" %>
+            <%= select_tag :bulk_action, options_for_select([
+              ["Create assignment", "create"], ["Enable", "enable"], ["Disable", "disable"],
+              ["Use direct mode", "direct"], ["Use bridged mode", "bridged"], ["Update categories", "categories"],
+              ["Preview / test", "preview"], ["Sync now", "sync"]
+            ]), class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
+          </div>
+          <div>
+            <%= label_tag :category_mode, "Category mode", class: "block text-sm font-medium text-slate-700" %>
+            <%= select_tag :category_mode, options_for_select([["Auto", "auto"], ["Custom", "custom"], ["None", "none"]]), class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
+          </div>
+          <div>
+            <%= label_tag :custom_categories, "Custom category IDs", class: "block text-sm font-medium text-slate-700" %>
+            <%= text_field_tag :custom_categories, nil, placeholder: "2000,2010,8000", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 font-mono text-sm" %>
+          </div>
+          <div class="flex items-end">
+            <%= form.submit "Apply to selected", class: "w-full rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="rounded-md border border-stone-200 bg-white px-6 py-12 text-center shadow-sm">
+      <p class="text-sm font-medium text-slate-700">The matrix needs at least one indexer and one Arr application.</p>
+    </div>
+  <% end %>
+</div>

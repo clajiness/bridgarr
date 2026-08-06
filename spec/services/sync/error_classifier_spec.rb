@@ -29,6 +29,30 @@ RSpec.describe Sync::ErrorClassifier do
     expect(result).not_to be_retryable
   end
 
+  it "classifies stale reconciliation plans as actionable and non-retryable" do
+    result = described_class.call("The reconciliation plan changed before the job started.")
+
+    expect(result.kind).to eq("stale_plan")
+    expect(result.recommendation).to include("Preview reconciliation again")
+    expect(result).not_to be_retryable
+  end
+
+  it "classifies unmanaged remote overlaps" do
+    result = described_class.call("A potentially overlapping unmanaged indexer exists as remote ID 42. Preview reconciliation and repair the association.")
+
+    expect(result.kind).to eq("remote_conflict")
+    expect(result.recommendation).to include("explicitly repair")
+    expect(result).not_to be_retryable
+  end
+
+  it "classifies orphaned remote associations" do
+    result = described_class.call("Remote indexer ID 42 no longer exists. Preview reconciliation and forget or repair the stale association.")
+
+    expect(result.kind).to eq("orphaned")
+    expect(result.recommendation).to include("forget the stale association")
+    expect(result).not_to be_retryable
+  end
+
   it "classifies challenge solver timeouts as retryable" do
     result = described_class.call("FlareSolverr was unable to process the request. Error solving the challenge. Timeout after 55.0 seconds.")
 

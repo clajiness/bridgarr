@@ -1,9 +1,10 @@
 module Arr
   class GenericTorznabClient
-    Result = Data.define(:success?, :skipped?, :remote_indexer_id, :message, :error, :http_status)
+    Result = Data.define(:success?, :skipped?, :remote_indexer_id, :message, :error, :http_status, :action, :desired_digest)
 
     INDEXER_PATH = "/api/v3/indexer"
     SCHEMA_PATH = "/api/v3/indexer/schema"
+    REQUIRED_TORZNAB_FIELDS = %w[baseUrl apiPath apiKey].freeze
 
     REQUEST_TIMEOUT_SECONDS = ENV.fetch("ARR_INDEXER_SYNC_TIMEOUT_SECONDS", 150).to_i
     TIMEOUT_ADOPTION_ATTEMPTS = 4
@@ -21,6 +22,7 @@ module Arr
       proxy_api_key: nil,
       jackett_id:,
       remote_indexer_id: nil,
+      enabled: true,
       connection_mode: "direct",
       category_mode: "auto",
       custom_category_ids: nil,
@@ -35,6 +37,7 @@ module Arr
       @proxy_api_key = proxy_api_key.to_s.strip
       @jackett_id = jackett_id
       @remote_indexer_id = remote_indexer_id
+      @enabled = ActiveModel::Type::Boolean.new.cast(enabled)
       @connection_mode = connection_mode.to_s.presence || "direct"
       @category_mode = category_mode.presence || "auto"
       @custom_category_ids = normalize_category_ids(custom_category_ids)
@@ -48,13 +51,22 @@ module Arr
       return failure("Jackett URL is missing.") if jackett_base_url.blank?
       return failure("Jackett API key is missing.") if jackett_api_key.blank?
 
-      if (remote_indexer = find_indexer_by_id)
-        return sync_existing_indexer(remote_indexer, already_synced_message)
+      inventory = remote_indexer_inventory
+      return inventory unless inventory.is_a?(Array)
+
+      if remote_indexer_id.present?
+        if (remote_indexer = find_indexer_by_id(inventory))
+          return sync_existing_indexer(remote_indexer, already_synced_message)
+        end
+
+        if (overlap = find_overlapping_indexer(inventory))
+          return overlap_failure(overlap, stale_remote_id: true)
+        end
+
+        return failure("Remote indexer ID #{remote_indexer_id} no longer exists. Preview reconciliation and forget or repair the stale association.")
       end
 
-      if (managed_indexer = find_indexer_by_name)
-        return sync_existing_indexer(managed_indexer, already_exists_message)
-      end
+      return overlap_failure(overlap) if (overlap = find_overlapping_indexer(inventory))
 
       schema_failure = load_torznab_schema
       return schema_failure if schema_failure
@@ -65,17 +77,19 @@ module Arr
       log_category_selection
 
       payload = torznab_payload
+      @pending_mutation = :create
       response = post_indexer(payload)
       return http_failure(response, "create Generic Torznab indexer") unless response.success?
 
-      body = JSON.parse(response.body)
-      success(body["id"], response.status)
-    rescue Faraday::TimeoutError => e
-      if (existing_indexer = find_existing_indexer_after_timeout)
-        return success(existing_indexer.fetch("id"), nil, "Generic Torznab indexer exists after #{arr_app.name} timed out.")
+      body = parse_response_body(response.body)
+      created_id = positive_remote_indexer_id(body["id"]) if body.is_a?(Hash)
+      unless created_id
+        return failure("#{arr_app.name} created the indexer but did not return a valid indexer ID. Preview reconciliation before retrying.")
       end
 
-      failure("Could not connect to #{arr_app.name}: #{e.message}")
+      success(created_id, response.status, action: "create")
+    rescue Faraday::TimeoutError => e
+      timeout_result(e)
     rescue Faraday::Error => e
       failure("Could not connect to #{arr_app.name}: #{e.message}")
     rescue JSON::ParserError
@@ -94,6 +108,7 @@ module Arr
         :proxy_api_key,
         :jackett_id,
         :remote_indexer_id,
+        :enabled,
         :connection_mode,
         :category_mode,
         :custom_category_ids,
@@ -115,8 +130,14 @@ module Arr
         response = http.get(SCHEMA_PATH)
         return http_failure(response, "fetch indexer schema") unless response.success?
 
-        @torznab_schema = select_torznab_schema(JSON.parse(response.body))
-        raise KeyError unless @torznab_schema
+        schemas = JSON.parse(response.body)
+        unless schemas.is_a?(Array) && schemas.all?(Hash)
+          return failure("#{arr_app.name} responded, but its indexer schema had an unexpected shape.")
+        end
+
+        @torznab_schema = select_torznab_schema(schemas)
+        return failure("#{arr_app.name} did not return a Generic Torznab schema.") unless @torznab_schema
+        return failure("#{arr_app.name} did not return configurable Generic Torznab fields.") unless configurable_fields?(@torznab_schema["fields"])
 
         nil
       end
@@ -128,9 +149,9 @@ module Arr
       def torznab_payload
         torznab_schema.deep_dup.tap do |payload|
           payload["name"] = name
-          payload["enableRss"] = true
-          payload["enableAutomaticSearch"] = true
-          payload["enableInteractiveSearch"] = true
+          payload["enableRss"] = enabled
+          payload["enableAutomaticSearch"] = enabled
+          payload["enableInteractiveSearch"] = enabled
           payload["fields"] = fields_with_jackett_settings(payload["fields"])
         end
       end
@@ -231,9 +252,7 @@ module Arr
 
       def sync_existing_indexer(remote_indexer, message)
         unless remote_indexer_configurable?(remote_indexer)
-          return failure("The existing bridged indexer did not return configurable fields, so Bridgarr could not verify its proxy API key.") if connection_mode_bridged?
-
-          return success(remote_indexer.fetch("id"), nil, message)
+          return failure("The existing managed indexer did not return configurable Torznab fields, so Bridgarr could not verify or update it.")
         end
 
         schema_failure = load_torznab_schema
@@ -243,23 +262,35 @@ module Arr
         return skipped(compatibility_error) if compatibility_error
 
         log_category_selection
-        return success(remote_indexer.fetch("id"), nil, message) if remote_indexer_matches?(remote_indexer)
+        return success(remote_indexer.fetch("id"), nil, message, action: "unchanged") if remote_indexer_matches?(remote_indexer)
 
         response = update_indexer(remote_indexer)
         return http_failure(response, "update Generic Torznab indexer") unless response.success?
 
         body = parse_response_body(response.body)
-        success(body["id"] || remote_indexer.fetch("id"), response.status, "Generic Torznab indexer updated.")
+        returned_id = positive_remote_indexer_id(body["id"]) if body.is_a?(Hash)
+        success(returned_id || remote_indexer.fetch("id"), response.status, "Generic Torznab indexer updated.", action: "update")
       end
 
       def remote_indexer_configurable?(remote_indexer)
-        remote_indexer["fields"].is_a?(Array)
+        configurable_fields?(remote_indexer["fields"])
+      end
+
+      def configurable_fields?(fields)
+        return false unless fields.is_a?(Array) && fields.all? { |field| field.is_a?(Hash) && field["name"].present? }
+
+        field_names = fields.pluck("name")
+        REQUIRED_TORZNAB_FIELDS.all? { |field_name| field_names.include?(field_name) }
       end
 
       def remote_indexer_matches?(remote_indexer)
         fields = remote_indexer.fetch("fields").index_by { |field| field.fetch("name") }
 
-        fields.dig("baseUrl", "value") == torznab_base_url &&
+        remote_indexer["name"] == name &&
+          boolean_value(remote_indexer["enableRss"]) == enabled &&
+          boolean_value(remote_indexer["enableAutomaticSearch"]) == enabled &&
+          boolean_value(remote_indexer["enableInteractiveSearch"]) == enabled &&
+          fields.dig("baseUrl", "value") == torznab_base_url &&
           fields.dig("apiPath", "value") == "/api" &&
           fields.dig("apiKey", "value") == torznab_api_key &&
           category_matches?(fields["categories"]) &&
@@ -277,17 +308,25 @@ module Arr
         normalize_category_ids(value).sort
       end
 
+      def boolean_value(value)
+        return true if value.nil?
+
+        ActiveModel::Type::Boolean.new.cast(value)
+      end
+
       def updated_indexer_payload(remote_indexer)
         remote_indexer.deep_dup.tap do |payload|
           payload["name"] = name
-          payload["enableRss"] = true
-          payload["enableAutomaticSearch"] = true
-          payload["enableInteractiveSearch"] = true
+          payload["enableRss"] = enabled
+          payload["enableAutomaticSearch"] = enabled
+          payload["enableInteractiveSearch"] = enabled
           payload["fields"] = fields_with_jackett_settings(payload["fields"])
         end
       end
 
       def update_indexer(remote_indexer)
+        @pending_mutation = :update
+        @pending_remote_indexer_id = remote_indexer.fetch("id")
         http.put("#{INDEXER_PATH}/#{remote_indexer.fetch("id")}") do |request|
           request.headers["Content-Type"] = "application/json"
           request.body = JSON.generate(updated_indexer_payload(remote_indexer))
@@ -301,25 +340,50 @@ module Arr
         end
       end
 
-      def remote_indexers
+      def remote_indexer_inventory
         response = http.get(INDEXER_PATH)
-        return unless response.success?
+        return http_failure(response, "inspect existing indexers") unless response.success?
 
-        JSON.parse(response.body)
+        indexers = JSON.parse(response.body)
+        unless indexers.is_a?(Array) && indexers.all? { |indexer| valid_remote_indexer?(indexer) }
+          return failure("#{arr_app.name} responded, but its indexer inventory had an unexpected shape.")
+        end
+
+        indexers
       end
 
-      def find_indexer_by_id
-        return if remote_indexer_id.blank?
-
-        remote_indexers&.find { |indexer| indexer["id"] == remote_indexer_id }
+      def find_indexer_by_id(indexers, id = remote_indexer_id)
+        indexers.find { |indexer| indexer["id"].to_s == id.to_s }
       end
 
-      def find_indexer_by_name
-        remote_indexers&.find { |indexer| indexer["name"] == name }
+      def valid_remote_indexer?(indexer)
+        indexer.is_a?(Hash) && positive_remote_indexer_id(indexer["id"])
       end
 
-      def safe_find_existing_indexer
-        find_indexer_by_name
+      def positive_remote_indexer_id(value)
+        parsed = Integer(value.to_s, 10, exception: false)
+        parsed if parsed&.positive?
+      end
+
+      def find_indexer_by_name(indexers)
+        indexers.find { |indexer| indexer["name"] == name }
+      end
+
+      def find_overlapping_indexer(indexers)
+        indexers.find { |indexer| indexer["name"] == name || same_torznab_endpoint?(indexer) }
+      end
+
+      def same_torznab_endpoint?(indexer)
+        fields = indexer["fields"]
+        return false unless fields.is_a?(Array) && fields.all?(Hash)
+
+        fields_by_name = fields.index_by { |field| field["name"] }
+        fields_by_name.dig("baseUrl", "value") == torznab_base_url && fields_by_name.dig("apiPath", "value").to_s == "/api"
+      end
+
+      def safe_remote_indexers
+        result = remote_indexer_inventory
+        result if result.is_a?(Array)
       rescue Faraday::Error, JSON::ParserError
         nil
       end
@@ -369,7 +433,8 @@ module Arr
 
       def find_existing_indexer_after_timeout
         TIMEOUT_ADOPTION_ATTEMPTS.times do |attempt|
-          existing_indexer = safe_find_existing_indexer
+          indexers = safe_remote_indexers
+          existing_indexer = timed_out_mutation_result(indexers) if indexers
           return existing_indexer if existing_indexer
 
           sleep TIMEOUT_ADOPTION_INTERVAL_SECONDS unless attempt == TIMEOUT_ADOPTION_ATTEMPTS - 1
@@ -378,21 +443,57 @@ module Arr
         nil
       end
 
-      def success(remote_indexer_id, http_status, message = "Generic Torznab indexer created.")
-        Result.new(success?: true, skipped?: false, remote_indexer_id:, message:, error: nil, http_status:)
+      def timed_out_mutation_result(indexers)
+        if @pending_mutation == :create
+          candidate = find_indexer_by_name(indexers)
+          candidate if candidate && remote_indexer_configurable?(candidate) && remote_indexer_matches?(candidate)
+        elsif @pending_mutation == :update
+          candidate = find_indexer_by_id(indexers, @pending_remote_indexer_id)
+          candidate if candidate && remote_indexer_configurable?(candidate) && remote_indexer_matches?(candidate)
+        end
+      end
+
+      def timeout_result(error)
+        if @pending_mutation && (existing_indexer = find_existing_indexer_after_timeout)
+          message = if @pending_mutation == :create
+            "Generic Torznab indexer exists after #{arr_app.name} timed out."
+          else
+            "Generic Torznab indexer matches after #{arr_app.name} timed out during update."
+          end
+          return success(existing_indexer.fetch("id"), nil, message, action: @pending_mutation.to_s)
+        end
+
+        failure("Could not connect to #{arr_app.name}: #{error.message}")
+      end
+
+      def overlap_failure(indexer, stale_remote_id: false)
+        if stale_remote_id
+          failure("Remote indexer ID #{remote_indexer_id} no longer exists, and a potentially overlapping indexer exists as remote ID #{indexer['id']}. Preview reconciliation and repair the association.")
+        else
+          failure("A potentially overlapping unmanaged indexer exists as remote ID #{indexer['id']}. Preview reconciliation and repair the association before syncing.")
+        end
+      end
+
+      def success(remote_indexer_id, http_status, message = "Generic Torznab indexer created.", action:)
+        Result.new(
+          success?: true,
+          skipped?: false,
+          remote_indexer_id:,
+          message:,
+          error: nil,
+          http_status:,
+          action:,
+          desired_digest: desired_configuration_digest
+        )
       end
 
       def already_synced_message
         "Generic Torznab indexer is already synced."
       end
 
-      def already_exists_message
-        "Generic Torznab indexer already exists."
-      end
-
       def skipped(message)
         message = Secrets::Redactor.call(message)
-        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, http_status: nil)
+        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, http_status: nil, action: nil, desired_digest: nil)
       end
 
       def http_failure(response, action)
@@ -405,7 +506,23 @@ module Arr
 
       def failure(message, http_status: nil)
         message = Secrets::Redactor.call(message)
-        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, http_status:)
+        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, http_status:, action: nil, desired_digest: nil)
+      end
+
+      def desired_configuration_digest
+        return unless @torznab_schema
+
+        Sync::DesiredConfiguration.digest(
+          "name" => name,
+          "enableRss" => enabled,
+          "enableAutomaticSearch" => enabled,
+          "enableInteractiveSearch" => enabled,
+          "baseUrl" => torznab_base_url,
+          "apiPath" => "/api",
+          "apiKey" => torznab_api_key,
+          "categories" => category_ids.sort,
+          "animeCategories" => anime_category_ids.sort
+        )
       end
 
       def response_detail(body)

@@ -37,6 +37,21 @@ module Sync
         concurrency_key: self.class.indexer_concurrency_key(sync_run_item.id)
       )
 
+      if (review_error = reviewed_plan_error(sync_run_item))
+        result = Sync::IndexerAppSync::Result.new(
+          success?: false,
+          skipped?: false,
+          remote_indexer_id: nil,
+          message: review_error,
+          error: review_error,
+          action: nil,
+          desired_digest: nil
+        )
+        record_result(sync_run_item, result)
+        log_sync_event("Stopped sync because the reviewed plan changed", sync_run_item:, attempt: sync_run_item.attempt_count)
+        return
+      end
+
       live_sync_started_at = monotonic_time
       result = Sync::IndexerAppSync.call(indexer_app: sync_run_item.indexer_app)
       record_result(sync_run_item, result)
@@ -82,6 +97,19 @@ module Sync
         else
           sync_run_item.record_result!(result)
         end
+      end
+
+      def reviewed_plan_error(sync_run_item)
+        return if sync_run_item.plan_digest.blank?
+
+        plan = Sync::Plan.call(scope: IndexerApp.where(id: sync_run_item.indexer_app_id))
+        Sync::PlanRecorder.call(plan)
+        item = plan.items.find { |candidate| candidate.indexer_app.id == sync_run_item.indexer_app_id }
+        return "The reviewed assignment no longer exists." unless item
+        return if ActiveSupport::SecurityUtils.secure_compare(sync_run_item.plan_digest, item.plan_digest)
+        return item.message if item.state == "unreachable"
+
+        "The reconciliation plan changed before the job started. Review and apply the refreshed plan."
       end
 
       def record_exception(sync_run_item, exception)

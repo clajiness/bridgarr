@@ -1,6 +1,6 @@
 class DashboardController < ApplicationController
   def index
-    @dashboard = Dashboard::Overview.new
+    @dashboard = Dashboard::Overview.new(filter: params[:filter], query: params[:query])
   end
 
   def readiness

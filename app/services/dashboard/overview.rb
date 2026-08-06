@@ -1,16 +1,35 @@
 module Dashboard
   class Overview
     PROXY_ACTIVITY_WINDOW = 24.hours
-    RECENT_LIMIT = 5
+    FILTERS = %w[all attention unsynced disabled].freeze
+    ATTENTION_STATUSES = %w[conflict orphaned unreachable invalid failed mismatch needs_apply].freeze
 
-    attr_reader :now
+    AssignmentRow = Data.define(:assignment, :status, :detail, :active_sync_item) do
+      delegate :indexer, :arr_app, to: :assignment
 
-    def initialize(now: Time.current)
-      @now = now
+      def attention?
+        ATTENTION_STATUSES.include?(status)
+      end
+
+      def unsynced?
+        status == "unsynced"
+      end
+
+      def disabled?
+        !assignment.enabled? || !assignment.indexer.enabled? || !assignment.arr_app.enabled?
+      end
+
+      def last_applied_at
+        assignment.last_applied_at || (assignment.last_synced_at if assignment.last_status == "ok")
+      end
     end
 
-    def jackett_configured?
-      Setting.jackett_configured?
+    attr_reader :now, :selected_filter, :query
+
+    def initialize(now: Time.current, filter: nil, query: nil)
+      @now = now
+      @selected_filter = FILTERS.include?(filter.to_s) ? filter.to_s : "all"
+      @query = query.to_s.strip
     end
 
     def readiness
@@ -25,32 +44,37 @@ module Dashboard
       ArrApp.count
     end
 
-    def enabled_arr_apps_count
-      ArrApp.where(enabled: true).count
-    end
-
     def indexers_count
       Indexer.count
-    end
-
-    def enabled_indexers_count
-      Indexer.where(enabled: true).count
     end
 
     def assignments_count
       IndexerApp.count
     end
 
-    def enabled_assignments_count
-      active_assignments.count
+    def assignment_rows
+      rows = filter_rows(all_assignment_rows)
+      return rows if query.blank?
+
+      normalized_query = query.downcase
+      rows.select do |row|
+        row.indexer.name.downcase.include?(normalized_query) ||
+          row.indexer.jackett_id.downcase.include?(normalized_query) ||
+          row.arr_app.name.downcase.include?(normalized_query)
+      end
     end
 
-    def failed_assignments_count
-      IndexerApp.where(last_status: "error").count
+    def assignment_filter_counts
+      @assignment_filter_counts ||= {
+        "all" => all_assignment_rows.size,
+        "attention" => all_assignment_rows.count(&:attention?),
+        "unsynced" => all_assignment_rows.count(&:unsynced?),
+        "disabled" => all_assignment_rows.count(&:disabled?)
+      }
     end
 
-    def unsynced_assignments_count
-      unsynced_assignment_scope.count
+    def attention_assignments_count
+      assignment_filter_counts.fetch("attention")
     end
 
     def latest_sync_run
@@ -61,85 +85,101 @@ module Dashboard
       latest_sync_run&.status.in?(%w[failed partial])
     end
 
-    def failed_assignments
-      @failed_assignments ||= IndexerApp.includes(:indexer, :arr_app)
-        .where(last_status: "error")
-        .order(last_synced_at: :desc, updated_at: :desc)
-        .limit(RECENT_LIMIT)
-    end
-
-    def unsynced_assignments
-      @unsynced_assignments ||= unsynced_assignment_scope
-        .includes(:indexer, :arr_app)
-        .order(updated_at: :desc)
-        .limit(RECENT_LIMIT)
-    end
-
-    def proxy_activity_stats
-      @proxy_activity_stats ||= {
-        total: recent_proxy_scope.count,
-        successful: recent_proxy_scope.successful.count,
-        failed: recent_proxy_scope.failed.count,
-        downloads: recent_proxy_scope.where(request_type: "download").count,
-        average_duration_ms: recent_proxy_scope.average(:duration_ms).to_i
-      }
+    def latest_sync_run_active?
+      latest_sync_run&.status.in?(%w[queued running retrying])
     end
 
     def proxy_failures_count
-      proxy_activity_stats[:failed]
+      @proxy_failures_count ||= ProxyRequest.where(created_at: PROXY_ACTIVITY_WINDOW.ago(now)..now).failed.count
     end
 
-    def failed_proxy_requests
-      @failed_proxy_requests ||= recent_proxy_scope
-        .includes(:indexer)
-        .failed
-        .recent
-        .limit(RECENT_LIMIT)
-    end
-
-    def slow_proxy_requests
-      @slow_proxy_requests ||= recent_proxy_scope
-        .includes(:indexer)
-        .where("duration_ms > 0")
-        .order(duration_ms: :desc, created_at: :desc)
-        .limit(RECENT_LIMIT)
-    end
-
-    def recent_proxy_requests
-      @recent_proxy_requests ||= ProxyRequest.includes(:indexer).recent.limit(RECENT_LIMIT)
-    end
-
-    def visible_proxy_requests
-      @visible_proxy_requests ||= showing_proxy_failures? ? failed_proxy_requests : recent_proxy_requests
-    end
-
-    def showing_proxy_failures?
-      failed_proxy_requests.any?
-    end
-
-    def attention_count
-      failed_assignments_count + unsynced_assignments_count + external_services_health.attention_count + (latest_sync_run_needs_attention? ? 1 : 0)
+    def jackett_changes_count
+      @jackett_changes_count ||= Indexer.with_jackett_changes.count
     end
 
     def needs_attention?
-      attention_count.positive?
+      attention_assignments_count.positive? ||
+        external_services_health.attention_count.positive? ||
+        latest_sync_run_needs_attention? ||
+        proxy_failures_count.positive? ||
+        jackett_changes_count.positive?
+    end
+
+    def health_checks_pending?
+      external_services_health.unknown_count.positive?
     end
 
     private
 
-      def active_assignments
-        IndexerApp.joins(:indexer, :arr_app)
-          .where(indexers: { enabled: true }, arr_apps: { enabled: true })
+      def all_assignment_rows
+        @all_assignment_rows ||= begin
+          assignments = IndexerApp.joins(:indexer, :arr_app).includes(:indexer, :arr_app).order("indexers.name", "arr_apps.name").to_a
+          active_items = SyncRunItem.active
+            .where(indexer_app_id: assignments.map(&:id))
+            .order(:created_at)
+            .index_by(&:indexer_app_id)
+
+          assignments.map do |assignment|
+            build_assignment_row(assignment, active_items[assignment.id])
+          end
+        end
       end
 
-      def recent_proxy_scope
-        ProxyRequest.where(created_at: PROXY_ACTIVITY_WINDOW.ago(now)..now)
+      def build_assignment_row(assignment, active_sync_item)
+        status = assignment_status(assignment, active_sync_item)
+        AssignmentRow.new(
+          assignment:,
+          status:,
+          detail: assignment_status_detail(assignment, active_sync_item, status),
+          active_sync_item:
+        )
       end
 
-      def unsynced_assignment_scope
-        active_assignments
-          .where(remote_indexer_id: nil)
-          .where(last_status: nil)
+      def assignment_status(assignment, active_sync_item)
+        return assignment.last_plan_state if assignment.last_plan_state.in?(%w[conflict orphaned unreachable invalid])
+        return "syncing" if active_sync_item
+        return "failed" if assignment.last_status == "error"
+        return "mismatch" if assignment.last_status == "mismatch"
+        return "not_applicable" if assignment.last_status == "skipped"
+        return "needs_apply" if unapplied_plan?(assignment)
+        return "unsynced" if assignment.last_synced_at.nil?
+        return "disabled" unless assignment.enabled? && assignment.indexer.enabled? && assignment.arr_app.enabled?
+
+        "healthy"
+      end
+
+      def assignment_status_detail(assignment, active_sync_item, status)
+        case status
+        when "conflict" then "Overlapping remote indexer"
+        when "orphaned" then "Remote indexer is missing"
+        when "unreachable" then "Destination could not be inspected"
+        when "invalid" then "Desired configuration is incomplete"
+        when "failed", "mismatch"
+          Sync::ErrorClassifier.call(assignment.last_error, skipped: false).summary
+        when "not_applicable" then "No compatible categories"
+        when "needs_apply" then "Preview found unapplied changes"
+        when "syncing" then active_sync_item.status.titleize
+        when "unsynced" then "Never applied"
+        when "disabled" then "Remote search modes are off"
+        else "Matches desired state"
+        end
+      end
+
+      def unapplied_plan?(assignment)
+        return false unless assignment.last_plan_state.in?(%w[create update])
+        return true if assignment.last_applied_at.nil?
+        return true if assignment.last_inspected_at.nil?
+
+        assignment.last_inspected_at.present? && assignment.last_inspected_at > assignment.last_applied_at
+      end
+
+      def filter_rows(rows)
+        case selected_filter
+        when "attention" then rows.select(&:attention?)
+        when "unsynced" then rows.select(&:unsynced?)
+        when "disabled" then rows.select(&:disabled?)
+        else rows
+        end
       end
   end
 end

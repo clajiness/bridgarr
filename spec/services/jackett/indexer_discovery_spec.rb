@@ -49,10 +49,10 @@ RSpec.describe Jackett::IndexerDiscovery do
     expect(result.indexers.map(&:jackett_id)).to eq([ "first-indexer", "second-indexer" ])
     expect(result.indexers.map(&:name)).to eq([ "First Indexer", "Second Indexer" ])
     expect(connection.path).to eq("/api/v2.0/indexers/all/results/torznab/api")
-    expect(connection.params).to eq(t: "indexers", configured: true, apikey: "jackett-api-key")
+    expect(connection.params).to eq(t: "indexers", apikey: "jackett-api-key")
   end
 
-  it "ignores unconfigured or incomplete indexers" do
+  it "keeps unconfigured indexers visible but ignores incomplete records" do
     connection = FakeIndexerConnection.new(
       DiscoveryResponse.new(
         status: 200,
@@ -77,7 +77,8 @@ RSpec.describe Jackett::IndexerDiscovery do
       connection:
     )
 
-    expect(result.indexers.map(&:jackett_id)).to eq([ "first-indexer" ])
+    expect(result.indexers.map(&:jackett_id)).to eq([ "first-indexer", "unconfigured" ])
+    expect(result.indexers.last.configured).to be(false)
   end
 
   it "fails when Jackett returns invalid XML" do

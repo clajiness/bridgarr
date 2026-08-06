@@ -84,7 +84,8 @@ RSpec.describe "Health checks", type: :request do
 
     get root_path
 
-    expect(response.body).to include("2 services need attention", "View health")
+    expect(response.body).to include("Needs attention", "Review 2 services.")
+    expect(response.body).to include(health_path)
     expect(response.body).not_to include("Failing Sonarr", "Stale Indexer", "HTTP 401")
   end
 

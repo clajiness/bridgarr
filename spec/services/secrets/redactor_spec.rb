@@ -49,4 +49,20 @@ RSpec.describe Secrets::Redactor do
     expect(redacted).not_to include("hash-secret")
     expect(redacted).not_to include("other-secret")
   end
+
+  it "redacts plain key-value credentials in diagnostic text" do
+    redacted = described_class.call("HTTP 401 apikey=plain-secret token = another-secret")
+
+    expect(redacted).to include("apikey=[REDACTED]", "token = [REDACTED]")
+    expect(redacted).not_to include("plain-secret", "another-secret")
+  end
+
+  it "redacts password and secret values in common diagnostic forms" do
+    message = 'password=hunter2 client_secret: deployment-secret {"db_password":"legacy-password"}'
+
+    redacted = described_class.call(message)
+
+    expect(redacted).to include("password=[REDACTED]", "client_secret: [REDACTED]", '"db_password":"[REDACTED]"')
+    expect(redacted).not_to include("hunter2", "deployment-secret", "legacy-password")
+  end
 end

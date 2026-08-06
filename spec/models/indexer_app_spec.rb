@@ -39,6 +39,24 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_synced_at).to eq(synced_at)
     expect(assignment.last_status).to eq("ok")
     expect(assignment.last_error).to be_nil
+    expect(assignment.last_plan_state).to eq("unchanged")
+    expect(assignment.last_applied_at).to eq(synced_at)
+  end
+
+  it "marks an edited desired state as needing reconciliation" do
+    assignment = described_class.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      last_plan_state: "unchanged",
+      last_inspected_at: 1.hour.ago,
+      last_applied_at: 1.hour.ago
+    )
+
+    assignment.update!(enabled: false)
+
+    expect(assignment.last_plan_state).to eq("update")
+    expect(assignment.last_inspected_at).to be_nil
   end
 
   it "records skipped sync results" do
