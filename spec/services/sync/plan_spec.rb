@@ -111,6 +111,58 @@ RSpec.describe Sync::Plan do
     expect(item.changes).to be_empty
   end
 
+  it "treats Arr's private API key placeholder as unchanged after the current key was applied" do
+    assignment.update!(
+      remote_indexer_id: 42,
+      jackett_api_key_version: Setting.jackett_api_key_version
+    )
+    remote = remote_indexer
+    remote.fetch("fields").find { |field| field["name"] == "apiKey" }["value"] = "********"
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: [ remote ])
+
+    item = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps).items.fetch(0)
+
+    expect(item.state).to eq("unchanged")
+    expect(item.changes).to be_empty
+    expect(item.remote_digest).to eq(item.desired_digest)
+  end
+
+  it "plans an API key update when the saved Jackett key version is stale" do
+    assignment.update!(remote_indexer_id: 42, jackett_api_key_version: 1)
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "rotated-jackett-key")
+    remote = remote_indexer
+    remote.fetch("fields").find { |field| field["name"] == "apiKey" }["value"] = "********"
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: [ remote ])
+
+    item = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps).items.fetch(0)
+
+    expect(item.state).to eq("update")
+    expect(item.changes.map { |change| change["field"] }).to eq([ "apiKey" ])
+  end
+
+  it "uses the proxy key version for masked bridged assignments" do
+    assignment.update!(
+      connection_mode: "bridged",
+      remote_indexer_id: 42,
+      proxy_api_key_version: Setting.proxy_api_key_version
+    )
+    remote = remote_indexer
+    fields = remote.fetch("fields").index_by { |field| field["name"] }
+    fields.fetch("baseUrl")["value"] = "http://localhost:3000/torznab/eztv"
+    fields.fetch("apiKey")["value"] = "********"
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: [ remote ])
+
+    current_item = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps).items.fetch(0)
+
+    expect(current_item.state).to eq("unchanged")
+
+    Setting.rotate_proxy_api_key!
+    stale_item = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps).items.fetch(0)
+
+    expect(stale_item.state).to eq("update")
+    expect(stale_item.changes.map { |change| change["field"] }).to eq([ "apiKey" ])
+  end
+
   it "marks a managed remote indexer invalid when required Torznab fields are missing" do
     assignment.update!(remote_indexer_id: 42)
     remote = remote_indexer

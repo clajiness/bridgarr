@@ -39,7 +39,11 @@ class IndexerApp < ApplicationRecord
         attributes[:last_desired_digest] = result.desired_digest
         attributes[:last_remote_digest] = result.desired_digest
       end
-      attributes[:proxy_api_key_version] = Setting.proxy_api_key_version if connection_mode_bridged?
+      if connection_mode_bridged?
+        attributes[:proxy_api_key_version] = Setting.proxy_api_key_version
+      else
+        attributes[:jackett_api_key_version] = Setting.jackett_api_key_version
+      end
     end
 
     update!(attributes)
@@ -89,12 +93,21 @@ class IndexerApp < ApplicationRecord
     category_mode == "none"
   end
 
+  def api_key_update_required?
+    if connection_mode_bridged?
+      proxy_api_key_version != Setting.proxy_api_key_version
+    else
+      jackett_api_key_version != Setting.jackett_api_key_version
+    end
+  end
+
   private
 
     def normalize_settings
       self.connection_mode = connection_mode.presence || "direct"
       self.category_mode = category_mode.presence || "auto"
       self.proxy_api_key_version = nil if connection_mode_direct?
+      self.jackett_api_key_version = nil if connection_mode_bridged?
 
       raw_categories = custom_categories.to_s.strip
       if raw_categories.blank?

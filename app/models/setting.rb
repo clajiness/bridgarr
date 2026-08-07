@@ -4,6 +4,7 @@ class Setting < ApplicationRecord
   PROXY_API_KEY_VERSION_KEY = "bridgarr.proxy_api_key_version"
   JACKETT_BASE_URL_KEY = "jackett.base_url"
   JACKETT_API_KEY_KEY = "jackett.api_key"
+  JACKETT_API_KEY_VERSION_KEY = "jackett.api_key_version"
   JACKETT_LAST_STATUS_KEY = "jackett.last_status"
   JACKETT_LAST_ERROR_KEY = "jackett.last_error"
   JACKETT_LAST_TESTED_AT_KEY = "jackett.last_tested_at"
@@ -22,7 +23,11 @@ class Setting < ApplicationRecord
   end
 
   def self.write_value(key, value)
-    if key == PROXY_API_KEY_KEY
+    if key == JACKETT_API_KEY_KEY
+      return Bridgarr::SecretPersistence.without_sql_logging do
+        persist_jackett_api_key(value)
+      end
+    elsif key == PROXY_API_KEY_KEY
       return Bridgarr::SecretPersistence.without_sql_logging do
         persist_value(key, value)
       end
@@ -38,6 +43,25 @@ class Setting < ApplicationRecord
   end
   private_class_method :persist_value
 
+  def self.persist_jackett_api_key(value)
+    transaction do
+      value = value.to_s.strip
+      setting = find_or_initialize_by(key: JACKETT_API_KEY_KEY)
+      changed = setting.value.to_s != value
+      setting.value = value
+      setting.save!
+
+      if changed
+        version = find_or_initialize_by(key: JACKETT_API_KEY_VERSION_KEY)
+        version.value = [ version.value.to_i, 0 ].max + 1
+        version.save!
+      end
+
+      true
+    end
+  end
+  private_class_method :persist_jackett_api_key
+
   def self.jackett_configured?
     fetch_value(JACKETT_BASE_URL_KEY).present? && fetch_value(JACKETT_API_KEY_KEY).present?
   end
@@ -51,6 +75,10 @@ class Setting < ApplicationRecord
 
   def self.proxy_api_key_version
     fetch_value(PROXY_API_KEY_VERSION_KEY).to_i
+  end
+
+  def self.jackett_api_key_version
+    fetch_value(JACKETT_API_KEY_VERSION_KEY).to_i
   end
 
   def self.rotate_proxy_api_key!

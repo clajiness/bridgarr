@@ -49,6 +49,22 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_applied_at).to eq(synced_at)
   end
 
+  it "records the current Jackett API key version after a successful direct sync" do
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
+    assignment = described_class.create!(arr_app:, indexer:)
+    result = Sync::IndexerAppSync::Result.new(
+      success?: true,
+      remote_indexer_id: 42,
+      message: "First Indexer synced to Main Sonarr.",
+      error: nil
+    )
+
+    assignment.record_sync_result(result)
+
+    expect(assignment.jackett_api_key_version).to eq(Setting.jackett_api_key_version)
+    expect(assignment).not_to be_api_key_update_required
+  end
+
   it "marks an edited desired state as needing reconciliation" do
     assignment = described_class.create!(
       arr_app:,

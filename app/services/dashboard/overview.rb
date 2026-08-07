@@ -143,6 +143,7 @@ module Dashboard
         return "mismatch" if assignment.last_status == "mismatch"
         return "not_applicable" if assignment.last_status == "skipped"
         return "needs_apply" if unapplied_plan?(assignment)
+        return "needs_apply" if unapplied_api_key_update?(assignment)
         return "disabled" unless assignment.enabled? && assignment.indexer.enabled? && assignment.arr_app.enabled?
         return "unsynced" if assignment.last_synced_at.nil?
 
@@ -158,7 +159,12 @@ module Dashboard
         when "failed", "mismatch"
           Sync::ErrorClassifier.call(assignment.last_error, skipped: false).summary
         when "not_applicable" then "No compatible categories"
-        when "needs_apply" then "Preview found unapplied changes"
+        when "needs_apply"
+          if unapplied_api_key_update?(assignment)
+            "API key changed; preview and apply the update"
+          else
+            "Preview found unapplied changes"
+          end
         when "syncing" then active_sync_item.status.titleize
         when "unsynced" then "Never applied"
         when "disabled" then disabled_status_detail(assignment)
@@ -179,6 +185,24 @@ module Dashboard
         return true if assignment.last_inspected_at.nil?
 
         assignment.last_inspected_at.present? && assignment.last_inspected_at > assignment.last_applied_at
+      end
+
+      def unapplied_api_key_update?(assignment)
+        return false if assignment.remote_indexer_id.blank?
+
+        if assignment.connection_mode_bridged?
+          proxy_api_key_version.positive? && assignment.proxy_api_key_version != proxy_api_key_version
+        else
+          jackett_api_key_version.positive? && assignment.jackett_api_key_version != jackett_api_key_version
+        end
+      end
+
+      def jackett_api_key_version
+        @jackett_api_key_version ||= Setting.jackett_api_key_version
+      end
+
+      def proxy_api_key_version
+        @proxy_api_key_version ||= Setting.proxy_api_key_version
       end
 
       def filter_rows(rows)

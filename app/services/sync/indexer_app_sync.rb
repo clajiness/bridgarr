@@ -29,7 +29,8 @@ module Sync
         enabled: indexer_app.enabled?,
         connection_mode: indexer_app.connection_mode,
         category_mode: indexer_app.category_mode,
-        custom_category_ids: indexer_app.custom_category_ids
+        custom_category_ids: indexer_app.custom_category_ids,
+        force_api_key_update: indexer_app.api_key_update_required?
       )
 
       if result.success?

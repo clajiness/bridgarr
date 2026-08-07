@@ -215,6 +215,70 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.reload.last_plan_state).to eq("create")
   end
 
+  it "clears a persisted false update when Arr masks an unchanged API key" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
+    assignment.update!(
+      remote_indexer_id: 42,
+      jackett_api_key_version: Setting.jackett_api_key_version,
+      last_status: "ok",
+      last_synced_at: 2.hours.ago,
+      last_applied_at: 2.hours.ago,
+      last_plan_state: "update",
+      last_inspected_at: 1.hour.ago
+    )
+    remote = {
+      "id" => 42,
+      "name" => "LimeTorrents (Bridgarr)",
+      "enableRss" => true,
+      "enableAutomaticSearch" => true,
+      "enableInteractiveSearch" => true,
+      "fields" => [
+        { "name" => "baseUrl", "value" => "http://localhost:9117/api/v2.0/indexers/limetorrents/results/torznab" },
+        { "name" => "apiPath", "value" => "/api" },
+        { "name" => "apiKey", "value" => "********" },
+        { "name" => "categories", "value" => [ 2000 ] }
+      ]
+    }
+    schema = {
+      "implementation" => "Torznab",
+      "configContract" => "TorznabSettings",
+      "fields" => [
+        { "name" => "baseUrl", "value" => "" },
+        { "name" => "apiPath", "value" => "/api" },
+        { "name" => "apiKey", "value" => "" },
+        { "name" => "categories", "value" => [ 2000 ] }
+      ]
+    }
+    allow(Arr::IndexerInventory).to receive(:call).and_return(
+      Arr::IndexerInventory::Result.new(
+        success?: true,
+        indexers: [ remote ],
+        torznab_schema: schema,
+        message: "Inspected Main Radarr.",
+        error: nil,
+        http_status: 200
+      )
+    )
+    allow(Jackett::TorznabCaps).to receive(:call).and_return(
+      Jackett::TorznabCaps::Result.new(
+        success?: true,
+        category_ids: [ 2000 ],
+        message: "Found 1 Torznab category.",
+        error: nil,
+        http_status: 200
+      )
+    )
+
+    get preview_indexer_apps_path(assignment_ids: [ assignment.id ])
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("No change", "Remote configuration already matches.")
+    expect(response.body).not_to include("API key:")
+    expect(assignment.reload.last_plan_state).to eq("unchanged")
+    expect(Dashboard::Overview.new.assignment_rows.first.status).to eq("healthy")
+  end
+
   it "prominently identifies destructive remote search-mode changes" do
     item = Sync::Plan::Item.new(
       indexer_app: assignment,

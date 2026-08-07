@@ -58,6 +58,30 @@ RSpec.describe Dashboard::Overview do
     expect(described_class.new.assignment_rows.first.status).to eq("needs_apply")
   end
 
+  it "marks a real Jackett API key rotation as needing apply" do
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "original-key")
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      jackett_api_key_version: Setting.jackett_api_key_version,
+      last_plan_state: "unchanged",
+      last_applied_at: 1.hour.ago,
+      last_inspected_at: 1.hour.ago,
+      last_synced_at: 1.hour.ago,
+      last_status: "ok"
+    )
+
+    expect(described_class.new.assignment_rows.first.status).to eq("healthy")
+
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "rotated-key")
+
+    expect(assignment.reload).to be_api_key_update_required
+    row = described_class.new.assignment_rows.first
+    expect(row.status).to eq("needs_apply")
+    expect(row.detail).to eq("API key changed; preview and apply the update")
+  end
+
   it "keeps a never-synced disabled assignment distinct and explains the next sync" do
     assignment = IndexerApp.create!(arr_app:, indexer:, enabled: false)
 
