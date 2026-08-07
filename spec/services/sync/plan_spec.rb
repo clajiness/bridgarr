@@ -109,6 +109,8 @@ RSpec.describe Sync::Plan do
 
     expect(item.state).to eq("unchanged")
     expect(item.changes).to be_empty
+    expect(item).not_to be_applyable
+    expect(item).not_to be_attention
   end
 
   it "treats Arr's private API key placeholder as unchanged after the current key was applied" do

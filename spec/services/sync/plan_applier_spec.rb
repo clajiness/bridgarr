@@ -71,6 +71,22 @@ RSpec.describe Sync::PlanApplier do
     expect(SyncRun.count).to eq(0)
   end
 
+  it "rejects an unchanged-only submission without queueing sync work" do
+    unchanged_item = item.with(state: "unchanged")
+    unchanged_plan = Sync::Plan::Result.new(items: [ unchanged_item ], generated_at: Time.current)
+
+    result = described_class.call(
+      plan: unchanged_plan,
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "current-plan" }
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to eq("No selected reconciliation changes are safe to apply.")
+    expect(SyncRun.count).to eq(0)
+    expect(Sync::BulkSyncJob).not_to have_been_enqueued
+  end
+
   it "rejects the entire apply when a selected assignment disappeared" do
     missing_assignment_id = assignment.id + 10_000
 

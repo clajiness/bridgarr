@@ -49,8 +49,12 @@
             <% assignment = item.indexer_app %>
             <tr class="align-top">
               <td class="px-4 py-4">
-                <%= check_box_tag "assignment_ids[]", assignment.id, item.applyable?, disabled: !item.applyable?, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
-                <% if item.applyable? %><%= hidden_field_tag "expected_digests[#{assignment.id}]", item.plan_digest %><% end %>
+                <% if item.applyable? %>
+                  <%= check_box_tag "assignment_ids[]", assignment.id, true, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+                  <%= hidden_field_tag "expected_digests[#{assignment.id}]", item.plan_digest %>
+                <% else %>
+                  <span class="text-slate-400" aria-label="No apply action">—</span>
+                <% end %>
               </td>
               <td class="px-4 py-4">
                 <p class="font-medium text-slate-950"><%= assignment.indexer.name %></p>
@@ -85,16 +89,20 @@
       </table>
     </div>
 
-    <div class="space-y-4">
-      <% if @plan.destructive_items.any? %>
-        <label class="flex items-start gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-950">
-          <%= check_box_tag :confirm_destructive, "1", false, class: "mt-1 h-4 w-4 rounded border-red-300 text-red-700 focus:ring-red-600" %>
-          <span><strong class="block">Confirm remote search-mode disablement</strong><span class="mt-1 block text-xs leading-5">I reviewed the affected assignments and understand that applying the selected destructive changes will disable remote search modes.</span></span>
-        </label>
-      <% end %>
-      <div class="flex justify-end">
-        <%= form.submit "Apply selected plan", disabled: @plan.applyable_items.empty?, class: "rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50" %>
+    <% if @plan.applyable_items.any? %>
+      <div class="space-y-4">
+        <% if @plan.destructive_items.any? %>
+          <label class="flex items-start gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-950">
+            <%= check_box_tag :confirm_destructive, "1", false, class: "mt-1 h-4 w-4 rounded border-red-300 text-red-700 focus:ring-red-600" %>
+            <span><strong class="block">Confirm remote search-mode disablement</strong><span class="mt-1 block text-xs leading-5">I reviewed the affected assignments and understand that applying the selected destructive changes will disable remote search modes.</span></span>
+          </label>
+        <% end %>
+        <div class="flex justify-end">
+          <%= form.submit "Apply selected plan", class: "rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+        </div>
       </div>
-    </div>
+    <% else %>
+      <p class="text-right text-sm text-slate-600">Nothing to apply.</p>
+    <% end %>
   <% end %>
 </div>
