@@ -31,7 +31,7 @@
     <div class="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
       <nav class="flex flex-wrap gap-2" aria-label="Assignment views">
         <% Dashboard::Overview::FILTERS.each do |filter| %>
-          <%= link_to root_path(filter:, query: @dashboard.query.presence), class: class_names(
+          <%= link_to root_path(filter:, query: @dashboard.query.presence, per_page: @assignment_rows_page.per_page), class: class_names(
             "rounded-md border px-3 py-2 text-sm font-semibold",
             @dashboard.selected_filter == filter ? "border-slate-900 bg-slate-900 text-white" : "border-stone-300 bg-white text-slate-700 hover:bg-stone-50"
           ) do %>
@@ -43,12 +43,13 @@
 
       <%= form_with url: root_path, method: :get, class: "flex w-full gap-2 lg:max-w-sm" do |form| %>
         <%= form.hidden_field :filter, value: @dashboard.selected_filter %>
+        <%= form.hidden_field :per_page, value: @assignment_rows_page.per_page %>
         <%= form.search_field :query, value: @dashboard.query, placeholder: "Search indexer or app", aria: { label: "Search assignments" }, class: "min-w-0 flex-1 rounded-md border border-stone-300 px-3 py-2 text-sm" %>
         <%= form.submit "Search", class: "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <% end %>
     </div>
 
-    <% if @dashboard.assignment_rows.any? %>
+    <% if @assignment_rows.any? %>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
@@ -63,7 +64,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
-            <% @dashboard.assignment_rows.each do |row| %>
+            <% @assignment_rows.each do |row| %>
               <% assignment = row.assignment %>
               <% indexer_health_status = record_health_status(row.indexer, now: @dashboard.now) %>
               <tr class="align-top hover:bg-stone-50/70">
@@ -106,6 +107,11 @@
           </tbody>
         </table>
       </div>
+      <%= render "shared/pagination",
+        pagination: @assignment_rows_page,
+        item_name: "assignment",
+        path: root_path,
+        preserved_params: { filter: @dashboard.selected_filter, query: @dashboard.query.presence } %>
     <% else %>
       <div class="px-6 py-12 text-center">
         <% if @dashboard.assignments_count.zero? %>
@@ -113,7 +119,7 @@
           <p class="mt-2 text-sm text-slate-500"><%= link_to "Open the assignment matrix", indexer_apps_path, class: "font-semibold text-slate-700 underline" %> to connect an indexer to an application.</p>
         <% else %>
           <p class="text-sm font-medium text-slate-700">No assignments match this view.</p>
-          <%= link_to "Clear filters", root_path, class: "mt-2 inline-block text-sm font-semibold text-slate-700 underline" %>
+          <%= link_to "Clear filters", root_path(per_page: @assignment_rows_page.per_page), class: "mt-2 inline-block text-sm font-semibold text-slate-700 underline" %>
         <% end %>
       </div>
     <% end %>

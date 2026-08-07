@@ -60,6 +60,12 @@ class IndexersController < ApplicationController
     @proxy_requests = @indexer.proxy_requests
     @proxy_requests = @proxy_requests.failed if @proxy_activity_filter == "failed"
     @proxy_requests = @proxy_requests.recent.limit(10)
+    @assignments_page = Pagination::Page.new(
+      collection: @indexer.indexer_apps.includes(:arr_app).order("arr_apps.name"),
+      page: params[:assignment_page],
+      per_page: params[:assignment_per_page]
+    )
+    @assignments = @assignments_page.records
   end
 
   def new

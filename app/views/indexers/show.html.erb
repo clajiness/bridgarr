@@ -108,7 +108,7 @@
       <h2 class="text-base font-semibold text-slate-950">App assignments</h2>
     </div>
 
-    <% if @indexer.indexer_apps.any? %>
+    <% if @assignments.any? %>
       <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
           <tr>
@@ -120,7 +120,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
-          <% @indexer.indexer_apps.includes(:arr_app).order("arr_apps.name").each do |assignment| %>
+          <% @assignments.each do |assignment| %>
             <% active_sync_run_item = assignment.active_sync_run_item %>
             <tr>
               <td class="px-4 py-3 font-medium text-slate-950">
@@ -172,6 +172,13 @@
           <% end %>
         </tbody>
       </table>
+      <%= render "shared/pagination",
+        pagination: @assignments_page,
+        item_name: "app assignment",
+        path: indexer_path(@indexer),
+        page_param: :assignment_page,
+        per_page_param: :assignment_per_page,
+        preserved_params: { proxy_activity: (@proxy_activity_filter if @proxy_activity_filter == "failed") } %>
     <% else %>
       <div class="px-6 py-12 text-center">
         <p class="text-sm font-medium text-slate-700">Assign this indexer to an app before syncing.</p>

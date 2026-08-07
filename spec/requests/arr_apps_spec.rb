@@ -28,6 +28,23 @@ RSpec.describe "Arr apps", type: :request do
     expect(response.body).to include("Add Sonarr, Radarr, or friends so Bridgarr knows where to send indexers.")
   end
 
+  it "paginates the apps index" do
+    12.times do |index|
+      ArrApp.create!(
+        name: "App-#{index.to_s.rjust(2, "0")}",
+        app_type: "sonarr",
+        base_url: "http://app-#{index}.example.test",
+        api_key: "app-api-key-#{index}"
+      )
+    end
+
+    get arr_apps_path(page: 2, per_page: 10)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–12 of 12 apps", "App-10", "App-11")
+    expect(response.body).not_to include("App-00")
+  end
+
   it "renders the new app page" do
     get new_arr_app_path
 
@@ -156,9 +173,9 @@ RSpec.describe "Arr apps", type: :request do
     )
     allow(Arr::ConnectionTest).to receive(:call).and_return(result)
 
-    post test_connection_arr_app_path(arr_app), params: { return_to: "index" }
+    post test_connection_arr_app_path(arr_app), params: { return_to: "index", page: 2, per_page: 10 }
 
-    expect(response).to redirect_to(arr_apps_path)
+    expect(response).to redirect_to(arr_apps_path(page: 2, per_page: 10))
     expect(flash[:notice]).to eq("Main Sonarr connection works.")
     expect(arr_app.reload.last_status).to eq("ok")
   end

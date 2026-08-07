@@ -226,6 +226,27 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).not_to include("Custom assignment settings:")
   end
 
+  it "paginates app assignments on an indexer" do
+    detail_indexer = Indexer.create!(name: "Many Apps", jackett_id: "many-apps")
+    12.times do |app_index|
+      app = ArrApp.create!(
+        name: "Assigned App-#{app_index.to_s.rjust(2, "0")}",
+        app_type: "sonarr",
+        base_url: "http://assigned-app-#{app_index}.example.test",
+        api_key: "assigned-app-key-#{app_index}"
+      )
+      IndexerApp.create!(indexer: detail_indexer, arr_app: app)
+    end
+
+    get indexer_path(detail_indexer, assignment_page: 2, assignment_per_page: 10)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–12 of 12 app assignments", "Assigned App-10", "Assigned App-11")
+    document = Nokogiri::HTML(response.body)
+    assignments_table = document.xpath("//h2[normalize-space()='App assignments']/ancestor::section[1]//table").first
+    expect(assignments_table.text).not_to include("Assigned App-00")
+  end
+
   it "marks assignments with custom settings" do
     indexer
     indexer.indexer_apps.first.update!(category_mode: "custom", custom_categories: "8000")
