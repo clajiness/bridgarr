@@ -16,6 +16,21 @@ RSpec.describe Setting, type: :model do
     expect(described_class).to be_jackett_configured
   end
 
+  it "increments the Jackett API key version only when the key changes" do
+    described_class.write_value(described_class::JACKETT_API_KEY_KEY, " first-key ")
+
+    expect(described_class.jackett_api_key_version).to eq(1)
+    expect(described_class.fetch_value(described_class::JACKETT_API_KEY_KEY)).to eq("first-key")
+
+    described_class.write_value(described_class::JACKETT_API_KEY_KEY, "first-key")
+
+    expect(described_class.jackett_api_key_version).to eq(1)
+
+    described_class.write_value(described_class::JACKETT_API_KEY_KEY, "second-key")
+
+    expect(described_class.jackett_api_key_version).to eq(2)
+  end
+
   it "records Jackett connection test results" do
     tested_at = Time.zone.local(2026, 7, 4, 12, 0, 0)
     result = Jackett::ConnectionTest::Result.new(success?: false, message: "Nope", error: "Connection failed", http_status: nil)
@@ -35,15 +50,17 @@ RSpec.describe Setting, type: :model do
     expect(described_class.proxy_api_key_version).to eq(1)
   end
 
-  it "filters proxy key creation, rotation, and legacy replacement from Active Record debug logs" do
+  it "filters saved Jackett and proxy API keys from Active Record debug logs" do
     generated_keys = %w[
       initial-generated-proxy-secret
       rotated-proxy-secret
       legacy-replacement-proxy-secret
     ]
+    jackett_key = "saved-jackett-secret"
     allow(SecureRandom).to receive(:hex).with(32).and_return(*generated_keys)
 
     log_output = capture_active_record_debug_logs do
+      described_class.write_value(described_class::JACKETT_API_KEY_KEY, jackett_key)
       expect(described_class.proxy_api_key).to eq(generated_keys.fetch(0))
       expect(described_class.rotate_proxy_api_key!).to eq(generated_keys.fetch(1))
 
@@ -53,8 +70,8 @@ RSpec.describe Setting, type: :model do
     end
 
     expect(log_output).to include("bridgarr.proxy_api_key_version")
-    generated_keys.each do |proxy_key|
-      expect(log_output).not_to include(proxy_key)
+    [ jackett_key, *generated_keys ].each do |secret|
+      expect(log_output).not_to include(secret)
     end
   end
 

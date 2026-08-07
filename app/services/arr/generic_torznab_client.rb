@@ -5,6 +5,7 @@ module Arr
     INDEXER_PATH = "/api/v3/indexer"
     SCHEMA_PATH = "/api/v3/indexer/schema"
     REQUIRED_TORZNAB_FIELDS = %w[baseUrl apiPath apiKey].freeze
+    PRIVATE_FIELD_VALUE = "********"
 
     REQUEST_TIMEOUT_SECONDS = ENV.fetch("ARR_INDEXER_SYNC_TIMEOUT_SECONDS", 150).to_i
     TIMEOUT_ADOPTION_ATTEMPTS = 4
@@ -26,6 +27,7 @@ module Arr
       connection_mode: "direct",
       category_mode: "auto",
       custom_category_ids: nil,
+      force_api_key_update: false,
       connection: nil,
       caps_client: Jackett::TorznabCaps
     )
@@ -41,6 +43,7 @@ module Arr
       @connection_mode = connection_mode.to_s.presence || "direct"
       @category_mode = category_mode.presence || "auto"
       @custom_category_ids = normalize_category_ids(custom_category_ids)
+      @force_api_key_update = ActiveModel::Type::Boolean.new.cast(force_api_key_update)
       @connection = connection
       @caps_client = caps_client
     end
@@ -112,6 +115,7 @@ module Arr
         :connection_mode,
         :category_mode,
         :custom_category_ids,
+        :force_api_key_update,
         :connection,
         :caps_client
 
@@ -283,7 +287,7 @@ module Arr
         REQUIRED_TORZNAB_FIELDS.all? { |field_name| field_names.include?(field_name) }
       end
 
-      def remote_indexer_matches?(remote_indexer)
+      def remote_indexer_matches?(remote_indexer, accept_private_api_key: !force_api_key_update)
         fields = remote_indexer.fetch("fields").index_by { |field| field.fetch("name") }
 
         remote_indexer["name"] == name &&
@@ -292,9 +296,15 @@ module Arr
           boolean_value(remote_indexer["enableInteractiveSearch"]) == enabled &&
           fields.dig("baseUrl", "value") == torznab_base_url &&
           fields.dig("apiPath", "value") == "/api" &&
-          fields.dig("apiKey", "value") == torznab_api_key &&
+          api_key_matches?(fields.dig("apiKey", "value"), accept_private: accept_private_api_key) &&
           category_matches?(fields["categories"]) &&
           category_matches?(fields["animeCategories"], anime: true)
+      end
+
+      def api_key_matches?(remote_value, accept_private:)
+        return true if remote_value == PRIVATE_FIELD_VALUE && accept_private
+
+        remote_value == torznab_api_key
       end
 
       def category_matches?(field, anime: false)
@@ -446,11 +456,16 @@ module Arr
       def timed_out_mutation_result(indexers)
         if @pending_mutation == :create
           candidate = find_indexer_by_name(indexers)
-          candidate if candidate && remote_indexer_configurable?(candidate) && remote_indexer_matches?(candidate)
+          candidate if candidate && remote_indexer_configurable?(candidate) && remote_indexer_matches_after_mutation?(candidate)
         elsif @pending_mutation == :update
           candidate = find_indexer_by_id(indexers, @pending_remote_indexer_id)
-          candidate if candidate && remote_indexer_configurable?(candidate) && remote_indexer_matches?(candidate)
+          candidate if candidate && remote_indexer_configurable?(candidate) && remote_indexer_matches_after_mutation?(candidate)
         end
+      end
+
+      def remote_indexer_matches_after_mutation?(remote_indexer)
+        accept_private_api_key = @pending_mutation == :create || !force_api_key_update
+        remote_indexer_matches?(remote_indexer, accept_private_api_key:)
       end
 
       def timeout_result(error)

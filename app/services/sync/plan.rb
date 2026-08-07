@@ -60,6 +60,7 @@ module Sync
     }.freeze
     SEARCH_MODE_FIELDS = %w[enableRss enableAutomaticSearch enableInteractiveSearch].freeze
     REQUIRED_TORZNAB_FIELDS = %w[baseUrl apiPath apiKey].freeze
+    PRIVATE_FIELD_VALUE = "********"
 
     def self.call(scope: IndexerApp.all, inventory_client: Arr::IndexerInventory, caps_client: Jackett::TorznabCaps, now: Time.current)
       new(scope:, inventory_client:, caps_client:, now:).call
@@ -133,9 +134,10 @@ module Sync
 
       def comparison_item(assignment, remote, desired)
         remote_attributes = normalized_remote_attributes(remote)
-        changes = changes_between(remote_attributes, desired.attributes)
+        comparable_remote_attributes = comparable_remote_attributes(assignment, remote_attributes, desired.attributes)
+        changes = changes_between(comparable_remote_attributes, desired.attributes)
         state = changes.empty? ? "unchanged" : "update"
-        remote_digest = DesiredConfiguration.digest(remote_attributes)
+        remote_digest = DesiredConfiguration.digest(comparable_remote_attributes)
         destructive = disables_remote_search?(remote_attributes, desired.attributes)
         message = state == "unchanged" ? "Remote configuration already matches." : update_message(assignment, desired.digest, remote_digest, changes.size)
         message = "#{message} Remote RSS, automatic search, and interactive search will be disabled." if destructive
@@ -322,6 +324,13 @@ module Sync
           "categories" => category_values(fields.dig("categories", "value")),
           "animeCategories" => category_values(fields.dig("animeCategories", "value"))
         }
+      end
+
+      def comparable_remote_attributes(assignment, remote_attributes, desired_attributes)
+        return remote_attributes unless remote_attributes["apiKey"] == PRIVATE_FIELD_VALUE
+        return remote_attributes if assignment.api_key_update_required?
+
+        remote_attributes.merge("apiKey" => desired_attributes["apiKey"])
       end
 
       def boolean_value(value)

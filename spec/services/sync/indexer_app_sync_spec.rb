@@ -107,6 +107,36 @@ RSpec.describe Sync::IndexerAppSync do
     expect(client.calls.first).to include(connection_mode: "bridged")
   end
 
+  it "forces a direct API key update only when its saved version is stale" do
+    assignment.update!(remote_indexer_id: 42, jackett_api_key_version: Setting.jackett_api_key_version)
+    current_client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer is already synced.",
+        error: nil
+      )
+    )
+
+    described_class.call(indexer_app: assignment, client: current_client)
+
+    expect(current_client.calls.first).to include(force_api_key_update: false)
+
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "rotated-jackett-key")
+    stale_client = FakeGenericTorznabClient.new(
+      FakeGenericTorznabClient::Result.new(
+        success?: true,
+        remote_indexer_id: 42,
+        message: "Generic Torznab indexer updated.",
+        error: nil
+      )
+    )
+
+    described_class.call(indexer_app: assignment, client: stale_client)
+
+    expect(stale_client.calls.first).to include(force_api_key_update: true)
+  end
+
   it "records the current proxy key version after a successful bridged resynchronization" do
     assignment.update!(connection_mode: "bridged", remote_indexer_id: 42)
     client = FakeGenericTorznabClient.new(

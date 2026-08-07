@@ -42,6 +42,7 @@ RSpec.describe "Dashboard", type: :request do
       indexer:,
       enabled: true,
       remote_indexer_id: 42,
+      jackett_api_key_version: Setting.jackett_api_key_version,
       last_status: "ok",
       last_synced_at: Time.current,
       last_applied_at: Time.current

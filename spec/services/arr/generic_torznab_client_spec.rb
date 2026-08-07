@@ -131,7 +131,7 @@ RSpec.describe Arr::GenericTorznabClient do
       fields: [
         { name: "baseUrl", value: "http://localhost:9117/api/v2.0/indexers/eztv/results/torznab" },
         { name: "apiPath", value: "/api" },
-        { name: "apiKey", value: "jackett-api-key" },
+        { name: "apiKey", value: "********" },
         { name: "categories", value: [ 5030, 5040 ] },
         { name: "animeCategories", value: [] }
       ]
@@ -729,6 +729,62 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(connection.put_path).to be_nil
   end
 
+  it "does not update a matching managed indexer when Arr masks its saved API key" do
+    remote = matching_remote_indexer
+    remote.fetch(:fields).find { |field| field[:name] == "apiKey" }[:value] = "********"
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ remote ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(result.action).to eq("unchanged")
+    expect(connection.put_path).to be_nil
+  end
+
+  it "replaces Arr's private API key placeholder after a local key rotation" do
+    remote = matching_remote_indexer
+    remote.fetch(:fields).find { |field| field[:name] == "apiKey" }[:value] = "********"
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ remote ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json),
+      update_response: ArrIndexerResponse.new(status: 202, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "rotated-jackett-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      force_api_key_update: true,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    fields = JSON.parse(connection.put_body).fetch("fields").index_by { |field| field.fetch("name") }
+
+    expect(result).to be_success
+    expect(result.action).to eq("update")
+    expect(fields.dig("apiKey", "value")).to eq("rotated-jackett-key")
+  end
+
   it "updates an existing managed indexer when assignment settings change" do
     connection = FakeArrIndexerConnection.new(
       indexers_response: ArrIndexerResponse.new(
@@ -970,7 +1026,7 @@ RSpec.describe Arr::GenericTorznabClient do
       fields: [
         { name: "baseUrl", value: "http://localhost:9117/api/v2.0/indexers/eztv/results/torznab" },
         { name: "apiPath", value: "/api" },
-        { name: "apiKey", value: "jackett-api-key" },
+        { name: "apiKey", value: "********" },
         { name: "categories", value: [ 5030, 5040 ] },
         { name: "animeCategories", value: [] }
       ]
@@ -1003,8 +1059,44 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(connection.put_path).to eq("/api/v3/indexer/42")
   end
 
+  it "does not accept Arr's masked API key as proof of a forced update after a timeout" do
+    stub_const("#{described_class}::TIMEOUT_ADOPTION_INTERVAL_SECONDS", 0)
+    original_remote = matching_remote_indexer
+    original_remote.fetch(:fields).find { |field| field[:name] == "apiKey" }[:value] = "********"
+    updated_remote = matching_remote_indexer
+    updated_remote.fetch(:fields).find { |field| field[:name] == "apiKey" }[:value] = "********"
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: [
+        ArrIndexerResponse.new(status: 200, body: [ original_remote ].to_json),
+        ArrIndexerResponse.new(status: 200, body: [ updated_remote ].to_json)
+      ],
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json),
+      update_response: Faraday::TimeoutError.new("Net::ReadTimeout")
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "rotated-jackett-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      force_api_key_update: true,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).not_to be_success
+    expect(result.action).to be_nil
+    expect(result.message).to include("Could not connect to Main Sonarr")
+  end
+
   it "adopts an indexer created before a timeout response" do
     indexers_response = ArrIndexerResponse.new(status: 200, body: [].to_json)
+    created_remote = matching_remote_indexer
+    created_remote.fetch(:fields).find { |field| field[:name] == "apiKey" }[:value] = "********"
     connection = FakeArrIndexerConnection.new(
       indexers_response:,
       schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
@@ -1012,7 +1104,7 @@ RSpec.describe Arr::GenericTorznabClient do
     )
 
     allow(connection).to receive(:post).and_wrap_original do |original, *args, &block|
-      indexers_response.body = [ matching_remote_indexer ].to_json
+      indexers_response.body = [ created_remote ].to_json
       original.call(*args, &block)
     end
 
@@ -1023,6 +1115,7 @@ RSpec.describe Arr::GenericTorznabClient do
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
+      force_api_key_update: true,
       connection:,
       caps_client: FakeTorznabCapsClient
     )

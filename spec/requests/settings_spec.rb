@@ -44,6 +44,30 @@ RSpec.describe "Settings", type: :request do
     expect(Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)).to eq("jackett-api-key")
   end
 
+  it "tracks Jackett API key rotations without treating an unchanged save as a rotation" do
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "original-key")
+
+    patch settings_path, params: {
+      settings: {
+        bridgarr_base_url: "http://localhost:3000",
+        jackett_base_url: "http://localhost:9117",
+        jackett_api_key: "original-key"
+      }
+    }
+
+    expect(Setting.jackett_api_key_version).to eq(1)
+
+    patch settings_path, params: {
+      settings: {
+        bridgarr_base_url: "http://localhost:3000",
+        jackett_base_url: "http://localhost:9117",
+        jackett_api_key: "rotated-key"
+      }
+    }
+
+    expect(Setting.jackett_api_key_version).to eq(2)
+  end
+
   it "tests the saved Jackett connection" do
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
