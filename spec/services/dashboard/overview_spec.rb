@@ -58,16 +58,35 @@ RSpec.describe Dashboard::Overview do
     expect(described_class.new.assignment_rows.first.status).to eq("needs_apply")
   end
 
-  it "keeps a never-synced disabled assignment in the disabled view" do
+  it "keeps a never-synced disabled assignment distinct and explains the next sync" do
     assignment = IndexerApp.create!(arr_app:, indexer:, enabled: false)
 
     dashboard = described_class.new(filter: "disabled")
     row = dashboard.assignment_rows.first
 
     expect(row.assignment).to eq(assignment)
-    expect(row.status).to eq("unsynced")
+    expect(row.status).to eq("disabled")
+    expect(row.detail).to eq("Assignment is disabled. The next sync will disable remote search modes.")
+    expect(row.detail).not_to eq("Remote search modes are off")
     expect(row).to be_disabled
     expect(dashboard.assignment_filter_counts.fetch("disabled")).to eq(1)
+  end
+
+  it "keeps invalid and drifted assignments distinct from disabled desired state" do
+    invalid_assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      enabled: false,
+      last_plan_state: "invalid"
+    )
+
+    invalid_row = described_class.new.assignment_rows.first
+    expect(invalid_row.assignment).to eq(invalid_assignment)
+    expect(invalid_row.status).to eq("invalid")
+
+    invalid_assignment.update!(enabled: true, last_plan_state: "update", last_applied_at: 2.hours.ago, last_inspected_at: 1.hour.ago)
+    drifted_row = described_class.new.assignment_rows.first
+    expect(drifted_row.status).to eq("needs_apply")
   end
 
   it "shows active work instead of a stale failure" do

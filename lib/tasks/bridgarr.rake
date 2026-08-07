@@ -1,6 +1,32 @@
 require "io/console"
 
 namespace :bridgarr do
+  desc "Repair pre-v0.6 assignments whose enabled state was never stored"
+  task repair_legacy_assignment_state: :environment do
+    migration_indexer_app = Class.new(ActiveRecord::Base) do
+      self.table_name = "indexer_apps"
+    end
+    legacy_assignments = migration_indexer_app.unscoped.where(enabled: nil)
+    count = legacy_assignments.count
+    dry_run = ActiveModel::Type::Boolean.new.cast(ENV["DRY_RUN"])
+    confirmed = ENV["CONFIRM"] == "true"
+
+    puts "Found #{count} pre-v0.6 #{'assignment'.pluralize(count)} with an unset desired state."
+
+    if count.zero?
+      puts "No local assignment state needs repair."
+    elsif dry_run
+      puts "Dry run only; no assignments were changed."
+    elsif !confirmed
+      puts "No assignments were changed. Re-run with CONFIRM=true to repair local desired state."
+    else
+      updated_count = legacy_assignments.update_all(enabled: true)
+      puts "Repaired #{updated_count} local #{'assignment'.pluralize(updated_count)}; no remote sync was started."
+    end
+
+    puts "Use Preview changes and review the plan before syncing any assignment."
+  end
+
   namespace :admin do
     desc "Create the single local Bridgarr administrator account"
     task create: :environment do

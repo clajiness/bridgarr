@@ -2,14 +2,15 @@ module Sync
   class PlanApplier
     Result = Data.define(:success?, :sync_run, :message, :error, :stale_assignment_ids)
 
-    def self.call(plan:, assignment_ids:, expected_digests: {})
-      new(plan:, assignment_ids:, expected_digests:).call
+    def self.call(plan:, assignment_ids:, expected_digests: {}, destructive_confirmation: false)
+      new(plan:, assignment_ids:, expected_digests:, destructive_confirmation:).call
     end
 
-    def initialize(plan:, assignment_ids:, expected_digests:)
+    def initialize(plan:, assignment_ids:, expected_digests:, destructive_confirmation:)
       @plan = plan
       @assignment_ids = Array(assignment_ids).map(&:to_i).uniq
       @expected_digests = expected_digests.to_h.stringify_keys
+      @destructive_confirmation = destructive_confirmation
     end
 
     def call
@@ -24,6 +25,9 @@ module Sync
 
       applyable_items = selected_items.select(&:applyable?)
       return failure("No selected reconciliation changes are safe to apply.") if applyable_items.empty?
+      if applyable_items.any?(&:destructive) && !destructive_confirmation
+        return failure("Confirm that the selected plan will disable remote search modes before applying it.")
+      end
 
       sync_run = BulkSync.call(
         scope: IndexerApp.where(id: applyable_items.map { |item| item.indexer_app.id }),
@@ -46,7 +50,7 @@ module Sync
 
     private
 
-      attr_reader :plan, :assignment_ids, :expected_digests
+      attr_reader :plan, :assignment_ids, :expected_digests, :destructive_confirmation
 
       def stale_failure(stale_ids)
         Result.new(

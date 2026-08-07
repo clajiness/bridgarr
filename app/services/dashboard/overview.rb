@@ -142,8 +142,8 @@ module Dashboard
         return "mismatch" if assignment.last_status == "mismatch"
         return "not_applicable" if assignment.last_status == "skipped"
         return "needs_apply" if unapplied_plan?(assignment)
-        return "unsynced" if assignment.last_synced_at.nil?
         return "disabled" unless assignment.enabled? && assignment.indexer.enabled? && assignment.arr_app.enabled?
+        return "unsynced" if assignment.last_synced_at.nil?
 
         "healthy"
       end
@@ -160,9 +160,16 @@ module Dashboard
         when "needs_apply" then "Preview found unapplied changes"
         when "syncing" then active_sync_item.status.titleize
         when "unsynced" then "Never applied"
-        when "disabled" then "Remote search modes are off"
+        when "disabled" then disabled_status_detail(assignment)
         else "Matches desired state"
         end
+      end
+
+      def disabled_status_detail(assignment)
+        return "Assignment is disabled. The next sync will disable remote search modes." unless assignment.enabled?
+        return "Indexer is disabled in Bridgarr. Enable it before syncing." unless assignment.indexer.enabled?
+
+        "Destination app is disabled in Bridgarr. Enable it before syncing."
       end
 
       def unapplied_plan?(assignment)

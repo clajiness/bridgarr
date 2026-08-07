@@ -103,7 +103,7 @@ RSpec.describe "Settings", type: :request do
     expect(response).to redirect_to(settings_path)
     expect(Setting.fetch_value(Setting::PROXY_API_KEY_KEY)).to eq("new-proxy-key")
     expect(Setting.proxy_api_key_version).to eq(2)
-    expect(flash[:notice]).to include("Sync all bridged assignments")
+    expect(flash[:notice]).to include("Preview and apply all bridged assignments")
   end
 
   it "warns when bridged assignments require the new proxy key" do

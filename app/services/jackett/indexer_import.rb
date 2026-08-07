@@ -1,6 +1,17 @@
 module Jackett
   class IndexerImport
-    Result = Struct.new(:success?, :imported_count, :updated_count, :assigned_count, :skipped_count, :sync_run, :message, :error, keyword_init: true)
+    Result = Struct.new(
+      :success?,
+      :imported_count,
+      :updated_count,
+      :assigned_count,
+      :skipped_count,
+      :sync_run,
+      :preview_assignment_ids,
+      :message,
+      :error,
+      keyword_init: true
+    )
 
     def self.call(
       base_url:,
@@ -34,7 +45,6 @@ module Jackett
       @arr_app_ids = requested_arr_app_ids.filter_map { |value| positive_integer(value) }.uniq
       @invalid_destination_selection = requested_arr_app_ids.size != @arr_app_ids.size
       @assignment_attributes = {
-        enabled: true,
         connection_mode: connection_mode.presence || "direct",
         category_mode: category_mode.presence || "auto",
         custom_categories:
@@ -92,15 +102,23 @@ module Jackett
 
           arr_app_ids.each do |arr_app_id|
             assignment = IndexerApp.find_or_initialize_by(indexer:, arr_app_id:)
-            assigned_count += 1 if assignment.new_record?
-            assignment.update!(assignment_attributes)
+            new_assignment = assignment.new_record?
+            assigned_count += 1 if new_assignment
+            attributes = new_assignment ? assignment_attributes.merge(enabled: true) : assignment_attributes
+            assignment.update!(attributes)
             assignments << assignment
           end
         end
       end
 
-      sync_run = Sync::BulkSync.call(scope: IndexerApp.where(id: assignments.map(&:id))) if sync_now && assignments.any?
-      success(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:)
+      assignment_ids = assignments.map(&:id).uniq
+      preview_assignment_ids = if sync_now && assignments.any? { |assignment| !assignment.enabled? }
+        assignment_ids
+      else
+        []
+      end
+      sync_run = Sync::BulkSync.call(scope: IndexerApp.where(id: assignment_ids)) if sync_now && assignment_ids.any? && preview_assignment_ids.empty?
+      success(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:, preview_assignment_ids:)
     rescue ActiveRecord::RecordInvalid => e
       failure("Could not import Jackett indexers: #{e.record.errors.full_messages.to_sentence}")
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::InvalidForeignKey
@@ -118,7 +136,7 @@ module Jackett
         :discovery,
         :invalid_destination_selection
 
-      def success(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:)
+      def success(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:, preview_assignment_ids:)
         Result.new(
           success?: true,
           imported_count:,
@@ -126,7 +144,8 @@ module Jackett
           assigned_count:,
           skipped_count:,
           sync_run:,
-          message: import_message(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:),
+          preview_assignment_ids:,
+          message: import_message(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:, preview_assignment_ids:),
           error: nil
         )
       end
@@ -140,19 +159,22 @@ module Jackett
           assigned_count: 0,
           skipped_count: 0,
           sync_run: nil,
+          preview_assignment_ids: [],
           message:,
           error: message
         )
       end
 
-      def import_message(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:)
+      def import_message(imported_count:, updated_count:, assigned_count:, skipped_count:, sync_run:, preview_assignment_ids:)
         parts = [
           "#{imported_count} #{'indexer'.pluralize(imported_count)} imported",
           "#{updated_count} updated",
           "#{assigned_count} #{'assignment'.pluralize(assigned_count)} created",
           "#{skipped_count} unchanged"
         ]
-        if sync_run
+        if preview_assignment_ids.any?
+          parts << "preview required before syncing disabled desired state"
+        elsif sync_run
           parts << (sync_run.total_count.positive? ? "sync queued" : "sync already active")
         end
         "#{parts.join(', ')}."

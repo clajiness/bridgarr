@@ -30,7 +30,7 @@ class SettingsController < ApplicationController
   def rotate_proxy_api_key
     Setting.rotate_proxy_api_key!
 
-    redirect_to settings_path, notice: "Proxy API key rotated. Sync all bridged assignments to apply the new key."
+    redirect_to settings_path, notice: "Proxy API key rotated. Preview and apply all bridged assignments to use the new key."
   end
 
   private

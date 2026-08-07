@@ -159,6 +159,13 @@ unreachable, or invalid. Previewing does not change remote applications. Apply
 rechecks the plan and refuses a stale preview. Unmanaged overlaps and stale
 remote associations require an explicit repair or forget action.
 
+Bulk synchronization starts from this preview. A plan that will turn off remote
+RSS, automatic search, or interactive search prominently reports the number of
+affected assignments and requires explicit confirmation before it can be
+applied. A disabled assignment is local desired state; the dashboard does not
+claim the remote modes are already off unless a reconciliation preview actually
+inspected the destination.
+
 Successful applies record a digest of the normalized configuration that was
 verified or sent. Later previews use it to distinguish local desired-state
 changes from remote drift without persisting raw API keys. Failure views can
@@ -314,6 +321,40 @@ to redact the `apikey` parameter. Bridgarr cannot sanitize logs produced
 upstream.
 
 ### Upgrading existing installations
+
+#### v0.6.1 legacy assignment-state repair
+
+Some databases first initialized from a schema shipped before v0.4 stored an
+assignment's `enabled` value as `NULL`, even though the original migration
+intended new assignments to default to enabled. Before v0.6 that value was not a
+user-facing desired-state setting and synchronization always enabled the three
+remote search modes. v0.6 began interpreting the unset value as disabled.
+
+The v0.6.1 migration automatically changes only those legacy `NULL` values to
+`true` and restores the database default/not-null constraint. A stored `false`
+is left unchanged because it may be an intentional v0.6-or-later disable. The
+repair is idempotent, changes only Bridgarr's local desired state, and does not
+inspect or synchronize any remote application.
+
+The same narrow repair can be audited manually when automatic migrations are
+disabled. Dry-run is explicit, and mutation requires confirmation:
+
+```bash
+docker compose exec -e DRY_RUN=true bridgarr bin/rails bridgarr:repair_legacy_assignment_state
+docker compose exec -e CONFIRM=true bridgarr bin/rails bridgarr:repair_legacy_assignment_state
+```
+
+For a non-container deployment:
+
+```bash
+DRY_RUN=true bin/rails bridgarr:repair_legacy_assignment_state
+CONFIRM=true bin/rails bridgarr:repair_legacy_assignment_state
+```
+
+After upgrading or running the task, use **Preview changes** and review the plan
+before applying any remote synchronization. If a row is stored as `false`
+rather than `NULL`, Bridgarr cannot safely infer whether that was an intentional
+v0.6 choice; review that assignment manually instead of bulk-repairing it.
 
 Existing application settings, assignments, and sync history are preserved,
 but the upgrade must be completed while untrusted network access is blocked:

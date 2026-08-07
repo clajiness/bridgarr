@@ -32,6 +32,14 @@ class IndexerAppsController < ApplicationController
   end
 
   def sync
+    unless @indexer_app.enabled?
+      return redirect_to(
+        preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
+        alert: "Disabled assignments must be previewed and explicitly confirmed before remote search modes are changed.",
+        status: :see_other
+      )
+    end
+
     result = Sync::AssignmentSync.call(indexer_app: @indexer_app)
     notice = result.created? ? "Assignment sync queued." : "Assignment sync is already queued."
 
@@ -74,7 +82,8 @@ class IndexerAppsController < ApplicationController
     result = Sync::PlanApplier.call(
       plan:,
       assignment_ids:,
-      expected_digests: expected_plan_digests(assignment_ids)
+      expected_digests: expected_plan_digests(assignment_ids),
+      destructive_confirmation: params[:confirm_destructive] == "1"
     )
 
     if result.success?
@@ -108,6 +117,14 @@ class IndexerAppsController < ApplicationController
       true
     end
     return redirect_assignment_syncing unless repaired
+
+    unless @indexer_app.enabled?
+      return redirect_to(
+        preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
+        notice: "Remote association repaired. Review and confirm the disabled desired state before applying it.",
+        status: :see_other
+      )
+    end
 
     result = Sync::AssignmentSync.call(indexer_app: @indexer_app)
 
@@ -176,13 +193,8 @@ class IndexerAppsController < ApplicationController
         return redirect_to indexer_apps_path(filter: params[:filter]), alert: "The selected cells do not have assignments yet. Create them before previewing or syncing."
       end
 
-      if action == "sync"
-        sync_run = Sync::BulkSync.call(scope: IndexerApp.where(id: assignment_ids))
-        notice = sync_run.total_count.positive? ? "Selected assignment sync queued." : "Selected assignments are already syncing."
-        redirect_to sync_run_path(sync_run), notice:
-      else
-        redirect_to preview_indexer_apps_path(assignment_ids:)
-      end
+      redirect_to preview_indexer_apps_path(assignment_ids:),
+        notice: ("Review and apply the selected reconciliation plan before syncing." if action == "sync")
     end
 
     def selected_assignment_ids(cells)

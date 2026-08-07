@@ -24,24 +24,15 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).not_to include(sync_run_path(runs.last))
   end
 
-  it "queues a bulk sync run" do
-    sync_run = SyncRun.create!(total_count: 1)
-    allow(Sync::BulkSync).to receive(:call).and_return(sync_run)
+  it "requires a reconciliation preview before bulk sync" do
+    allow(Sync::BulkSync).to receive(:call)
 
     post sync_runs_path
 
-    expect(response).to redirect_to(sync_run_path(sync_run))
-    expect(flash[:notice]).to eq("Bulk sync queued.")
-  end
-
-  it "explains when no assignments are ready to sync" do
-    sync_run = SyncRun.create!(total_count: 0)
-    allow(Sync::BulkSync).to receive(:call).and_return(sync_run)
-
-    post sync_runs_path
-
-    expect(response).to redirect_to(sync_run_path(sync_run))
-    expect(flash[:notice]).to eq("No enabled indexer assignments are ready to sync.")
+    expect(response).to redirect_to(preview_indexer_apps_path)
+    expect(response).to have_http_status(:see_other)
+    expect(flash[:notice]).to include("Review the reconciliation preview", "explicitly apply")
+    expect(Sync::BulkSync).not_to have_received(:call)
   end
 
   it "renders a sync run detail page" do
