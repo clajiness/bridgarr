@@ -2,7 +2,7 @@ require "digest"
 
 module Sync
   class Plan
-    STATES = %w[create update unchanged conflict orphaned unreachable invalid].freeze
+    STATES = %w[create update unchanged not_applicable conflict orphaned unreachable invalid].freeze
     APPLYABLE_STATES = %w[create update unchanged].freeze
 
     Result = Data.define(:items, :generated_at) do
@@ -15,7 +15,7 @@ module Sync
       end
 
       def attention_items
-        items.reject(&:applyable?)
+        items.select(&:attention?)
       end
 
       def destructive_items
@@ -40,6 +40,10 @@ module Sync
 
       def changed?
         changes.any?
+      end
+
+      def attention?
+        !applyable? && state != "not_applicable"
       end
     end
 
@@ -101,7 +105,11 @@ module Sync
           caps_client:,
           caps_cache:
         )
-        return invalid_item(assignment, desired_result.message) unless desired_result.success?
+        unless desired_result.success?
+          return not_applicable_item(assignment, desired_result.message) if desired_result.not_applicable?
+
+          return invalid_item(assignment, desired_result.message)
+        end
 
         desired = desired_result.configuration
         remote_by_id = find_by_id(inventory.indexers, assignment.remote_indexer_id)
@@ -229,6 +237,19 @@ module Sync
           changes: [],
           message:,
           desired_digest: desired&.digest,
+          remote_digest: nil,
+          destructive: false
+        )
+      end
+
+      def not_applicable_item(assignment, message)
+        build_item(
+          assignment:,
+          state: "not_applicable",
+          remote_indexer_id: assignment.remote_indexer_id,
+          changes: [],
+          message:,
+          desired_digest: nil,
           remote_digest: nil,
           destructive: false
         )

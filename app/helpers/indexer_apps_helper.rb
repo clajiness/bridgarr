@@ -4,6 +4,7 @@ module IndexerAppsHelper
       "create" => "Create",
       "update" => "Update",
       "unchanged" => "No change",
+      "not_applicable" => "Not applicable",
       "conflict" => "Conflict",
       "orphaned" => "Orphaned",
       "unreachable" => "Unreachable",
@@ -17,6 +18,8 @@ module IndexerAppsHelper
       "border-blue-200 bg-blue-50 text-blue-800"
     when "unchanged"
       "border-amber-200 bg-amber-50 text-amber-900"
+    when "not_applicable"
+      "border-stone-200 bg-stone-50 text-slate-700"
     when "conflict", "orphaned", "unreachable", "invalid"
       "border-red-200 bg-red-50 text-red-800"
     else

@@ -1,7 +1,7 @@
 class IndexerApp < ApplicationRecord
   CONNECTION_MODES = %w[ direct bridged ].freeze
   CATEGORY_MODES = %w[ auto custom none ].freeze
-  PLAN_STATES = %w[create update unchanged conflict orphaned unreachable invalid].freeze
+  PLAN_STATES = %w[create update unchanged not_applicable conflict orphaned unreachable invalid].freeze
 
   belongs_to :indexer
   belongs_to :arr_app

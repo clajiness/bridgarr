@@ -2,7 +2,7 @@ require "digest"
 
 module Sync
   class DesiredConfiguration
-    Result = Data.define(:success?, :configuration, :message, :error)
+    Result = Data.define(:success?, :not_applicable?, :configuration, :message, :error)
 
     class Configuration
       attr_reader :attributes
@@ -56,8 +56,16 @@ module Sync
       return failure("#{arr_app.name} did not return a Generic Torznab schema.") if torznab_schema.blank?
       return failure("#{arr_app.name} did not return configurable Generic Torznab fields.") unless configurable_schema?
 
-      compatibility_error = category_compatibility_error
-      return failure(compatibility_error) if compatibility_error
+      unless manual_categories?
+        unless torznab_caps_result.success?
+          return failure("Could not inspect Torznab categories for #{indexer.name}: #{torznab_caps_result.message}")
+        end
+        unless category_policy.compatible?
+          return not_applicable(
+            "#{indexer.name} is not applicable to #{arr_app.name} because their available Torznab categories do not overlap."
+          )
+        end
+      end
 
       configuration = Configuration.new(
         "name" => remote_name,
@@ -71,7 +79,7 @@ module Sync
         "animeCategories" => category_policy.anime_category_ids.sort
       )
 
-      Result.new(success?: true, configuration:, message: "Desired configuration calculated.", error: nil)
+      Result.new(success?: true, not_applicable?: false, configuration:, message: "Desired configuration calculated.", error: nil)
     end
 
     private
@@ -125,14 +133,6 @@ module Sync
         )
       end
 
-      def category_compatibility_error
-        return if manual_categories?
-        return "Could not inspect Torznab categories for #{indexer.name}: #{torznab_caps_result.message}" unless torznab_caps_result.success?
-        return if category_policy.compatible?
-
-        "No compatible default categories were found for #{indexer.name} in #{arr_app.name}. Review the assignment's category mode."
-      end
-
       def manual_categories?
         indexer_app.category_mode_custom? || indexer_app.category_mode_none?
       end
@@ -164,7 +164,12 @@ module Sync
 
       def failure(message)
         message = Secrets::Redactor.call(message)
-        Result.new(success?: false, configuration: nil, message:, error: message)
+        Result.new(success?: false, not_applicable?: false, configuration: nil, message:, error: message)
+      end
+
+      def not_applicable(message)
+        message = Secrets::Redactor.call(message)
+        Result.new(success?: false, not_applicable?: true, configuration: nil, message:, error: message)
       end
   end
 end

@@ -154,10 +154,12 @@ Bridgarr-managed remote indexer when one is associated and requires explicit
 confirmation.
 
 Use **Preview** before applying changes. Bridgarr inspects each destination once
-and classifies assignments as create, update, unchanged, conflict, orphaned,
-unreachable, or invalid. Previewing does not change remote applications. Apply
-rechecks the plan and refuses a stale preview. Unmanaged overlaps and stale
-remote associations require an explicit repair or forget action.
+and classifies assignments as create, update, unchanged, not applicable,
+conflict, orphaned, unreachable, or invalid. Category-incompatible assignments
+are not applicable and do not require attention. Previewing does not change
+remote applications. Apply rechecks the plan and refuses a stale preview.
+Unmanaged overlaps and stale remote associations require an explicit repair or
+forget action.
 
 Bulk synchronization starts from this preview. A plan that will turn off remote
 RSS, automatic search, or interactive search prominently reports the number of

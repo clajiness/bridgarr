@@ -215,7 +215,9 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("1", "Assignment will have remote search modes disabled")
     expect(response.body).to include("Remote search modes will be disabled")
     expect(response.body).to include("Confirm remote search-mode disablement")
-    expect(response.body).to include("required=\"required\"")
+    confirmation = Nokogiri::HTML(response.body).at_css('input[name="confirm_destructive"]')
+    expect(confirmation).to be_present
+    expect(confirmation.attribute("required")).to be_nil
   end
 
   it "does not expand an explicitly empty preview selection to every assignment" do

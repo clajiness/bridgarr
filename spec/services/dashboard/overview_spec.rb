@@ -89,6 +89,24 @@ RSpec.describe Dashboard::Overview do
     expect(drifted_row.status).to eq("needs_apply")
   end
 
+  it "keeps category-incompatible assignments out of attention" do
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      last_plan_state: "not_applicable",
+      last_status: "skipped"
+    )
+
+    dashboard = described_class.new
+    row = dashboard.assignment_rows.first
+
+    expect(row.assignment).to eq(assignment)
+    expect(row.status).to eq("not_applicable")
+    expect(row.detail).to eq("No compatible categories")
+    expect(row).not_to be_attention
+    expect(dashboard.assignment_filter_counts.fetch("attention")).to eq(0)
+  end
+
   it "shows active work instead of a stale failure" do
     assignment = IndexerApp.create!(
       arr_app:,
@@ -104,6 +122,22 @@ RSpec.describe Dashboard::Overview do
 
     expect(row.status).to eq("syncing")
     expect(row.detail).to eq("Running")
+  end
+
+  it "shows active work instead of a stale not-applicable plan" do
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      last_plan_state: "not_applicable",
+      last_status: "skipped"
+    )
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "queued")
+
+    row = described_class.new.assignment_rows.first
+
+    expect(row.status).to eq("syncing")
+    expect(row.detail).to eq("Queued")
   end
 
   it "does not label a failed legacy attempt as successfully applied" do
