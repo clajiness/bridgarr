@@ -145,7 +145,7 @@
                       <p class="text-xs leading-5 text-slate-500"><%= format_server_timestamp(assignment.last_synced_at) %></p>
                     <% end %>
                     <% if assignment.last_error.present? %>
-                      <p class="<%= class_names("text-xs leading-5 [overflow-wrap:anywhere]", assignment.last_status == "error" ? "text-red-800" : "text-slate-500") %>"><%= assignment_error_summary(assignment) %></p>
+                      <p class="<%= class_names("text-xs leading-5 [overflow-wrap:anywhere]", assignment_error_classes(assignment)) %>"><%= assignment_error_summary(assignment) %></p>
                       <p class="text-xs leading-5 text-slate-600"><%= assignment_error_recommendation(assignment) %></p>
                       <%= render "indexer_apps/diagnostic_button", assignment: %>
                       <details>

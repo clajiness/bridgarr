@@ -24,6 +24,7 @@ RSpec.describe Dashboard::Overview do
     expect(row.status).to eq("conflict")
     expect(row).to be_attention
     expect(dashboard.assignment_filter_counts.fetch("attention")).to eq(1)
+    expect(dashboard).to be_critical_attention
   end
 
   it "marks a newer reconciliation preview as needing apply" do
@@ -37,11 +38,14 @@ RSpec.describe Dashboard::Overview do
       last_status: "ok"
     )
 
-    row = described_class.new.assignment_rows.first
+    dashboard = described_class.new
+    row = dashboard.assignment_rows.first
 
     expect(row.assignment).to eq(assignment)
     expect(row.status).to eq("needs_apply")
     expect(row.detail).to eq("Preview found unapplied changes")
+    expect(dashboard).to be_needs_attention
+    expect(dashboard).not_to be_critical_attention
   end
 
   it "marks a locally edited desired state as needing apply before another preview" do

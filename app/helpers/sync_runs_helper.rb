@@ -2,7 +2,7 @@ module SyncRunsHelper
   def sync_run_status_classes(status)
     case status
     when "succeeded"
-      "border-amber-200 bg-amber-50 text-amber-900"
+      "border-green-200 bg-green-50 text-green-800"
     when "failed", "partial"
       "border-red-200 bg-red-50 text-red-800"
     when "mismatched"
@@ -11,6 +11,8 @@ module SyncRunsHelper
       "border-stone-200 bg-stone-50 text-slate-700"
     when "running", "retrying"
       "border-blue-200 bg-blue-50 text-blue-800"
+    when "queued"
+      "border-amber-200 bg-amber-50 text-amber-900"
     else
       "border-slate-200 bg-slate-100 text-slate-700"
     end
@@ -43,5 +45,18 @@ module SyncRunsHelper
     return nil if sync_run_item.error.blank?
 
     Sync::ErrorClassifier.call(sync_run_item.error, skipped: sync_run_item.skipped?).recommendation
+  end
+
+  def sync_error_classes(sync_run_item)
+    case sync_run_item.status
+    when "failed"
+      "text-red-800"
+    when "mismatched"
+      "text-amber-800"
+    when "running", "retrying"
+      "text-blue-800"
+    else
+      "text-slate-700"
+    end
   end
 end

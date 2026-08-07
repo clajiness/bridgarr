@@ -105,6 +105,14 @@ module Dashboard
         jackett_changes_count.positive?
     end
 
+    def critical_attention?
+      all_assignment_rows.any? { |row| row.status.in?(%w[conflict orphaned unreachable invalid failed]) } ||
+        external_services_health.failed_count.positive? ||
+        latest_sync_run_needs_attention? ||
+        proxy_failures_count.positive? ||
+        Indexer.where(jackett_state: %w[disabled missing]).exists?
+    end
+
     def health_checks_pending?
       external_services_health.unknown_count.positive?
     end

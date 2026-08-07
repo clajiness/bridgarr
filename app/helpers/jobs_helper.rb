@@ -2,11 +2,13 @@ module JobsHelper
   def queue_job_status_classes(status)
     case status.to_s
     when "finished"
-      "border-amber-200 bg-amber-50 text-amber-900"
-    when "failed"
+      "border-green-200 bg-green-50 text-green-800"
+    when "failed", "blocked"
       "border-red-200 bg-red-50 text-red-800"
     when "running"
       "border-blue-200 bg-blue-50 text-blue-800"
+    when "queued", "scheduled"
+      "border-amber-200 bg-amber-50 text-amber-900"
     else
       "border-slate-200 bg-slate-100 text-slate-700"
     end

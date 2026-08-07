@@ -1,6 +1,7 @@
 module DashboardHelper
   def dashboard_operational_state(dashboard)
-    return :attention if dashboard.needs_attention?
+    return :attention if dashboard.critical_attention?
+    return :warning if dashboard.needs_attention?
     return :syncing if dashboard.latest_sync_run_active?
     return :setup unless dashboard.readiness.complete?
     return :pending if dashboard.health_checks_pending?
@@ -11,6 +12,7 @@ module DashboardHelper
   def dashboard_operational_title(dashboard)
     {
       attention: "Needs attention",
+      warning: "Needs attention",
       syncing: "Sync in progress",
       setup: "Finish setup",
       pending: "Health checks pending",
@@ -56,8 +58,9 @@ module DashboardHelper
   def dashboard_operational_classes(dashboard)
     case dashboard_operational_state(dashboard)
     when :attention then "border-red-200 bg-red-50"
+    when :warning, :setup, :pending then "border-amber-200 bg-amber-50"
     when :syncing then "border-blue-200 bg-blue-50"
-    when :healthy then "border-amber-200 bg-amber-50"
+    when :healthy then "border-green-200 bg-green-50"
     else "border-stone-200 bg-white"
     end
   end
@@ -83,9 +86,11 @@ module DashboardHelper
     case status
     when "conflict", "orphaned", "unreachable", "invalid", "failed"
       "border-red-200 bg-red-50 text-red-800"
-    when "mismatch", "healthy"
+    when "healthy"
+      "border-green-200 bg-green-50 text-green-800"
+    when "mismatch", "needs_apply", "unsynced"
       "border-amber-200 bg-amber-50 text-amber-900"
-    when "needs_apply", "syncing"
+    when "syncing"
       "border-blue-200 bg-blue-50 text-blue-800"
     else
       "border-slate-200 bg-slate-100 text-slate-700"
@@ -151,9 +156,9 @@ module DashboardHelper
 
   def dashboard_readiness_status_classes(item)
     if item.complete
-      "border-amber-200 bg-amber-50 text-amber-900"
+      "border-green-200 bg-green-50 text-green-800"
     else
-      "border-slate-200 bg-slate-100 text-slate-700"
+      "border-amber-200 bg-amber-50 text-amber-900"
     end
   end
 end

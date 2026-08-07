@@ -36,7 +36,7 @@
                     <% if existing && existing.name != jackett_indexer.name %><span class="mt-1 block text-xs font-normal text-slate-500">Previously <%= existing.name %></span><% end %>
                   </td>
                   <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= jackett_indexer.jackett_id %></td>
-                  <td class="px-4 py-3"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= state.in?(%w[new unchanged]) ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-800' %>"><%= if existing && state == "unchanged"; "Already imported · Unchanged"; elsif state == "new"; "Ready to import · New"; else; state.humanize; end %></span></td>
+                  <td class="px-4 py-3"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(state) %>"><%= if existing && state == "unchanged"; "Already imported · Unchanged"; elsif state == "new"; "Ready to import · New"; else; state.humanize; end %></span></td>
                 </tr>
               <% end %>
             </tbody>

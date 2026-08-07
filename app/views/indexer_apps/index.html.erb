@@ -54,7 +54,7 @@
                   <%= link_to indexer.name, indexer, class: "font-semibold text-slate-950 hover:underline" %>
                   <span class="mt-1 block font-mono text-xs font-normal text-slate-500"><%= indexer.jackett_id %></span>
                   <% if indexer.jackett_state.in?(%w[renamed changed disabled missing]) %>
-                    <span class="mt-2 inline-flex rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800"><%= indexer.jackett_state.humanize %></span>
+                    <span class="mt-2 inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(indexer.jackett_state) %>"><%= indexer.jackett_state.humanize %></span>
                   <% end %>
                 </th>
                 <% @arr_apps.each do |arr_app| %>
@@ -71,7 +71,7 @@
                           </div>
                           <p class="text-xs leading-5 text-slate-600"><%= assignment_status_label(assignment) %><% if assignment.last_synced_at %> · <%= format_server_timestamp(assignment.last_synced_at) %><% end %></p>
                           <% if assignment.last_error.present? %>
-                            <p class="text-xs leading-5 text-red-800"><%= assignment_error_summary(assignment) %></p>
+                            <p class="text-xs leading-5 <%= assignment_error_classes(assignment) %>"><%= assignment_error_summary(assignment) %></p>
                             <p class="text-xs leading-5 text-slate-600"><%= assignment_error_recommendation(assignment) %></p>
                             <%= render "indexer_apps/diagnostic_button", assignment: %>
                           <% end %>

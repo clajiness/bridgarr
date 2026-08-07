@@ -119,6 +119,8 @@ RSpec.describe "Settings", type: :request do
 
     expect(response.body).to include("Connected")
     expect(response.body).to include(Time.iso8601("2026-07-04T12:00:00Z").localtime.strftime("%Y-%m-%d %H:%M:%S %Z"))
+    connected_badge = Nokogiri::HTML(response.body).css("span").find { |node| node.text.strip == "Connected" }
+    expect(connected_badge["class"]).to include("bg-green-50", "text-green-800")
   end
 
   it "rotates the bridged proxy API key" do

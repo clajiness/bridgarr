@@ -10,9 +10,9 @@ module ApplicationHelper
     return "border-red-200 bg-red-50 text-red-800" if assignment.last_status == "error"
     return "border-amber-200 bg-amber-50 text-amber-900" if assignment.last_status == "mismatch"
     return "border-stone-200 bg-stone-50 text-slate-700" if assignment.last_status == "skipped"
-    return "border-amber-200 bg-amber-50 text-amber-900" if assignment.remote_indexer_id.present?
+    return "border-green-200 bg-green-50 text-green-800" if assignment.remote_indexer_id.present?
 
-    "border-slate-200 bg-slate-100 text-slate-700"
+    "border-amber-200 bg-amber-50 text-amber-900"
   end
 
   def assignment_status_label(assignment)
@@ -25,9 +25,13 @@ module ApplicationHelper
   end
 
   def assignment_connection_mode_classes(assignment)
-    return "border-amber-200 bg-amber-50 text-amber-900" if assignment.connection_mode_bridged?
+    return "border-blue-200 bg-blue-50 text-blue-800" if assignment.connection_mode_bridged?
 
     "border-stone-200 bg-stone-50 text-slate-700"
+  end
+
+  def enabled_status_classes(enabled)
+    enabled ? "border-blue-200 bg-blue-50 text-blue-800" : "border-slate-200 bg-slate-100 text-slate-700"
   end
 
   def assignment_custom_settings_description(assignment)
@@ -55,6 +59,17 @@ module ApplicationHelper
     Sync::ErrorClassifier.call(assignment.last_error, skipped: assignment.last_status == "skipped").recommendation
   end
 
+  def assignment_error_classes(assignment)
+    case assignment.last_status
+    when "error"
+      "text-red-800"
+    when "mismatch"
+      "text-amber-800"
+    else
+      "text-slate-600"
+    end
+  end
+
   def health_status_label(status, operational: false)
     {
       "ok" => operational ? "Operational" : "Healthy",
@@ -68,11 +83,24 @@ module ApplicationHelper
   def health_status_classes(status)
     case status.to_s
     when "ok"
-      "border-amber-200 bg-amber-50 text-amber-900"
-    when "error", "stale"
+      "border-green-200 bg-green-50 text-green-800"
+    when "error"
       "border-red-200 bg-red-50 text-red-800"
+    when "stale"
+      "border-amber-200 bg-amber-50 text-amber-900"
     else
       "border-slate-200 bg-slate-100 text-slate-700"
+    end
+  end
+
+  def health_error_classes(status)
+    case status.to_s
+    when "error"
+      "text-red-800"
+    when "stale", "unknown"
+      "text-amber-800"
+    else
+      "text-slate-600"
     end
   end
 
