@@ -19,17 +19,20 @@
   </section>
 
   <%= form_with url: indexer_apps_path, method: :get, class: "flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end" do |form| %>
+    <%= form.hidden_field :per_page, value: @indexers_page.per_page %>
     <div class="w-full sm:max-w-xs">
       <%= form.label :filter, "Saved view", class: "block text-sm font-medium text-slate-700" %>
       <%= form.select :filter, matrix_filter_options, { selected: params[:filter] }, class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
     </div>
     <%= form.submit "Apply filter", class: "rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
-    <% if params[:filter].present? %><%= link_to "Clear", indexer_apps_path, class: "px-3 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950" %><% end %>
+    <% if params[:filter].present? %><%= link_to "Clear", indexer_apps_path(per_page: @indexers_page.per_page), class: "px-3 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950" %><% end %>
   <% end %>
 
   <% if @indexers.any? && @arr_apps.any? %>
     <%= form_with url: bulk_update_indexer_apps_path, class: "space-y-4" do |form| %>
       <%= hidden_field_tag :filter, params[:filter] %>
+      <%= hidden_field_tag :page, @indexers_page.current_page %>
+      <%= hidden_field_tag :per_page, @indexers_page.per_page %>
 
       <div class="overflow-x-auto rounded-md border border-stone-200 bg-white shadow-sm">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -115,6 +118,11 @@
         </div>
       </div>
     <% end %>
+    <%= render "shared/pagination",
+      pagination: @indexers_page,
+      item_name: "indexer",
+      path: indexer_apps_path,
+      preserved_params: { filter: params[:filter] } %>
   <% else %>
     <div class="rounded-md border border-stone-200 bg-white px-6 py-12 text-center shadow-sm">
       <p class="text-sm font-medium text-slate-700">The matrix needs at least one indexer and one Arr application.</p>

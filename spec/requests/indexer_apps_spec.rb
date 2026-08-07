@@ -41,6 +41,26 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("Enabled")
   end
 
+  it "paginates assignment matrix rows" do
+    arr_app
+    12.times do |index|
+      Indexer.create!(
+        name: "Matrix-#{index.to_s.rjust(2, "0")}",
+        jackett_id: "matrix-#{index}"
+      )
+    end
+
+    get indexer_apps_path(page: 2, per_page: 10)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–12 of 12 indexers", "Matrix-10", "Matrix-11")
+    expect(response.body).not_to include("Matrix-00")
+    document = Nokogiri::HTML(response.body)
+    bulk_form = document.at_css('form[action="/indexer_apps/bulk_update"]')
+    expect(bulk_form.at_css('input[name="page"]')["value"]).to eq("2")
+    expect(bulk_form.at_css('input[name="per_page"]')["value"]).to eq("10")
+  end
+
   it "updates assignment category settings" do
     patch indexer_app_path(assignment), params: {
       indexer_app: {

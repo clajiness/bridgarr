@@ -1,6 +1,12 @@
 class DashboardController < ApplicationController
   def index
     @dashboard = Dashboard::Overview.new(filter: params[:filter], query: params[:query])
+    @assignment_rows_page = Pagination::Page.new(
+      collection: @dashboard.assignment_rows,
+      page: params[:page],
+      per_page: params[:per_page]
+    )
+    @assignment_rows = @assignment_rows_page.records
   end
 
   def readiness

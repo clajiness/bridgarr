@@ -103,6 +103,29 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).not_to include("Jackett returned HTTP 400")
   end
 
+  it "paginates filtered assignment rows" do
+    arr_app = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key"
+    )
+    12.times do |index|
+      indexer = Indexer.create!(
+        name: "Dashboard-#{index.to_s.rjust(2, "0")}",
+        jackett_id: "dashboard-#{index}"
+      )
+      IndexerApp.create!(arr_app:, indexer:)
+    end
+
+    get root_path(page: 2, per_page: 10, query: "Dashboard")
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Showing 11–12 of 12 assignments", "Dashboard-10", "Dashboard-11")
+    expect(response.body).not_to include("Dashboard-00")
+    expect(response.body).to include("query=Dashboard", "per_page=10")
+  end
+
   it "describes a disabled assignment as local desired state" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://sonarr.example.test", api_key: "key")
     indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")

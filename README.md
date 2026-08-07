@@ -488,13 +488,13 @@ This is intentionally operational visibility, not long-term analytics.
 GitHub Actions builds the Docker image on pull requests without publishing it.
 Pushes to `main` publish:
 
-- `latest`
 - `main`
 - `sha-<commit>`
 
-Version tags publish semver image tags. For example, pushing Git tag
+Stable version tags publish semver image tags and update `latest`. For example, pushing Git tag
 `v0.3.3` publishes image tags like:
 
+- `latest`
 - `0.3.3`
 - `0.3`
 

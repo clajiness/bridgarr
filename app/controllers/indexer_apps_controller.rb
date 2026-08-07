@@ -3,7 +3,12 @@ class IndexerAppsController < ApplicationController
 
   def index
     @arr_apps = ArrApp.order(:name).to_a
-    @indexers = filtered_indexers
+    @indexers_page = Pagination::Page.new(
+      collection: filtered_indexers,
+      page: params[:page],
+      per_page: params[:per_page]
+    )
+    @indexers = @indexers_page.records
     @assignments_by_cell = IndexerApp
       .includes(:indexer, :arr_app)
       .where(indexer_id: @indexers.map(&:id), arr_app_id: @arr_apps.map(&:id))
@@ -48,7 +53,7 @@ class IndexerAppsController < ApplicationController
 
   def bulk_update
     cells = selected_cells
-    return redirect_to(indexer_apps_path(filter: params[:filter]), alert: "Select at least one matrix cell.") if cells.empty?
+    return redirect_to(matrix_return_path, alert: "Select at least one matrix cell.") if cells.empty?
 
     action = params[:bulk_action].to_s
     if action.in?(%w[preview test sync])
@@ -62,9 +67,9 @@ class IndexerAppsController < ApplicationController
       custom_categories: params[:custom_categories]
     )
     if result.success?
-      redirect_to indexer_apps_path(filter: params[:filter]), notice: result.message
+      redirect_to matrix_return_path, notice: result.message
     else
-      redirect_to indexer_apps_path(filter: params[:filter]), alert: result.message
+      redirect_to matrix_return_path, alert: result.message
     end
   end
 
@@ -190,7 +195,7 @@ class IndexerAppsController < ApplicationController
     def run_selected_action(action, cells)
       assignment_ids = selected_assignment_ids(cells)
       if assignment_ids.empty?
-        return redirect_to indexer_apps_path(filter: params[:filter]), alert: "The selected cells do not have assignments yet. Create them before previewing or syncing."
+        return redirect_to matrix_return_path, alert: "The selected cells do not have assignments yet. Create them before previewing or syncing."
       end
 
       redirect_to preview_indexer_apps_path(assignment_ids:),
@@ -262,5 +267,9 @@ class IndexerAppsController < ApplicationController
       else
         indexers
       end
+    end
+
+    def matrix_return_path
+      indexer_apps_path(filter: params[:filter], page: params[:page], per_page: params[:per_page])
     end
 end

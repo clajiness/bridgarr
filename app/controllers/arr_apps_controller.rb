@@ -2,7 +2,12 @@ class ArrAppsController < ApplicationController
   before_action :set_arr_app, only: %i[ show edit update destroy test_connection ]
 
   def index
-    @arr_apps = ArrApp.order(:name)
+    @arr_apps_page = Pagination::Page.new(
+      collection: ArrApp.order(:name),
+      page: params[:page],
+      per_page: params[:per_page]
+    )
+    @arr_apps = @arr_apps_page.records
   end
 
   def show
@@ -82,7 +87,11 @@ class ArrAppsController < ApplicationController
     end
 
     def arr_app_test_redirect_path
-      params[:return_to] == "index" ? arr_apps_path : @arr_app
+      if params[:return_to] == "index"
+        arr_apps_path(page: params[:page], per_page: params[:per_page])
+      else
+        @arr_app
+      end
     end
 
     def elapsed_ms(started_at)
