@@ -6,7 +6,7 @@
       <p class="font-mono text-sm text-slate-500">guided setup</p>
       <h1 class="mt-1 text-3xl font-semibold text-slate-950">Discover and assign indexers</h1>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-        Review Jackett changes, select destinations, create assignments, and optionally sync everything in one workflow.
+        Review configured Jackett indexers, select destinations, create assignments, and optionally sync everything in one workflow.
       </p>
     </div>
     <%= link_to "Back", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
@@ -27,10 +27,9 @@
             <tbody class="divide-y divide-slate-200">
               <% @jackett_indexers.each do |jackett_indexer| %>
                 <% existing = @existing_by_jackett_id[jackett_indexer.jackett_id] %>
-                <% state = existing&.jackett_state || (jackett_indexer.configured ? "new" : "disabled") %>
-                <% selectable = jackett_indexer.configured %>
+                <% state = existing&.jackett_state || "new" %>
                 <tr>
-                  <td class="px-4 py-3"><%= check_box_tag "jackett_ids[]", jackett_indexer.jackett_id, selectable && (existing.nil? || state != "unchanged"), disabled: !selectable, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %></td>
+                  <td class="px-4 py-3"><%= check_box_tag "jackett_ids[]", jackett_indexer.jackett_id, existing.nil? || state != "unchanged", class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %></td>
                   <td class="px-4 py-3 font-medium text-slate-950">
                     <%= jackett_indexer.name %>
                     <% if existing && existing.name != jackett_indexer.name %><span class="mt-1 block text-xs font-normal text-slate-500">Previously <%= existing.name %></span><% end %>
@@ -89,14 +88,6 @@
       </div>
     <% end %>
   <% else %>
-    <div class="rounded-md border border-stone-200 bg-white px-6 py-12 text-center shadow-sm"><p class="text-sm font-medium text-slate-700">Jackett did not return any indexers.</p></div>
-  <% end %>
-
-  <% if @missing_indexers.any? %>
-    <section class="rounded-md border border-red-200 bg-red-50 px-5 py-4">
-      <h2 class="font-semibold text-red-950">Missing from Jackett</h2>
-      <p class="mt-1 text-sm text-red-900">These imported indexers were not present in the latest inventory.</p>
-      <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-red-900"><% @missing_indexers.each do |indexer| %><li><%= link_to indexer.name, indexer, class: "font-semibold underline" %></li><% end %></ul>
-    </section>
+    <div class="rounded-md border border-stone-200 bg-white px-6 py-12 text-center shadow-sm"><p class="text-sm font-medium text-slate-700">Jackett does not have any configured indexers.</p></div>
   <% end %>
 </div>

@@ -115,6 +115,24 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).not_to include("Jackett returned HTTP 400")
   end
 
+  it "links Jackett inventory changes to the indexer catalog" do
+    Indexer.create!(name: "Missing Indexer", jackett_id: "missing-indexer", jackett_state: "missing")
+
+    get root_path
+
+    dashboard_document = Nokogiri::HTML(response.body)
+    dashboard_link = dashboard_document.css("a").find { |link| link.text.strip == "Jackett changes" }
+
+    expect(dashboard_link["href"]).to eq(indexers_path)
+
+    get readiness_path
+
+    readiness_document = Nokogiri::HTML(response.body)
+    readiness_link = readiness_document.css("a").find { |link| link.text.include?("Review Jackett changes") }
+
+    expect(readiness_link["href"]).to eq(indexers_path)
+  end
+
   it "paginates filtered assignment rows" do
     arr_app = ArrApp.create!(
       name: "Sonarr",

@@ -55,16 +55,19 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).not_to include("Catalog-00")
   end
 
-  it "previews configured Jackett indexers for import" do
+  it "previews only configured Jackett indexers for import" do
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
     Indexer.create!(name: "Existing Indexer", jackett_id: "existing-indexer")
+    disabled_indexer = Indexer.create!(name: "Previously Imported", jackett_id: "unconfigured-indexer")
+    missing_indexer = Indexer.create!(name: "Missing Indexer", jackett_id: "missing-indexer")
 
     result = Jackett::IndexerDiscovery::Result.new(
       success?: true,
       indexers: [
         Jackett::IndexerDiscovery::IndexerRecord.new(name: "Existing Indexer", jackett_id: "existing-indexer", configured: true),
-        Jackett::IndexerDiscovery::IndexerRecord.new(name: "New Indexer", jackett_id: "new-indexer", configured: true)
+        Jackett::IndexerDiscovery::IndexerRecord.new(name: "New Indexer", jackett_id: "new-indexer", configured: true),
+        Jackett::IndexerDiscovery::IndexerRecord.new(name: "Unconfigured Indexer", jackett_id: "unconfigured-indexer", configured: false)
       ],
       message: "Found 2 configured Jackett indexers.",
       error: nil,
@@ -81,6 +84,31 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).to include("Ready to import")
     expect(response.body).to include("Import and create assignments")
     expect(response.body).to include("jackett_ids[]")
+    expect(response.body).not_to include("Unconfigured Indexer")
+    expect(response.body).not_to include("Previously Imported")
+    expect(response.body).not_to include("Missing Indexer")
+    expect(response.body).not_to include("Missing from Jackett")
+    expect(disabled_indexer.reload.jackett_state).to eq("disabled")
+    expect(missing_indexer.reload.jackett_state).to eq("missing")
+  end
+
+  it "renders an empty state when Jackett has no configured indexers" do
+    result = Jackett::IndexerDiscovery::Result.new(
+      success?: true,
+      indexers: [
+        Jackett::IndexerDiscovery::IndexerRecord.new(name: "Unconfigured Indexer", jackett_id: "unconfigured-indexer", configured: false)
+      ],
+      message: "Found 1 Jackett indexer.",
+      error: nil,
+      http_status: 200
+    )
+    allow(Jackett::IndexerDiscovery).to receive(:call).and_return(result)
+
+    get discover_indexers_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Jackett does not have any configured indexers.")
+    expect(response.body).not_to include("Unconfigured Indexer")
   end
 
   it "redirects when Jackett indexer discovery fails" do

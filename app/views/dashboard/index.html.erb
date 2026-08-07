@@ -22,7 +22,7 @@
       <% unless @dashboard.readiness.complete? %><%= link_to "Setup", readiness_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
       <% if @dashboard.external_services_health.attention_count.positive? || @dashboard.health_checks_pending? %><%= link_to "Health", health_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
       <% if @dashboard.latest_sync_run_needs_attention? || @dashboard.latest_sync_run_active? %><%= link_to "Sync run", sync_run_path(@dashboard.latest_sync_run), class: "text-slate-700 hover:text-slate-950" %><% end %>
-      <% if @dashboard.jackett_changes_count.positive? %><%= link_to "Jackett changes", discover_indexers_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
+      <% if @dashboard.jackett_changes_count.positive? %><%= link_to "Jackett changes", indexers_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
       <% if @dashboard.proxy_failures_count.positive? %><%= link_to "Proxy failures", proxy_activity_path(status: "failed"), class: "text-slate-700 hover:text-slate-950" %><% end %>
     </div>
   </section>
