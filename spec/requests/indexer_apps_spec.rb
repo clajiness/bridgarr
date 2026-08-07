@@ -275,6 +275,10 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("No change", "Remote configuration already matches.")
     expect(response.body).not_to include("API key:")
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css('input[name="assignment_ids[]"]')).to be_nil
+    expect(document.at_css('input[type="submit"][value="Apply selected plan"]')).to be_nil
+    expect(response.body).to include("Nothing to apply.")
     expect(assignment.reload.last_plan_state).to eq("unchanged")
     expect(Dashboard::Overview.new.assignment_rows.first.status).to eq("healthy")
   end

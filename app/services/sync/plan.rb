@@ -3,7 +3,7 @@ require "digest"
 module Sync
   class Plan
     STATES = %w[create update unchanged not_applicable conflict orphaned unreachable invalid].freeze
-    APPLYABLE_STATES = %w[create update unchanged].freeze
+    APPLYABLE_STATES = %w[create update].freeze
 
     Result = Data.define(:items, :generated_at) do
       def counts
@@ -43,7 +43,7 @@ module Sync
       end
 
       def attention?
-        !applyable? && state != "not_applicable"
+        !applyable? && !state.in?(%w[unchanged not_applicable])
       end
     end
 
