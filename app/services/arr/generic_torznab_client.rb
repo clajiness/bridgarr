@@ -71,8 +71,8 @@ module Arr
       schema_failure = load_torznab_schema
       return schema_failure if schema_failure
 
-      compatibility_error = category_compatibility_error
-      return skipped(compatibility_error) if compatibility_error
+      compatibility_result = category_compatibility_result
+      return compatibility_result if compatibility_result
 
       log_category_selection
 
@@ -218,16 +218,16 @@ module Arr
         )
       end
 
-      def category_compatibility_error
+      def category_compatibility_result
         return if category_policy.manual?
 
         unless torznab_caps_result.success?
-          return "Could not inspect Torznab categories for #{name}: #{torznab_caps_result.message}"
+          return failure("Could not inspect Torznab categories for #{name}: #{torznab_caps_result.message}")
         end
 
         return if category_policy.compatible?
 
-        "No compatible default categories were found for #{name}. #{arr_app.name}'s Generic Torznab defaults do not overlap with the categories advertised by this Jackett indexer. Review the category mode or choose custom categories."
+        skipped("No compatible default categories were found for #{name}. #{arr_app.name}'s Generic Torznab defaults do not overlap with the categories advertised by this Jackett indexer. Review the category mode or choose custom categories.")
       end
 
       def category_policy_manual?
@@ -258,8 +258,8 @@ module Arr
         schema_failure = load_torznab_schema
         return schema_failure if schema_failure
 
-        compatibility_error = category_compatibility_error
-        return skipped(compatibility_error) if compatibility_error
+        compatibility_result = category_compatibility_result
+        return compatibility_result if compatibility_result
 
         log_category_selection
         return success(remote_indexer.fetch("id"), nil, message, action: "unchanged") if remote_indexer_matches?(remote_indexer)

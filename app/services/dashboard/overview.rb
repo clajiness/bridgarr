@@ -138,6 +138,7 @@ module Dashboard
       def assignment_status(assignment, active_sync_item)
         return assignment.last_plan_state if assignment.last_plan_state.in?(%w[conflict orphaned unreachable invalid])
         return "syncing" if active_sync_item
+        return "not_applicable" if assignment.last_plan_state == "not_applicable"
         return "failed" if assignment.last_status == "error"
         return "mismatch" if assignment.last_status == "mismatch"
         return "not_applicable" if assignment.last_status == "skipped"

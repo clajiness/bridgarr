@@ -88,7 +88,7 @@
     <div class="space-y-4">
       <% if @plan.destructive_items.any? %>
         <label class="flex items-start gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-950">
-          <%= check_box_tag :confirm_destructive, "1", false, required: true, class: "mt-1 h-4 w-4 rounded border-red-300 text-red-700 focus:ring-red-600" %>
+          <%= check_box_tag :confirm_destructive, "1", false, class: "mt-1 h-4 w-4 rounded border-red-300 text-red-700 focus:ring-red-600" %>
           <span><strong class="block">Confirm remote search-mode disablement</strong><span class="mt-1 block text-xs leading-5">I reviewed the affected assignments and understand that applying the selected destructive changes will disable remote search modes.</span></span>
         </label>
       <% end %>

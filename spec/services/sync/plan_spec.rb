@@ -22,14 +22,22 @@ RSpec.describe Sync::Plan do
   class FakePlanCaps
     Result = Data.define(:success?, :category_ids, :message, :error, :http_status)
 
+    class << self
+      attr_accessor :result
+    end
+
     def self.call(**)
-      Result.new(
+      result || Result.new(
         success?: true,
         category_ids: [ 5030, 5040 ],
         message: "Categories inspected.",
         error: nil,
         http_status: 200
       )
+    end
+
+    def self.reset!
+      self.result = nil
     end
   end
 
@@ -61,6 +69,7 @@ RSpec.describe Sync::Plan do
 
   before do
     FakePlanInventory.reset!
+    FakePlanCaps.reset!
     Setting.write_value(Setting::BRIDGARR_BASE_URL_KEY, "http://localhost:3000")
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-secret-key")
@@ -113,6 +122,40 @@ RSpec.describe Sync::Plan do
     expect(item.state).to eq("invalid")
     expect(item).not_to be_applyable
     expect(item.message).to include("did not return configurable fields")
+  end
+
+  it "marks assignments without compatible app categories as not applicable" do
+    incompatible_schema = schema.deep_dup
+    incompatible_schema.fetch("fields").find { |field| field["name"] == "categories" }["value"] = [ 2000 ]
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: []).with(torznab_schema: incompatible_schema)
+
+    plan = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps)
+    item = plan.items.fetch(0)
+
+    expect(item.state).to eq("not_applicable")
+    expect(item).not_to be_applyable
+    expect(item).not_to be_attention
+    expect(item.message).to eq("EZTV is not applicable to Main Sonarr because their available Torznab categories do not overlap.")
+    expect(plan.attention_items).to be_empty
+  end
+
+  it "keeps a category inspection failure invalid and actionable" do
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: [])
+    FakePlanCaps.result = FakePlanCaps::Result.new(
+      success?: false,
+      category_ids: [],
+      message: "Jackett timed out.",
+      error: "Jackett timed out.",
+      http_status: nil
+    )
+
+    plan = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps)
+    item = plan.items.fetch(0)
+
+    expect(item.state).to eq("invalid")
+    expect(item).to be_attention
+    expect(item.message).to eq("Could not inspect Torznab categories for EZTV: Jackett timed out.")
+    expect(plan.attention_items).to eq([ item ])
   end
 
   it "shows redacted field-level updates" do

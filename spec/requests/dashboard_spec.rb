@@ -213,6 +213,7 @@ RSpec.describe "Dashboard", type: :request do
       arr_app: sonarr,
       indexer:,
       enabled: true,
+      last_plan_state: "not_applicable",
       last_status: "skipped",
       last_error: "EZTV does not expose Radarr-compatible Torznab categories."
     )

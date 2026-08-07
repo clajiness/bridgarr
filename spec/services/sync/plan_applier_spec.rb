@@ -111,4 +111,24 @@ RSpec.describe Sync::PlanApplier do
 
     expect(confirmed_result).to be_success
   end
+
+  it "applies a safe selection without confirming an unselected destructive item" do
+    second_indexer = Indexer.create!(name: "Second", jackett_id: "second")
+    destructive_assignment = IndexerApp.create!(arr_app: assignment.arr_app, indexer: second_indexer)
+    destructive_item = item.with(
+      indexer_app: destructive_assignment,
+      plan_digest: "destructive-plan",
+      destructive: true
+    )
+    mixed_plan = Sync::Plan::Result.new(items: [ item, destructive_item ], generated_at: Time.current)
+
+    result = described_class.call(
+      plan: mixed_plan,
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "current-plan" }
+    )
+
+    expect(result).to be_success
+    expect(result.sync_run.sync_run_items.pluck(:indexer_app_id)).to eq([ assignment.id ])
+  end
 end

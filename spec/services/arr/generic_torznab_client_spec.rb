@@ -566,7 +566,7 @@ RSpec.describe Arr::GenericTorznabClient do
     )
 
     expect(result).not_to be_success
-    expect(result).to be_skipped
+    expect(result).not_to be_skipped
     expect(result.message).to eq("Could not inspect Torznab categories for EZTV: Jackett returned HTTP 500.")
     expect(connection.get_paths).to eq([ "/api/v3/indexer", "/api/v3/indexer/schema" ])
     expect(connection.post_path).to be_nil
