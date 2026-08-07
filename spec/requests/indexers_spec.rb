@@ -144,6 +144,28 @@ RSpec.describe "Indexers", type: :request do
     expect(flash[:alert]).to eq("Add a Jackett URL before discovering indexers.")
   end
 
+  it "redirects an imported disabled desired state to reconciliation preview" do
+    assignment = indexer.indexer_apps.first
+    assignment.update!(enabled: false)
+    result = Jackett::IndexerImport::Result.new(
+      success?: true,
+      imported_count: 0,
+      updated_count: 0,
+      assigned_count: 0,
+      skipped_count: 1,
+      sync_run: nil,
+      preview_assignment_ids: [ assignment.id ],
+      message: "Preview required.",
+      error: nil
+    )
+    allow(Jackett::IndexerImport).to receive(:call).and_return(result)
+
+    post import_from_jackett_indexers_path, params: { jackett_ids: [ indexer.jackett_id ], sync_now: "1" }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to eq("Preview required.")
+  end
+
   it "renders the new indexer page" do
     arr_app
 

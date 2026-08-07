@@ -17,6 +17,10 @@ module Sync
       def attention_items
         items.reject(&:applyable?)
       end
+
+      def destructive_items
+        items.select(&:destructive)
+      end
     end
 
     Item = Data.define(
@@ -50,6 +54,7 @@ module Sync
       "categories" => "Categories",
       "animeCategories" => "Anime categories"
     }.freeze
+    SEARCH_MODE_FIELDS = %w[enableRss enableAutomaticSearch enableInteractiveSearch].freeze
     REQUIRED_TORZNAB_FIELDS = %w[baseUrl apiPath apiKey].freeze
 
     def self.call(scope: IndexerApp.all, inventory_client: Arr::IndexerInventory, caps_client: Jackett::TorznabCaps, now: Time.current)
@@ -123,29 +128,39 @@ module Sync
         changes = changes_between(remote_attributes, desired.attributes)
         state = changes.empty? ? "unchanged" : "update"
         remote_digest = DesiredConfiguration.digest(remote_attributes)
+        destructive = disables_remote_search?(remote_attributes, desired.attributes)
+        message = state == "unchanged" ? "Remote configuration already matches." : update_message(assignment, desired.digest, remote_digest, changes.size)
+        message = "#{message} Remote RSS, automatic search, and interactive search will be disabled." if destructive
 
         build_item(
           assignment:,
           state:,
           remote_indexer_id: remote["id"],
           changes:,
-          message: state == "unchanged" ? "Remote configuration already matches." : update_message(assignment, desired.digest, remote_digest, changes.size),
+          message:,
           desired_digest: desired.digest,
           remote_digest:,
-          destructive: false
+          destructive:
         )
       end
 
       def create_item(assignment, desired)
+        destructive = SEARCH_MODE_FIELDS.any? { |field| desired.attributes[field] == false }
+        message = if destructive
+          "A managed Generic Torznab indexer will be created with remote RSS, automatic search, and interactive search disabled."
+        else
+          "A managed Generic Torznab indexer will be created."
+        end
+
         build_item(
           assignment:,
           state: "create",
           remote_indexer_id: nil,
           changes: [],
-          message: "A managed Generic Torznab indexer will be created.",
+          message:,
           desired_digest: desired.digest,
           remote_digest: nil,
-          destructive: false
+          destructive:
         )
       end
 
@@ -310,6 +325,12 @@ module Sync
             "desired" => sensitive ? "[REDACTED]" : display_value(desired[field]),
             "sensitive" => sensitive
           }
+        end
+      end
+
+      def disables_remote_search?(remote_attributes, desired_attributes)
+        SEARCH_MODE_FIELDS.any? do |field|
+          remote_attributes[field] != false && desired_attributes[field] == false
         end
       end
 

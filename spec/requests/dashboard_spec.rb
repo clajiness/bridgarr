@@ -59,6 +59,19 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).not_to include("System status")
   end
 
+  it "describes a disabled assignment as local desired state" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://sonarr.example.test", api_key: "key")
+    indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
+    IndexerApp.create!(arr_app:, indexer:, enabled: false, last_synced_at: 1.hour.ago, last_status: "ok")
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Desired state", "Disabled")
+    expect(response.body).to include("Assignment is disabled. The next sync will disable remote search modes.")
+    expect(response.body).not_to include("Remote search modes are off")
+  end
+
   it "shows setup readiness details on their own page" do
     get readiness_path
 

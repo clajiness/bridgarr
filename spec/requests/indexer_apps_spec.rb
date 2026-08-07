@@ -87,6 +87,32 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(flash[:alert]).to include("do not have assignments yet")
   end
 
+  it "routes selected sync through preview without queueing remote work" do
+    assignment
+    allow(Sync::BulkSync).to receive(:call)
+
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}" ],
+      bulk_action: "sync"
+    }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to include("Review and apply")
+    expect(Sync::BulkSync).not_to have_received(:call)
+  end
+
+  it "requires preview before syncing a disabled assignment" do
+    assignment.update!(enabled: false)
+    allow(Sync::AssignmentSync).to receive(:call)
+
+    post sync_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(response).to have_http_status(:see_other)
+    expect(flash[:alert]).to include("Disabled assignments must be previewed")
+    expect(Sync::AssignmentSync).not_to have_received(:call)
+  end
+
   it "rejects unknown matrix actions without changing assignments" do
     assignment
 
@@ -169,6 +195,29 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.reload.last_plan_state).to eq("create")
   end
 
+  it "prominently identifies destructive remote search-mode changes" do
+    item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "update",
+      remote_indexer_id: 42,
+      changes: [ { "field" => "enableRss", "label" => "RSS", "current" => "Enabled", "desired" => "Disabled" } ],
+      message: "Remote search modes will change.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "plan",
+      destructive: true
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ item ], generated_at: Time.current))
+
+    get preview_indexer_apps_path(assignment_ids: [ assignment.id ])
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("1", "Assignment will have remote search modes disabled")
+    expect(response.body).to include("Remote search modes will be disabled")
+    expect(response.body).to include("Confirm remote search-mode disablement")
+    expect(response.body).to include("required=\"required\"")
+  end
+
   it "does not expand an explicitly empty preview selection to every assignment" do
     assignment
     allow(Sync::Plan).to receive(:call).and_call_original
@@ -207,6 +256,30 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(sync_run.sync_run_items.first.plan_digest).to eq("reviewed-plan")
   end
 
+  it "refuses a destructive plan without server-side confirmation" do
+    item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "update",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Disable remote search modes.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "reviewed-plan",
+      destructive: true
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ item ], generated_at: Time.current))
+
+    post apply_plan_indexer_apps_path, params: {
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "reviewed-plan" }
+    }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:alert]).to include("Confirm", "disable remote search modes")
+    expect(SyncRun.count).to eq(0)
+  end
+
   it "returns an empty apply submission to the matrix instead of expanding its scope" do
     assignment
     allow(Sync::Plan).to receive(:call).and_call_original
@@ -237,6 +310,30 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
     expect(flash[:alert]).to include("conflict changed")
     expect(assignment.reload.remote_indexer_id).to be_nil
+  end
+
+  it "returns a repaired disabled assignment to preview instead of syncing it" do
+    assignment.update!(enabled: false)
+    conflict = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "conflict",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Conflict.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "conflict-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ conflict ], generated_at: Time.current))
+    allow(Sync::AssignmentSync).to receive(:call)
+
+    post repair_indexer_app_path(assignment), params: { remote_indexer_id: 42 }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to include("Review and confirm the disabled desired state")
+    expect(assignment.reload.remote_indexer_id).to eq(42)
+    expect(Sync::AssignmentSync).not_to have_received(:call)
   end
 
   it "does not forget a remote association while its sync is active" do

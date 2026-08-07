@@ -19,11 +19,9 @@ class SyncRunsController < ApplicationController
   end
 
   def create
-    sync_run = Sync::BulkSync.call
-
-    message = sync_run.total_count.positive? ? "Bulk sync queued." : "No enabled indexer assignments are ready to sync."
-
-    redirect_to sync_run_path(sync_run), notice: message
+    redirect_to preview_indexer_apps_path,
+      notice: "Review the reconciliation preview and explicitly apply the assignments you want to sync.",
+      status: :see_other
   end
 
   def abandon

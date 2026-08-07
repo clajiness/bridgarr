@@ -96,6 +96,38 @@ RSpec.describe Jackett::IndexerImport do
     expect(assignment).to be_enabled
   end
 
+  it "preserves an existing disabled assignment and requires preview before immediate sync" do
+    arr_app = ArrApp.create!(name: "Main Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
+    indexer = Indexer.create!(name: "Existing Indexer", jackett_id: "existing-indexer")
+    assignment = IndexerApp.create!(indexer:, arr_app:, enabled: false)
+    discovery = FakeDiscovery.new(
+      Jackett::IndexerDiscovery::Result.new(
+        success?: true,
+        indexers: [ Jackett::IndexerDiscovery::IndexerRecord.new(name: "Existing Indexer", jackett_id: "existing-indexer", configured: true) ],
+        message: "Found 1 configured Jackett indexer.",
+        error: nil,
+        http_status: 200
+      )
+    )
+    allow(Sync::BulkSync).to receive(:call)
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_ids: [ "existing-indexer" ],
+      arr_app_ids: [ arr_app.id ],
+      sync_now: true,
+      discovery:
+    )
+
+    expect(result).to be_success
+    expect(assignment.reload).not_to be_enabled
+    expect(result.sync_run).to be_nil
+    expect(result.preview_assignment_ids).to eq([ assignment.id ])
+    expect(result.message).to include("preview required before syncing disabled desired state")
+    expect(Sync::BulkSync).not_to have_received(:call)
+  end
+
   it "requires at least one selected Jackett indexer" do
     result = described_class.call(
       base_url: "http://localhost:9117",

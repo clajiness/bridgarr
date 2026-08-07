@@ -41,7 +41,13 @@ class IndexersController < ApplicationController
     )
 
     if result.success?
-      destination = result.sync_run ? sync_run_path(result.sync_run) : indexer_apps_path
+      destination = if result.preview_assignment_ids.present?
+        preview_indexer_apps_path(assignment_ids: result.preview_assignment_ids)
+      elsif result.sync_run
+        sync_run_path(result.sync_run)
+      else
+        indexer_apps_path
+      end
       redirect_to destination, notice: result.message
     else
       redirect_to indexers_path, alert: result.message

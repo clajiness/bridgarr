@@ -87,4 +87,28 @@ RSpec.describe Sync::PlanApplier do
     expect(result.stale_assignment_ids).to eq([ missing_assignment_id ])
     expect(SyncRun.count).to eq(0)
   end
+
+  it "requires explicit confirmation before applying remote search-mode disablement" do
+    destructive_item = item.with(destructive: true)
+    destructive_plan = Sync::Plan::Result.new(items: [ destructive_item ], generated_at: Time.current)
+
+    result = described_class.call(
+      plan: destructive_plan,
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "current-plan" }
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to include("Confirm", "disable remote search modes")
+    expect(SyncRun.count).to eq(0)
+
+    confirmed_result = described_class.call(
+      plan: destructive_plan,
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "current-plan" },
+      destructive_confirmation: true
+    )
+
+    expect(confirmed_result).to be_success
+  end
 end

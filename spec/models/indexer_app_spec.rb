@@ -23,6 +23,12 @@ RSpec.describe IndexerApp, type: :model do
     expect(duplicate.errors[:indexer_id]).to include("has already been taken")
   end
 
+  it "defaults new assignments to enabled" do
+    assignment = described_class.create!(arr_app:, indexer:)
+
+    expect(assignment).to be_enabled
+  end
+
   it "records sync results" do
     assignment = described_class.create!(arr_app: arr_app, indexer: indexer)
     synced_at = Time.zone.local(2026, 7, 4, 12, 0, 0)

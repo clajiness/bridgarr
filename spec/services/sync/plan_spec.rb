@@ -79,6 +79,19 @@ RSpec.describe Sync::Plan do
     expect(assignment.reload.last_plan_state).to be_nil
   end
 
+  it "flags creation with disabled remote search modes for explicit confirmation" do
+    assignment.update!(enabled: false)
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: [])
+
+    plan = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps)
+    item = plan.items.fetch(0)
+
+    expect(item.state).to eq("create")
+    expect(item.destructive).to be(true)
+    expect(item.message).to include("will be created with remote RSS, automatic search, and interactive search disabled")
+    expect(plan.destructive_items).to eq([ item ])
+  end
+
   it "plans an unchanged assignment" do
     assignment.update!(remote_indexer_id: 42)
     FakePlanInventory.results[arr_app.id] = inventory(indexers: [ remote_indexer ])
@@ -113,6 +126,8 @@ RSpec.describe Sync::Plan do
     expect(item.state).to eq("update")
     expect(item.changes.map { |change| change["field"] }).to include("enableRss", "apiKey")
     expect(item.changes.to_json).not_to include("different-secret", "jackett-secret-key")
+    expect(item.destructive).to be(true)
+    expect(item.message).to include("Remote RSS, automatic search, and interactive search will be disabled")
   end
 
   it "distinguishes remote drift from a local desired-state change" do
