@@ -53,10 +53,54 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("All systems operational")
     expect(response.body).to include("1 indexer · 1 app · 1 managed assignment")
     expect(response.body).to include("Desired state")
+    expect(response.body).to include("Assignment state")
+    expect(response.body).to include("Indexer health")
     expect(response.body).to include("Last applied")
-    expect(response.body).to include("Healthy")
+    expect(response.body).to include("In sync")
+    expect(response.body).to include("Matches desired state")
+    expect(response.body).to include("Operational")
+    expect(response.body).to include("Latest live search passed")
     expect(response.body).not_to include("Finish setup")
     expect(response.body).not_to include("System status")
+  end
+
+  it "distinguishes an in-sync assignment from failed indexer health" do
+    checked_at = Time.current.change(usec: 0)
+    arr_app = ArrApp.create!(
+      name: "Radarr",
+      app_type: "radarr",
+      base_url: "http://radarr.example.test",
+      api_key: "radarr-api-key",
+      last_status: "ok",
+      last_tested_at: checked_at
+    )
+    indexer = Indexer.create!(
+      name: "kickasstorrents.to",
+      jackett_id: "kickasstorrents-to",
+      last_status: "error",
+      last_error: "Jackett returned HTTP 400 while running the live search.",
+      last_http_status: 400,
+      last_tested_at: checked_at
+    )
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      last_status: "ok",
+      last_synced_at: checked_at,
+      last_applied_at: checked_at
+    )
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Review 1 service")
+    expect(response.body).to include("Assignment issues", "0")
+    expect(response.body).to include("In sync", "Matches desired state")
+    expect(response.body).to include("Failed", "Latest live search failed")
+    expect(response.body).to include("Checked")
+    expect(response.body).to include(health_path)
+    expect(response.body).not_to include("Jackett returned HTTP 400")
   end
 
   it "describes a disabled assignment as local desired state" do
