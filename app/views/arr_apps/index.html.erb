@@ -35,7 +35,7 @@
               <td class="px-4 py-3 text-slate-700"><%= arr_app.app_type.titleize %></td>
               <td class="px-4 py-3 text-slate-700"><%= arr_app.base_url %></td>
               <td class="px-4 py-3">
-                <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", arr_app.enabled? ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-100 text-slate-600") %>">
+                <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", enabled_status_classes(arr_app.enabled?)) %>">
                   <%= arr_app.enabled? ? "Enabled" : "Disabled" %>
                 </span>
               </td>
@@ -52,7 +52,7 @@
                       <p class="text-xs leading-5 text-slate-500">Not tested</p>
                     <% end %>
                     <p class="text-xs leading-5 text-slate-500"><% if arr_app.last_http_status.present? %>HTTP <%= arr_app.last_http_status %> · <% end %><%= health_duration(arr_app.last_duration_ms) %></p>
-                    <% if arr_app.last_error.present? %><p class="max-w-sm text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= sanitized_health_error(arr_app.last_error) %></p><% end %>
+                    <% if arr_app.last_error.present? %><p class="max-w-sm text-xs leading-5 <%= health_error_classes(health_status) %> [overflow-wrap:anywhere]"><%= sanitized_health_error(arr_app.last_error) %></p><% end %>
                   </div>
                 <% else %>
                   <span class="text-sm text-slate-500">Not tested</span>

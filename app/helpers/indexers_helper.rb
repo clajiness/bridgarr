@@ -1,7 +1,7 @@
 module IndexersHelper
   def proxy_request_status_classes(proxy_request)
     if proxy_request.successful?
-      "border-amber-200 bg-amber-50 text-amber-900"
+      "border-green-200 bg-green-50 text-green-800"
     else
       "border-red-200 bg-red-50 text-red-800"
     end
@@ -19,6 +19,19 @@ module IndexersHelper
     return "n/a" if proxy_request.item_count.nil?
 
     pluralize(proxy_request.item_count, "item")
+  end
+
+  def jackett_state_classes(state)
+    case state.to_s
+    when "unchanged"
+      "border-green-200 bg-green-50 text-green-800"
+    when "new", "renamed", "changed"
+      "border-amber-200 bg-amber-50 text-amber-900"
+    when "disabled", "missing"
+      "border-red-200 bg-red-50 text-red-800"
+    else
+      "border-slate-200 bg-slate-100 text-slate-700"
+    end
   end
 
   def proxy_duration(duration_ms)

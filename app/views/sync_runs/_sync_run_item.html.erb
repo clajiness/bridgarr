@@ -23,7 +23,7 @@
   </td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.started_at.present? ? format_server_timestamp(sync_run_item.started_at) : "Not started" %></td>
   <td class="px-4 py-3 text-slate-700"><%= sync_run_item.finished_at.present? ? format_server_timestamp(sync_run_item.finished_at) : "Not finished" %></td>
-  <td class="<%= class_names("min-w-0 px-4 py-3 align-top", sync_run_item.failed? ? "text-red-800" : "text-slate-700") %>">
+  <td class="<%= class_names("min-w-0 px-4 py-3 align-top", sync_error_classes(sync_run_item)) %>">
     <% if sync_run_item.planned_action.present? %>
       <p class="mb-1 text-xs font-semibold uppercase tracking-normal text-slate-500"><%= reconciliation_state_label(sync_run_item.planned_action) %></p>
     <% end %>

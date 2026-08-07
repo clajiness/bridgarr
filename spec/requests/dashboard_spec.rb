@@ -63,6 +63,17 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("Latest live search passed")
     expect(response.body).not_to include("Finish setup")
     expect(response.body).not_to include("System status")
+
+    document = Nokogiri::HTML(response.body)
+    operational_banner = document.at_xpath("//h2[normalize-space()='All systems operational']/ancestor::section[1]")
+    in_sync_badge = document.css("span").find { |node| node.text.strip == "In sync" }
+    operational_badge = document.css("a").find { |node| node.text.strip == "Operational" }
+    enabled_badge = document.css("span").find { |node| node.text.strip == "Enabled" }
+
+    expect(operational_banner["class"]).to include("border-green-200", "bg-green-50")
+    expect(in_sync_badge["class"]).to include("bg-green-50", "text-green-800")
+    expect(operational_badge["class"]).to include("bg-green-50", "text-green-800")
+    expect(enabled_badge["class"]).to include("bg-blue-50", "text-blue-800")
   end
 
   it "distinguishes an in-sync assignment from failed indexer health" do

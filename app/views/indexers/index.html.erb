@@ -8,7 +8,7 @@
     </div>
 
     <div class="flex flex-wrap gap-3">
-      <% if Indexer.with_jackett_changes.exists? %><%= link_to "Review Jackett changes", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100" %><% end %>
+      <% if Indexer.with_jackett_changes.exists? %><%= link_to "Review Jackett changes", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100" %><% end %>
       <%= button_to "Check all now", health_checks_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <%= link_to "Discover from Jackett", discover_indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
       <%= link_to "New indexer", new_indexer_path, class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
@@ -33,12 +33,12 @@
             <tr>
               <td class="px-4 py-3 font-medium text-slate-950">
                 <%= link_to indexer.name, indexer, class: "hover:underline" %>
-                <% if indexer.jackett_state.in?(%w[renamed changed disabled missing]) %><span class="mt-1 block text-xs font-semibold text-red-700"><%= indexer.jackett_state.humanize %> in Jackett</span><% end %>
+                <% if indexer.jackett_state.in?(%w[renamed changed disabled missing]) %><span class="mt-1 inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(indexer.jackett_state) %>"><%= indexer.jackett_state.humanize %> in Jackett</span><% end %>
               </td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= indexer.jackett_id %></td>
               <td class="px-4 py-3 text-slate-700"><%= indexer.arr_apps.map(&:name).to_sentence.presence || "None" %></td>
               <td class="px-4 py-3">
-                <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", indexer.enabled? ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-100 text-slate-600") %>">
+                <span class="<%= class_names("rounded-md border px-2 py-1 text-xs font-semibold", enabled_status_classes(indexer.enabled?)) %>">
                   <%= indexer.enabled? ? "Enabled" : "Disabled" %>
                 </span>
               </td>
@@ -48,7 +48,7 @@
                   <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(health_status) %>"><%= health_status_label(health_status, operational: true) %></span>
                   <% if indexer.last_tested_at.present? %><p class="text-xs text-slate-500">Live search · <%= format_server_timestamp(indexer.last_tested_at) %></p><% end %>
                   <% if indexer.last_http_status.present? || !indexer.last_duration_ms.nil? %><p class="text-xs text-slate-500"><% if indexer.last_http_status.present? %>HTTP <%= indexer.last_http_status %> · <% end %><%= health_duration(indexer.last_duration_ms) %></p><% end %>
-                  <% if indexer.last_error.present? %><p class="max-w-sm text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= sanitized_health_error(indexer.last_error) %></p><% end %>
+                  <% if indexer.last_error.present? %><p class="max-w-sm text-xs leading-5 <%= health_error_classes(health_status) %> [overflow-wrap:anywhere]"><%= sanitized_health_error(indexer.last_error) %></p><% end %>
                 </div>
               </td>
               <td class="px-4 py-3 text-right">

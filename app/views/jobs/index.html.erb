@@ -189,7 +189,7 @@
                 <p class="font-medium text-slate-950"><%= process.kind.titleize %> · <%= process.name %></p>
                 <p class="mt-1 text-xs text-slate-500"><%= process.hostname.presence || "Unknown host" %> · heartbeat <%= format_server_timestamp(process.last_heartbeat_at) %></p>
               </div>
-              <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= process.active ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800" %>"><%= process.active ? "Active" : "Stale" %></span>
+              <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= process.active ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-900" %>"><%= process.active ? "Active" : "Stale" %></span>
             </div>
           <% end %>
         </div>

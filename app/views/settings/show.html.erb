@@ -76,7 +76,7 @@
         <div class="rounded-md border border-stone-200 bg-stone-50 p-4">
           <% if @jackett_last_status.present? %>
             <div class="space-y-3">
-              <span class="inline-flex rounded-md px-2 py-1 text-xs font-semibold uppercase <%= @jackett_last_status == "ok" ? "bg-amber-50 text-amber-900" : "bg-red-50 text-red-800" %>">
+              <span class="inline-flex rounded-md px-2 py-1 text-xs font-semibold uppercase <%= @jackett_last_status == "ok" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800" %>">
                 <%= @jackett_last_status == "ok" ? "Connected" : "Failed" %>
               </span>
 

@@ -51,7 +51,7 @@
               <% unless item.last_duration_ms.nil? %> · <%= health_duration(item.last_duration_ms) %><% end %>
             </p>
             <% if item.last_error.present? && item.status.in?(%w[error unknown stale]) %>
-              <p class="mt-2 text-xs leading-5 text-red-800 [overflow-wrap:anywhere]"><%= item.last_error %></p>
+              <p class="mt-2 text-xs leading-5 <%= health_error_classes(item.status) %> [overflow-wrap:anywhere]"><%= item.last_error %></p>
             <% end %>
           </div>
           <span class="inline-flex h-fit w-fit rounded-md border px-2 py-1 text-xs font-semibold <%= health_status_classes(item.status) %>"><%= health_status_label(item.status, operational: item.kind == :indexer) %></span>

@@ -17,7 +17,7 @@ module IndexerAppsHelper
     when "create", "update"
       "border-blue-200 bg-blue-50 text-blue-800"
     when "unchanged"
-      "border-amber-200 bg-amber-50 text-amber-900"
+      "border-green-200 bg-green-50 text-green-800"
     when "not_applicable"
       "border-stone-200 bg-stone-50 text-slate-700"
     when "conflict", "orphaned", "unreachable", "invalid"
@@ -28,7 +28,7 @@ module IndexerAppsHelper
   end
 
   def assignment_enabled_classes(assignment)
-    assignment.enabled? ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-300 bg-slate-100 text-slate-700"
+    enabled_status_classes(assignment.enabled?)
   end
 
   def matrix_filter_options
