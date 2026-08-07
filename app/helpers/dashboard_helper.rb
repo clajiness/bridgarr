@@ -75,7 +75,7 @@ module DashboardHelper
       "syncing" => "Syncing",
       "unsynced" => "Unsynced",
       "disabled" => "Disabled",
-      "healthy" => "Healthy"
+      "healthy" => "In sync"
     }.fetch(status, status.to_s.humanize)
   end
 
@@ -95,10 +95,20 @@ module DashboardHelper
   def dashboard_assignment_filter_label(filter)
     {
       "all" => "All",
-      "attention" => "Needs attention",
+      "attention" => "Assignment issues",
       "unsynced" => "Unsynced",
       "disabled" => "Disabled"
     }.fetch(filter)
+  end
+
+  def dashboard_indexer_health_detail(status)
+    {
+      "ok" => "Latest live search passed",
+      "error" => "Latest live search failed",
+      "unknown" => "No live-search result yet",
+      "stale" => "Live-search result is stale",
+      "disabled" => "Disabled in Bridgarr"
+    }.fetch(status.to_s, "Live-search health is unknown")
   end
 
   def external_service_path(item)

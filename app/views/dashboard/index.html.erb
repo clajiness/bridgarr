@@ -56,7 +56,8 @@
               <th class="px-4 py-3">Indexer</th>
               <th class="px-4 py-3">Destination</th>
               <th class="px-4 py-3">Desired state</th>
-              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Assignment state</th>
+              <th class="px-4 py-3">Indexer health</th>
               <th class="px-4 py-3">Last applied</th>
               <th class="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -64,6 +65,7 @@
           <tbody class="divide-y divide-slate-200">
             <% @dashboard.assignment_rows.each do |row| %>
               <% assignment = row.assignment %>
+              <% indexer_health_status = record_health_status(row.indexer, now: @dashboard.now) %>
               <tr class="align-top hover:bg-stone-50/70">
                 <td class="px-4 py-4">
                   <%= link_to row.indexer.name, row.indexer, class: "font-semibold text-slate-950 hover:underline" %>
@@ -80,6 +82,15 @@
                 <td class="max-w-xs px-4 py-4">
                   <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= dashboard_assignment_status_classes(row.status) %>"><%= dashboard_assignment_status_label(row.status) %></span>
                   <p class="mt-2 text-xs leading-5 text-slate-600"><%= row.detail %></p>
+                </td>
+                <td class="max-w-xs px-4 py-4">
+                  <%= link_to health_path, class: "inline-flex rounded-md border px-2 py-1 text-xs font-semibold #{health_status_classes(indexer_health_status)}" do %>
+                    <%= health_status_label(indexer_health_status, operational: true) %>
+                  <% end %>
+                  <p class="mt-2 text-xs leading-5 text-slate-600"><%= dashboard_indexer_health_detail(indexer_health_status) %></p>
+                  <% if row.indexer.last_tested_at.present? %>
+                    <p class="mt-1 whitespace-nowrap text-xs text-slate-500">Checked <%= format_server_timestamp(row.indexer.last_tested_at) %></p>
+                  <% end %>
                 </td>
                 <td class="whitespace-nowrap px-4 py-4 text-slate-700"><%= row.last_applied_at ? format_server_timestamp(row.last_applied_at) : "Never" %></td>
                 <td class="px-4 py-4 text-right">
