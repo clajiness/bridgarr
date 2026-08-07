@@ -132,7 +132,7 @@ module DashboardHelper
   end
 
   def dashboard_readiness_item_path(item)
-    return discover_indexers_path if item.key == :jackett_changes
+    return indexers_path if item.key == :jackett_changes
 
     case item.key
     when :settings

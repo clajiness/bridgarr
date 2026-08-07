@@ -19,9 +19,8 @@ class IndexersController < ApplicationController
 
     if result.success?
       Jackett::InventoryReconciler.call(records: result.indexers)
-      @jackett_indexers = result.indexers
+      @jackett_indexers = result.indexers.select(&:configured)
       @existing_by_jackett_id = Indexer.where(jackett_id: @jackett_indexers.map(&:jackett_id)).index_by(&:jackett_id)
-      @missing_indexers = Indexer.where(jackett_state: "missing").order(:name)
       @arr_apps = ArrApp.where(enabled: true).order(:name)
     else
       redirect_to indexers_path, alert: result.message
