@@ -2,12 +2,18 @@ module Sync
   class PlanRecorder
     def self.call(plan, inspected_at: plan.generated_at)
       plan.items.each do |item|
-        IndexerApp.where(id: item.indexer_app.id).update_all(
+        attributes = {
           last_plan_state: item.state,
           last_inspected_at: inspected_at,
           last_desired_digest: item.desired_digest,
           last_remote_digest: item.remote_digest
-        )
+        }
+        if item.state == "unchanged"
+          attributes[:last_applied_digest] = item.desired_digest
+          attributes[:last_applied_settings] = item.indexer_app.desired_settings_snapshot
+        end
+
+        IndexerApp.where(id: item.indexer_app.id).update_all(attributes)
       end
 
       plan

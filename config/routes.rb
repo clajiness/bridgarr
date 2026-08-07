@@ -27,6 +27,7 @@ Rails.application.routes.draw do
       post :bulk_update
       get :preview
       post :apply_plan
+      post :revert_plan
     end
     post :sync, on: :member
     post :repair, on: :member

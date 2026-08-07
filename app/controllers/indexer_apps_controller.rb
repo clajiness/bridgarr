@@ -99,6 +99,30 @@ class IndexerAppsController < ApplicationController
     end
   end
 
+  def revert_plan
+    assignment_ids, requests = desired_state_revert_requests
+    if assignment_ids.empty?
+      return redirect_to(
+        preview_return_path(assignment_ids),
+        alert: "Choose at least one local desired-state change to revert.",
+        status: :see_other
+      )
+    end
+
+    plan = Sync::Plan.call(scope: IndexerApp.where(id: assignment_ids))
+    Sync::PlanRecorder.call(plan)
+    result = Sync::DesiredStateReverter.call(
+      plan:,
+      requests:,
+      expected_digests: expected_plan_digests(assignment_ids)
+    )
+
+    redirect_to(
+      preview_return_path(assignment_ids),
+      result.success? ? { notice: result.message, status: :see_other } : { alert: result.message, status: :see_other }
+    )
+  end
+
   def repair
     return redirect_assignment_syncing if @indexer_app.active_sync?
 
@@ -232,6 +256,27 @@ class IndexerAppsController < ApplicationController
       return {} unless submitted_digests.respond_to?(:permit)
 
       submitted_digests.permit(*assignment_ids.map(&:to_s)).to_h
+    end
+
+    def desired_state_revert_requests
+      if params[:revert_all] == "1"
+        ids = normalized_ids(params[:revert_assignment_ids])
+        return [ ids, ids.index_with { [ "all" ] } ]
+      end
+
+      assignment_id, option_key = params[:revert_target].to_s.split(":", 2)
+      assignment_id = positive_integer(assignment_id)
+      return [ [], {} ] unless assignment_id && option_key.present?
+
+      [ [ assignment_id ], { assignment_id => [ option_key ] } ]
+    end
+
+    def preview_return_path(fallback_assignment_ids)
+      return preview_indexer_apps_path if params[:preview_scope] == "all"
+
+      assignment_ids = normalized_ids(params[:preview_assignment_ids])
+      assignment_ids = fallback_assignment_ids if assignment_ids.empty?
+      preview_indexer_apps_path(assignment_ids:)
     end
 
     def redirect_assignment_syncing

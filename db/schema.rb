@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_07_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_07_150000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key", null: false
     t.string "app_type", null: false
@@ -38,6 +38,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_07_090000) do
     t.integer "jackett_api_key_version"
     t.datetime "last_applied_at"
     t.string "last_applied_digest"
+    t.json "last_applied_settings"
     t.string "last_desired_digest"
     t.text "last_error"
     t.datetime "last_inspected_at"
