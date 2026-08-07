@@ -1,6 +1,7 @@
 class IndexerApp < ApplicationRecord
   CONNECTION_MODES = %w[ direct bridged ].freeze
   CATEGORY_MODES = %w[ auto custom none ].freeze
+  DESIRED_SETTING_KEYS = %w[enabled connection_mode category_mode custom_categories].freeze
   PLAN_STATES = %w[create update unchanged not_applicable conflict orphaned unreachable invalid].freeze
 
   belongs_to :indexer
@@ -33,6 +34,7 @@ class IndexerApp < ApplicationRecord
     }
     if result.success?
       attributes[:last_applied_at] = synced_at
+      attributes[:last_applied_settings] = desired_settings_snapshot
       attributes[:last_plan_state] = "unchanged"
       if result.respond_to?(:desired_digest) && result.desired_digest.present?
         attributes[:last_applied_digest] = result.desired_digest
@@ -51,6 +53,29 @@ class IndexerApp < ApplicationRecord
 
   def custom_category_ids
     custom_categories.to_s.scan(/\d+/).map(&:to_i).select(&:positive?).uniq
+  end
+
+  def desired_settings_snapshot
+    {
+      "enabled" => enabled?,
+      "connection_mode" => connection_mode,
+      "category_mode" => category_mode,
+      "custom_categories" => custom_categories
+    }
+  end
+
+  def last_applied_settings_snapshot
+    snapshot = last_applied_settings
+    return unless snapshot.is_a?(Hash)
+
+    normalized = snapshot.stringify_keys.slice(*DESIRED_SETTING_KEYS)
+    return unless normalized.keys.sort == DESIRED_SETTING_KEYS.sort
+    return unless normalized["enabled"].in?([ true, false ])
+    return unless normalized["connection_mode"].in?(CONNECTION_MODES)
+    return unless normalized["category_mode"].in?(CATEGORY_MODES)
+    return unless valid_snapshot_categories?(normalized)
+
+    normalized
   end
 
   def custom_categories?
@@ -140,6 +165,13 @@ class IndexerApp < ApplicationRecord
       return if custom_category_ids.any?
 
       errors.add(:custom_categories, "must be present when category mode is custom")
+    end
+
+    def valid_snapshot_categories?(snapshot)
+      categories = snapshot["custom_categories"]
+      return snapshot["category_mode"] != "custom" if categories.blank?
+
+      valid_category_list_text?(categories.to_s)
     end
 
     def valid_category_list_text?(value)

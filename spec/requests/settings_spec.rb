@@ -14,6 +14,11 @@ RSpec.describe "Settings", type: :request do
     expect(response.body).to include("Bridgarr URL")
     expect(response.body).to include("Jackett URL")
     expect(response.body).to include("Build info")
+    document = Nokogiri::HTML(response.body)
+    main_column = document.at_css('[data-settings-column="main"]')
+    sidebar = document.at_css('[data-settings-column="sidebar"]')
+    expect(main_column.text).to include("Connection settings", "Bridged proxy authentication")
+    expect(sidebar.text).to include("Jackett connection", "Build info")
   end
 
   it "renders injected build identity" do

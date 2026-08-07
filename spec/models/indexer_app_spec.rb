@@ -47,6 +47,19 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_error).to be_nil
     expect(assignment.last_plan_state).to eq("unchanged")
     expect(assignment.last_applied_at).to eq(synced_at)
+    expect(assignment.last_applied_settings).to eq(
+      "enabled" => true,
+      "connection_mode" => "direct",
+      "category_mode" => "auto",
+      "custom_categories" => nil
+    )
+  end
+
+  it "rejects malformed applied-setting snapshots as rollback sources" do
+    assignment = described_class.create!(arr_app:, indexer:)
+    assignment.update_column(:last_applied_settings, { "enabled" => true, "connection_mode" => "direct" })
+
+    expect(assignment.reload.last_applied_settings_snapshot).to be_nil
   end
 
   it "records the current Jackett API key version after a successful direct sync" do

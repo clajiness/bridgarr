@@ -308,6 +308,100 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(confirmation.attribute("required")).to be_nil
   end
 
+  it "offers field, assignment, and preview rollback controls only for local desired-state changes" do
+    assignment.update_column(:last_applied_settings, assignment.desired_settings_snapshot)
+    assignment.update!(enabled: false, category_mode: "none")
+    item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "update",
+      remote_indexer_id: 42,
+      changes: [
+        { "field" => "enableRss", "label" => "RSS", "current" => "Enabled", "desired" => "Disabled" },
+        { "field" => "categories", "label" => "Categories", "current" => "2000", "desired" => "None" }
+      ],
+      message: "2 fields will change.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "reviewed-plan",
+      destructive: true
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ item ], generated_at: Time.current))
+
+    get preview_indexer_apps_path(assignment_ids: [ assignment.id ])
+
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css('button[name="revert_target"][value$=":enabled"]')).to be_present
+    expect(document.at_css('button[name="revert_target"][value$=":categories"]')).to be_present
+    expect(document.at_css('button[name="revert_target"][value$=":all"]')).to be_present
+    expect(document.at_css('button[name="revert_all"][value="1"]')).to be_present
+  end
+
+  it "reverts one reviewed local desired-state change and returns to the same preview scope" do
+    assignment.update_column(:last_applied_settings, assignment.desired_settings_snapshot)
+    assignment.update!(category_mode: "none")
+    item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "update",
+      remote_indexer_id: 42,
+      changes: [ { "field" => "categories", "label" => "Categories", "current" => "2000", "desired" => "None" } ],
+      message: "1 field will change.",
+      desired_digest: "desired",
+      remote_digest: "remote",
+      plan_digest: "reviewed-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ item ], generated_at: Time.current))
+
+    post revert_plan_indexer_apps_path, params: {
+      revert_target: "#{assignment.id}:categories",
+      expected_digests: { assignment.id.to_s => "reviewed-plan" },
+      preview_scope: "selected",
+      preview_assignment_ids: [ assignment.id ]
+    }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to include("Reverted 1 local desired-state change")
+    expect(assignment.reload.category_mode).to eq("auto")
+  end
+
+  it "reverts all reviewed local desired-state changes across the full preview" do
+    second_indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
+    second_assignment = IndexerApp.create!(arr_app:, indexer: second_indexer, remote_indexer_id: 43)
+    [ assignment, second_assignment ].each do |record|
+      record.update_column(:last_applied_settings, record.desired_settings_snapshot)
+      record.update!(category_mode: "none")
+    end
+    items = [ assignment, second_assignment ].map.with_index do |record, index|
+      Sync::Plan::Item.new(
+        indexer_app: record,
+        state: "update",
+        remote_indexer_id: record.remote_indexer_id,
+        changes: [ { "field" => "categories", "label" => "Categories", "current" => "2000", "desired" => "None" } ],
+        message: "1 field will change.",
+        desired_digest: "desired-#{index}",
+        remote_digest: "remote-#{index}",
+        plan_digest: "reviewed-plan-#{index}",
+        destructive: false
+      )
+    end
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items:, generated_at: Time.current))
+
+    post revert_plan_indexer_apps_path, params: {
+      revert_all: "1",
+      revert_assignment_ids: [ assignment.id, second_assignment.id ],
+      expected_digests: {
+        assignment.id.to_s => "reviewed-plan-0",
+        second_assignment.id.to_s => "reviewed-plan-1"
+      },
+      preview_scope: "all"
+    }
+
+    expect(response).to redirect_to(preview_indexer_apps_path)
+    expect(flash[:notice]).to include("2 local desired-state changes", "2 assignments")
+    expect(assignment.reload.category_mode).to eq("auto")
+    expect(second_assignment.reload.category_mode).to eq("auto")
+  end
+
   it "does not expand an explicitly empty preview selection to every assignment" do
     assignment
     allow(Sync::Plan).to receive(:call).and_call_original

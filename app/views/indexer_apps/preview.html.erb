@@ -1,4 +1,6 @@
 <% content_for :title, "Reconciliation preview" %>
+<% revert_options_by_assignment_id = @plan.items.to_h { |item| [ item.indexer_app.id, Sync::DesiredStateReverter.options_for(item) ] } %>
+<% revertible_assignment_ids = revert_options_by_assignment_id.filter_map { |assignment_id, options| assignment_id if options.any? } %>
 
 <div class="space-y-6">
   <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -34,6 +36,12 @@
   <% end %>
 
   <%= form_with url: apply_plan_indexer_apps_path, class: "space-y-4" do |form| %>
+    <%= hidden_field_tag :preview_scope, params.key?(:assignment_ids) ? "selected" : "all" %>
+    <% if params.key?(:assignment_ids) %>
+      <% @plan.items.each do |item| %><%= hidden_field_tag "preview_assignment_ids[]", item.indexer_app.id %><% end %>
+    <% end %>
+    <% revertible_assignment_ids.each do |assignment_id| %><%= hidden_field_tag "revert_assignment_ids[]", assignment_id %><% end %>
+
     <div class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
@@ -47,6 +55,7 @@
         <tbody class="divide-y divide-slate-200">
           <% @plan.items.each do |item| %>
             <% assignment = item.indexer_app %>
+            <% revert_options = revert_options_by_assignment_id.fetch(assignment.id) %>
             <tr class="align-top">
               <td class="px-4 py-4">
                 <% if item.applyable? %>
@@ -67,14 +76,35 @@
                   <p class="mt-2 text-xs font-semibold text-red-800">Remote search modes will be disabled.</p>
                 <% end %>
                 <% if item.changes.any? %>
+                  <% rendered_revert_option_keys = [] %>
                   <ul class="mt-2 space-y-1 text-xs leading-5 text-slate-600">
                     <% item.changes.each do |change| %>
-                      <li><span class="font-semibold text-slate-800"><%= change["label"] %>:</span> <%= change["current"] %> → <%= change["desired"] %></li>
+                      <% revert_option = revert_options.find { |option| option.remote_fields.include?(change["field"]) && !rendered_revert_option_keys.include?(option.key) } %>
+                      <li class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span><span class="font-semibold text-slate-800"><%= change["label"] %>:</span> <%= change["current"] %> → <%= change["desired"] %></span>
+                        <% if revert_option %>
+                          <%= button_tag "Revert #{revert_option.label}",
+                            name: :revert_target,
+                            value: "#{assignment.id}:#{revert_option.key}",
+                            formaction: revert_plan_indexer_apps_path,
+                            class: "font-semibold text-blue-700 hover:text-blue-900",
+                            data: { turbo_confirm: "Revert #{revert_option.label} to its last successfully applied value? This changes only Bridgarr's desired state." } %>
+                          <% rendered_revert_option_keys << revert_option.key %>
+                        <% end %>
+                      </li>
                     <% end %>
                   </ul>
                 <% end %>
                 <div class="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
                   <%= link_to "Assignment settings", edit_indexer_app_path(assignment, return_to: "preview"), class: "text-slate-700 hover:text-slate-950" %>
+                  <% if revert_options.many? %>
+                    <%= button_tag "Revert all for this assignment",
+                      name: :revert_target,
+                      value: "#{assignment.id}:all",
+                      formaction: revert_plan_indexer_apps_path,
+                      class: "text-blue-700 hover:text-blue-900",
+                      data: { turbo_confirm: "Revert all local desired-state changes for #{assignment.indexer.name} in #{assignment.arr_app.name}?" } %>
+                  <% end %>
                   <% if item.state == "conflict" && item.remote_indexer_id.present? %>
                     <% repair_confirmation = if assignment.enabled?; "Associate this assignment with remote indexer ID #{item.remote_indexer_id} and sync it?"; else; "Associate this assignment with remote indexer ID #{item.remote_indexer_id}? You will return to preview before any remote change."; end %>
                     <%= link_to "Repair association", repair_indexer_app_path(assignment, remote_indexer_id: item.remote_indexer_id), class: "text-blue-700 hover:text-blue-900", data: { turbo_method: :post, turbo_confirm: repair_confirmation } %>
@@ -97,7 +127,15 @@
             <span><strong class="block">Confirm remote search-mode disablement</strong><span class="mt-1 block text-xs leading-5">I reviewed the affected assignments and understand that applying the selected destructive changes will disable remote search modes.</span></span>
           </label>
         <% end %>
-        <div class="flex justify-end">
+        <div class="flex flex-wrap items-center justify-end gap-3">
+          <% if revertible_assignment_ids.any? %>
+            <%= button_tag "Revert all local changes",
+              name: :revert_all,
+              value: "1",
+              formaction: revert_plan_indexer_apps_path,
+              class: "rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50",
+              data: { turbo_confirm: "Revert every safely restorable local desired-state change in this preview?" } %>
+          <% end %>
           <%= form.submit "Apply selected plan", class: "rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
         </div>
       </div>
