@@ -16,7 +16,17 @@ module Sync
         IndexerApp.where(id: item.indexer_app.id).update_all(attributes)
       end
 
+      broadcast_live_refreshes(plan)
       plan
     end
+
+    def self.broadcast_live_refreshes(plan)
+      return if plan.items.empty?
+
+      %w[dashboard readiness assignment_matrix indexers arr_apps].each do |stream|
+        Turbo::StreamsChannel.broadcast_refresh_later_to stream
+      end
+    end
+    private_class_method :broadcast_live_refreshes
   end
 end

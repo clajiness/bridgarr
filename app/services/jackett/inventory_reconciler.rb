@@ -36,6 +36,7 @@ module Jackett
         missing_scope.update_all(jackett_state: "missing", updated_at: seen_at)
       end
 
+      broadcast_live_refreshes
       Result.new(seen_count: existing_by_id.size, changed_count:, missing_count: missing_scope.count)
     end
 
@@ -54,6 +55,12 @@ module Jackett
       def source_name_changed?(indexer, record)
         previous_name = indexer.jackett_name.presence || indexer.name
         previous_name != record.name
+      end
+
+      def broadcast_live_refreshes
+        %w[dashboard readiness indexers assignment_matrix].each do |stream|
+          Turbo::StreamsChannel.broadcast_refresh_later_to stream
+        end
       end
 
       def missing_scope

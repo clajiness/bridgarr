@@ -13,7 +13,8 @@ class SyncRunItem < ApplicationRecord
   scope :ordered, -> { order(:indexer_name, :arr_app_name, :id) }
   scope :active, -> { where(status: ACTIVE_STATUSES) }
 
-  after_update_commit -> { broadcast_replace_later_to sync_run }
+  after_update_commit -> { broadcast_replace_later_to sync_run, attributes: { method: :morph } }
+  after_commit :broadcast_live_refreshes, if: :live_refresh_relevant_change?
 
   def indexer
     indexer_app&.indexer
@@ -125,6 +126,16 @@ class SyncRunItem < ApplicationRecord
   end
 
   private
+
+    def broadcast_live_refreshes
+      %w[dashboard indexers arr_apps].each do |stream|
+        broadcast_refresh_later_to stream
+      end
+    end
+
+    def live_refresh_relevant_change?
+      destroyed? || previously_new_record? || previous_changes.key?("status")
+    end
 
     def sync_status_for(result, classification:)
       return "succeeded" if result.success?

@@ -10,7 +10,7 @@ class IndexerApp < ApplicationRecord
 
   before_validation :normalize_settings
   before_update :mark_changed_desired_state
-  after_update_commit -> { broadcast_refresh_later_to "assignment_matrix" }
+  after_commit :broadcast_live_refreshes
 
   validates :indexer_id, uniqueness: { scope: :arr_app_id }
   validates :connection_mode, inclusion: { in: CONNECTION_MODES }
@@ -127,6 +127,12 @@ class IndexerApp < ApplicationRecord
   end
 
   private
+
+    def broadcast_live_refreshes
+      %w[assignment_matrix dashboard readiness indexers arr_apps].each do |stream|
+        broadcast_refresh_later_to stream
+      end
+    end
 
     def normalize_settings
       self.connection_mode = connection_mode.presence || "direct"
