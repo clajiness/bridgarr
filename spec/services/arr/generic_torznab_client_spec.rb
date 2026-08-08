@@ -29,9 +29,9 @@ RSpec.describe Arr::GenericTorznabClient do
       @get_paths << path
 
       response = case path
-      when "/api/v3/indexer"
+      when %r{\A/api/v[13]/indexer\z}
         @indexers_responses.size > 1 ? @indexers_responses.shift : @indexers_responses.first
-      when "/api/v3/indexer/schema"
+      when %r{\A/api/v[13]/indexer/schema\z}
         @schema_response
       end
       raise response if response.is_a?(StandardError)
@@ -193,6 +193,29 @@ RSpec.describe Arr::GenericTorznabClient do
     )
   end
 
+  it "uses Lidarr v1 endpoints for inventory, schema, and creation" do
+    arr_app.app_type = "lidarr"
+    connection = FakeArrIndexerConnection.new(
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(connection.get_paths).to eq([ "/api/v1/indexer", "/api/v1/indexer/schema" ])
+    expect(connection.post_path).to eq("/api/v1/indexer")
+  end
+
   it "fails closed when a successful create response omits the remote indexer ID" do
     connection = FakeArrIndexerConnection.new(
       schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
@@ -251,7 +274,9 @@ RSpec.describe Arr::GenericTorznabClient do
       jackett_base_url: "http://localhost:9117",
       jackett_api_key: "jackett-api-key",
       jackett_id: "eztv",
-      enabled: false,
+      enable_rss: false,
+      enable_automatic_search: false,
+      enable_interactive_search: false,
       connection:,
       caps_client: FakeTorznabCapsClient
     )

@@ -27,8 +27,12 @@ module IndexerAppsHelper
     end
   end
 
-  def assignment_enabled_classes(assignment)
-    enabled_status_classes(assignment.enabled?)
+  def assignment_search_mode_badges(assignment)
+    [
+      [ "RSS #{assignment.enable_rss? ? 'on' : 'off'}", assignment.enable_rss? ],
+      [ "Automatic #{assignment.enable_automatic_search? ? 'on' : 'off'}", assignment.enable_automatic_search? ],
+      [ "Interactive #{assignment.enable_interactive_search? ? 'on' : 'off'}", assignment.enable_interactive_search? ]
+    ]
   end
 
   def matrix_filter_options

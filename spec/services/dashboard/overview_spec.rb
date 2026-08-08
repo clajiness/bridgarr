@@ -86,15 +86,21 @@ RSpec.describe Dashboard::Overview do
     expect(row.detail).to eq("API key changed; preview and apply the update")
   end
 
-  it "keeps a never-synced disabled assignment distinct and explains the next sync" do
-    assignment = IndexerApp.create!(arr_app:, indexer:, enabled: false)
+  it "keeps a never-synced assignment with all search modes disabled distinct" do
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      enable_rss: false,
+      enable_automatic_search: false,
+      enable_interactive_search: false
+    )
 
     dashboard = described_class.new(filter: "disabled")
     row = dashboard.assignment_rows.first
 
     expect(row.assignment).to eq(assignment)
     expect(row.status).to eq("disabled")
-    expect(row.detail).to eq("Assignment is disabled. The next sync will disable remote search modes.")
+    expect(row.detail).to eq("All remote search modes are disabled for this assignment.")
     expect(row.detail).not_to eq("Remote search modes are off")
     expect(row).to be_disabled
     expect(dashboard.assignment_filter_counts.fetch("disabled")).to eq(1)
@@ -104,7 +110,9 @@ RSpec.describe Dashboard::Overview do
     invalid_assignment = IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: false,
+      enable_rss: false,
+      enable_automatic_search: false,
+      enable_interactive_search: false,
       last_plan_state: "invalid"
     )
 
@@ -112,7 +120,14 @@ RSpec.describe Dashboard::Overview do
     expect(invalid_row.assignment).to eq(invalid_assignment)
     expect(invalid_row.status).to eq("invalid")
 
-    invalid_assignment.update!(enabled: true, last_plan_state: "update", last_applied_at: 2.hours.ago, last_inspected_at: 1.hour.ago)
+    invalid_assignment.update!(
+      enable_rss: true,
+      enable_automatic_search: true,
+      enable_interactive_search: true,
+      last_plan_state: "update",
+      last_applied_at: 2.hours.ago,
+      last_inspected_at: 1.hour.ago
+    )
     drifted_row = described_class.new.assignment_rows.first
     expect(drifted_row.status).to eq("needs_apply")
   end

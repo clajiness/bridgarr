@@ -2,8 +2,6 @@ module Arr
   class GenericTorznabClient
     Result = Data.define(:success?, :skipped?, :remote_indexer_id, :message, :error, :http_status, :action, :desired_digest)
 
-    INDEXER_PATH = "/api/v3/indexer"
-    SCHEMA_PATH = "/api/v3/indexer/schema"
     REQUIRED_TORZNAB_FIELDS = %w[baseUrl apiPath apiKey].freeze
     PRIVATE_FIELD_VALUE = "********"
 
@@ -23,7 +21,9 @@ module Arr
       proxy_api_key: nil,
       jackett_id:,
       remote_indexer_id: nil,
-      enabled: true,
+      enable_rss: true,
+      enable_automatic_search: true,
+      enable_interactive_search: true,
       connection_mode: "direct",
       category_mode: "auto",
       custom_category_ids: nil,
@@ -32,6 +32,7 @@ module Arr
       caps_client: Jackett::TorznabCaps
     )
       @arr_app = arr_app
+      @routes = ApiRoutes.for(app_type: arr_app.app_type)
       @name = name
       @bridgarr_base_url = bridgarr_base_url.to_s.strip.delete_suffix("/")
       @jackett_base_url = jackett_base_url.to_s.strip.delete_suffix("/")
@@ -39,7 +40,9 @@ module Arr
       @proxy_api_key = proxy_api_key.to_s.strip
       @jackett_id = jackett_id
       @remote_indexer_id = remote_indexer_id
-      @enabled = ActiveModel::Type::Boolean.new.cast(enabled)
+      @enable_rss = ActiveModel::Type::Boolean.new.cast(enable_rss)
+      @enable_automatic_search = ActiveModel::Type::Boolean.new.cast(enable_automatic_search)
+      @enable_interactive_search = ActiveModel::Type::Boolean.new.cast(enable_interactive_search)
       @connection_mode = connection_mode.to_s.presence || "direct"
       @category_mode = category_mode.presence || "auto"
       @custom_category_ids = normalize_category_ids(custom_category_ids)
@@ -104,6 +107,7 @@ module Arr
     private
 
       attr_reader :arr_app,
+        :routes,
         :name,
         :bridgarr_base_url,
         :jackett_base_url,
@@ -111,7 +115,9 @@ module Arr
         :proxy_api_key,
         :jackett_id,
         :remote_indexer_id,
-        :enabled,
+        :enable_rss,
+        :enable_automatic_search,
+        :enable_interactive_search,
         :connection_mode,
         :category_mode,
         :custom_category_ids,
@@ -131,7 +137,7 @@ module Arr
       def load_torznab_schema
         return if @torznab_schema
 
-        response = http.get(SCHEMA_PATH)
+        response = http.get(routes.indexer_schema)
         return http_failure(response, "fetch indexer schema") unless response.success?
 
         schemas = JSON.parse(response.body)
@@ -153,9 +159,9 @@ module Arr
       def torznab_payload
         torznab_schema.deep_dup.tap do |payload|
           payload["name"] = name
-          payload["enableRss"] = enabled
-          payload["enableAutomaticSearch"] = enabled
-          payload["enableInteractiveSearch"] = enabled
+          payload["enableRss"] = enable_rss
+          payload["enableAutomaticSearch"] = enable_automatic_search
+          payload["enableInteractiveSearch"] = enable_interactive_search
           payload["fields"] = fields_with_jackett_settings(payload["fields"])
         end
       end
@@ -291,9 +297,9 @@ module Arr
         fields = remote_indexer.fetch("fields").index_by { |field| field.fetch("name") }
 
         remote_indexer["name"] == name &&
-          boolean_value(remote_indexer["enableRss"]) == enabled &&
-          boolean_value(remote_indexer["enableAutomaticSearch"]) == enabled &&
-          boolean_value(remote_indexer["enableInteractiveSearch"]) == enabled &&
+          boolean_value(remote_indexer["enableRss"]) == enable_rss &&
+          boolean_value(remote_indexer["enableAutomaticSearch"]) == enable_automatic_search &&
+          boolean_value(remote_indexer["enableInteractiveSearch"]) == enable_interactive_search &&
           fields.dig("baseUrl", "value") == torznab_base_url &&
           fields.dig("apiPath", "value") == "/api" &&
           api_key_matches?(fields.dig("apiKey", "value"), accept_private: accept_private_api_key) &&
@@ -327,9 +333,9 @@ module Arr
       def updated_indexer_payload(remote_indexer)
         remote_indexer.deep_dup.tap do |payload|
           payload["name"] = name
-          payload["enableRss"] = enabled
-          payload["enableAutomaticSearch"] = enabled
-          payload["enableInteractiveSearch"] = enabled
+          payload["enableRss"] = enable_rss
+          payload["enableAutomaticSearch"] = enable_automatic_search
+          payload["enableInteractiveSearch"] = enable_interactive_search
           payload["fields"] = fields_with_jackett_settings(payload["fields"])
         end
       end
@@ -337,21 +343,21 @@ module Arr
       def update_indexer(remote_indexer)
         @pending_mutation = :update
         @pending_remote_indexer_id = remote_indexer.fetch("id")
-        http.put("#{INDEXER_PATH}/#{remote_indexer.fetch("id")}") do |request|
+        http.put(routes.indexer(remote_indexer.fetch("id"))) do |request|
           request.headers["Content-Type"] = "application/json"
           request.body = JSON.generate(updated_indexer_payload(remote_indexer))
         end
       end
 
       def post_indexer(payload)
-        http.post(INDEXER_PATH) do |request|
+        http.post(routes.indexers) do |request|
           request.headers["Content-Type"] = "application/json"
           request.body = JSON.generate(payload)
         end
       end
 
       def remote_indexer_inventory
-        response = http.get(INDEXER_PATH)
+        response = http.get(routes.indexers)
         return http_failure(response, "inspect existing indexers") unless response.success?
 
         indexers = JSON.parse(response.body)
@@ -529,9 +535,9 @@ module Arr
 
         Sync::DesiredConfiguration.digest(
           "name" => name,
-          "enableRss" => enabled,
-          "enableAutomaticSearch" => enabled,
-          "enableInteractiveSearch" => enabled,
+          "enableRss" => enable_rss,
+          "enableAutomaticSearch" => enable_automatic_search,
+          "enableInteractiveSearch" => enable_interactive_search,
           "baseUrl" => torznab_base_url,
           "apiPath" => "/api",
           "apiKey" => torznab_api_key,

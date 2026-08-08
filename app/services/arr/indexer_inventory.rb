@@ -2,8 +2,6 @@ module Arr
   class IndexerInventory
     Result = Data.define(:success?, :indexers, :torznab_schema, :message, :error, :http_status)
 
-    INDEXER_PATH = "/api/v3/indexer"
-    SCHEMA_PATH = "/api/v3/indexer/schema"
     REQUEST_TIMEOUT_SECONDS = ENV.fetch("ARR_INDEXER_INSPECTION_TIMEOUT_SECONDS", "15").to_i
 
     def self.call(arr_app:, connection: nil)
@@ -12,14 +10,15 @@ module Arr
 
     def initialize(arr_app:, connection:)
       @arr_app = arr_app
+      @routes = ApiRoutes.for(app_type: arr_app.app_type)
       @connection = connection
     end
 
     def call
-      indexers_response = http.get(INDEXER_PATH)
+      indexers_response = http.get(routes.indexers)
       return http_failure(indexers_response, "inspect indexers") unless indexers_response.success?
 
-      schema_response = http.get(SCHEMA_PATH)
+      schema_response = http.get(routes.indexer_schema)
       return http_failure(schema_response, "inspect the Generic Torznab schema") unless schema_response.success?
 
       indexers = JSON.parse(indexers_response.body)
@@ -47,7 +46,7 @@ module Arr
 
     private
 
-      attr_reader :arr_app, :connection
+      attr_reader :arr_app, :routes, :connection
 
       def valid_indexers?(indexers)
         indexers.is_a?(Array) && indexers.all? do |indexer|

@@ -67,7 +67,7 @@ module HealthChecks
 
       def check_arr_app(arr_app)
         started = monotonic_time
-        result = arr_test.call(base_url: arr_app.base_url, api_key: arr_app.api_key)
+        result = arr_test.call(base_url: arr_app.base_url, api_key: arr_app.api_key, app_type: arr_app.app_type)
         arr_app.record_connection_test_result(result, tested_at: wall_time, duration_ms: elapsed_ms(started))
       rescue StandardError => e
         result = unexpected_failure(e)

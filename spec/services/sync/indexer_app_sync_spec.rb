@@ -32,7 +32,7 @@ RSpec.describe Sync::IndexerAppSync do
   end
 
   let(:assignment) do
-    IndexerApp.create!(arr_app:, indexer:, enabled: true)
+    IndexerApp.create!(arr_app:, indexer:)
   end
 
   before do
@@ -69,6 +69,9 @@ RSpec.describe Sync::IndexerAppSync do
       proxy_api_key: "proxy-api-key",
       jackett_id: "eztv",
       remote_indexer_id: nil,
+      enable_rss: true,
+      enable_automatic_search: true,
+      enable_interactive_search: true,
       connection_mode: "direct",
       category_mode: "auto",
       custom_category_ids: []
@@ -230,8 +233,8 @@ RSpec.describe Sync::IndexerAppSync do
     expect(assignment.last_error).to include("no results in the configured categories")
   end
 
-  it "reconciles disabled assignments as disabled remote desired state" do
-    assignment.update!(enabled: false)
+  it "passes independent search modes as remote desired state" do
+    assignment.update!(enable_rss: false, enable_interactive_search: false)
     client = FakeGenericTorznabClient.new(
       FakeGenericTorznabClient::Result.new(
         success?: true,
@@ -246,7 +249,11 @@ RSpec.describe Sync::IndexerAppSync do
     expect(result).to be_success
     expect(result.message).to eq("EZTV synced to Main Sonarr.")
     expect(client.calls.size).to eq(1)
-    expect(client.calls.first).to include(enabled: false)
+    expect(client.calls.first).to include(
+      enable_rss: false,
+      enable_automatic_search: true,
+      enable_interactive_search: false
+    )
   end
 
   it "does not append the Bridgarr suffix twice" do

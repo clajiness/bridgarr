@@ -41,7 +41,7 @@ RSpec.describe Sync::DesiredStateReverter do
   end
 
   it "reverts one setting group while preserving other pending local changes" do
-    assignment.update!(enabled: false, category_mode: "none")
+    assignment.update!(enable_rss: false, category_mode: "none")
     item = plan_item(changes: [
       { "field" => "enableRss" },
       { "field" => "categories" }
@@ -55,11 +55,11 @@ RSpec.describe Sync::DesiredStateReverter do
 
     expect(result).to be_success
     expect(result.message).to include("1 local desired-state change", "1 assignment")
-    expect(assignment.reload).to have_attributes(enabled: false, category_mode: "auto", custom_categories: nil)
+    expect(assignment.reload).to have_attributes(enable_rss: false, category_mode: "auto", custom_categories: nil)
   end
 
   it "reverts every represented local setting group for an assignment" do
-    assignment.update!(enabled: false, connection_mode: "bridged", category_mode: "none")
+    assignment.update!(enable_automatic_search: false, connection_mode: "bridged", category_mode: "none")
     item = plan_item(changes: [
       { "field" => "enableAutomaticSearch" },
       { "field" => "baseUrl" },
@@ -75,7 +75,7 @@ RSpec.describe Sync::DesiredStateReverter do
     expect(result).to be_success
     expect(result.message).to include("3 local desired-state changes")
     expect(assignment.reload).to have_attributes(
-      enabled: true,
+      enable_automatic_search: true,
       connection_mode: "direct",
       category_mode: "auto",
       custom_categories: nil

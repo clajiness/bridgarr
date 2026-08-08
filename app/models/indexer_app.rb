@@ -1,7 +1,8 @@
 class IndexerApp < ApplicationRecord
   CONNECTION_MODES = %w[ direct bridged ].freeze
   CATEGORY_MODES = %w[ auto custom none ].freeze
-  DESIRED_SETTING_KEYS = %w[enabled connection_mode category_mode custom_categories].freeze
+  SEARCH_MODE_SETTING_KEYS = %w[enable_rss enable_automatic_search enable_interactive_search].freeze
+  DESIRED_SETTING_KEYS = [ *SEARCH_MODE_SETTING_KEYS, "connection_mode", "category_mode", "custom_categories" ].freeze
   PLAN_STATES = %w[create update unchanged not_applicable conflict orphaned unreachable invalid].freeze
 
   belongs_to :indexer
@@ -22,8 +23,12 @@ class IndexerApp < ApplicationRecord
   scope :with_enabled_parents, -> do
     joins(:indexer, :arr_app).where(indexers: { enabled: true }, arr_apps: { enabled: true })
   end
-  scope :enabled_assignments, -> { where(enabled: true) }
-  scope :disabled_assignments, -> { where(enabled: false) }
+  scope :enabled_assignments, -> do
+    where(enable_rss: true).or(where(enable_automatic_search: true)).or(where(enable_interactive_search: true))
+  end
+  scope :disabled_assignments, -> do
+    where(enable_rss: false, enable_automatic_search: false, enable_interactive_search: false)
+  end
 
   def record_sync_result(result, synced_at: Time.current)
     attributes = {
@@ -57,7 +62,9 @@ class IndexerApp < ApplicationRecord
 
   def desired_settings_snapshot
     {
-      "enabled" => enabled?,
+      "enable_rss" => enable_rss?,
+      "enable_automatic_search" => enable_automatic_search?,
+      "enable_interactive_search" => enable_interactive_search?,
       "connection_mode" => connection_mode,
       "category_mode" => category_mode,
       "custom_categories" => custom_categories
@@ -68,9 +75,9 @@ class IndexerApp < ApplicationRecord
     snapshot = last_applied_settings
     return unless snapshot.is_a?(Hash)
 
-    normalized = snapshot.stringify_keys.slice(*DESIRED_SETTING_KEYS)
+    normalized = normalize_legacy_snapshot(snapshot.stringify_keys).slice(*DESIRED_SETTING_KEYS)
     return unless normalized.keys.sort == DESIRED_SETTING_KEYS.sort
-    return unless normalized["enabled"].in?([ true, false ])
+    return unless SEARCH_MODE_SETTING_KEYS.all? { |key| normalized[key].in?([ true, false ]) }
     return unless normalized["connection_mode"].in?(CONNECTION_MODES)
     return unless normalized["category_mode"].in?(CATEGORY_MODES)
     return unless valid_snapshot_categories?(normalized)
@@ -83,7 +90,19 @@ class IndexerApp < ApplicationRecord
   end
 
   def custom_settings?
-    !connection_mode_direct? || !category_mode_auto?
+    !all_search_modes_enabled? || !connection_mode_direct? || !category_mode_auto?
+  end
+
+  def any_search_mode_enabled?
+    enable_rss? || enable_automatic_search? || enable_interactive_search?
+  end
+
+  def all_search_modes_enabled?
+    enable_rss? && enable_automatic_search? && enable_interactive_search?
+  end
+
+  def search_modes_disabled?
+    !any_search_mode_enabled?
   end
 
   def active_sync_run_item
@@ -149,7 +168,9 @@ class IndexerApp < ApplicationRecord
     end
 
     def mark_changed_desired_state
-      return unless will_save_change_to_enabled? ||
+      return unless will_save_change_to_enable_rss? ||
+        will_save_change_to_enable_automatic_search? ||
+        will_save_change_to_enable_interactive_search? ||
         will_save_change_to_connection_mode? ||
         will_save_change_to_category_mode? ||
         will_save_change_to_custom_categories?
@@ -178,6 +199,16 @@ class IndexerApp < ApplicationRecord
       return snapshot["category_mode"] != "custom" if categories.blank?
 
       valid_category_list_text?(categories.to_s)
+    end
+
+    def normalize_legacy_snapshot(snapshot)
+      return snapshot unless snapshot.key?("enabled")
+      return snapshot if SEARCH_MODE_SETTING_KEYS.any? { |key| snapshot.key?(key) }
+
+      legacy_enabled = snapshot["enabled"]
+      return snapshot unless legacy_enabled.in?([ true, false ])
+
+      snapshot.merge(SEARCH_MODE_SETTING_KEYS.index_with { legacy_enabled })
     end
 
     def valid_category_list_text?(value)

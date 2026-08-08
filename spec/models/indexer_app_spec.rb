@@ -23,10 +23,13 @@ RSpec.describe IndexerApp, type: :model do
     expect(duplicate.errors[:indexer_id]).to include("has already been taken")
   end
 
-  it "defaults new assignments to enabled" do
+  it "defaults every search mode to enabled" do
     assignment = described_class.create!(arr_app:, indexer:)
 
-    expect(assignment).to be_enabled
+    expect(assignment).to be_enable_rss
+    expect(assignment).to be_enable_automatic_search
+    expect(assignment).to be_enable_interactive_search
+    expect(assignment).to be_all_search_modes_enabled
   end
 
   it "records sync results" do
@@ -48,7 +51,9 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_plan_state).to eq("unchanged")
     expect(assignment.last_applied_at).to eq(synced_at)
     expect(assignment.last_applied_settings).to eq(
-      "enabled" => true,
+      "enable_rss" => true,
+      "enable_automatic_search" => true,
+      "enable_interactive_search" => true,
       "connection_mode" => "direct",
       "category_mode" => "auto",
       "custom_categories" => nil
@@ -60,6 +65,22 @@ RSpec.describe IndexerApp, type: :model do
     assignment.update_column(:last_applied_settings, { "enabled" => true, "connection_mode" => "direct" })
 
     expect(assignment.reload.last_applied_settings_snapshot).to be_nil
+  end
+
+  it "normalizes complete legacy enabled snapshots for rollback" do
+    assignment = described_class.create!(arr_app:, indexer:)
+    assignment.update_column(:last_applied_settings, {
+      "enabled" => false,
+      "connection_mode" => "direct",
+      "category_mode" => "auto",
+      "custom_categories" => nil
+    })
+
+    expect(assignment.reload.last_applied_settings_snapshot).to include(
+      "enable_rss" => false,
+      "enable_automatic_search" => false,
+      "enable_interactive_search" => false
+    )
   end
 
   it "records the current Jackett API key version after a successful direct sync" do
@@ -88,7 +109,7 @@ RSpec.describe IndexerApp, type: :model do
       last_applied_at: 1.hour.ago
     )
 
-    assignment.update!(enabled: false)
+    assignment.update!(enable_automatic_search: false)
 
     expect(assignment.last_plan_state).to eq("update")
     expect(assignment.last_inspected_at).to be_nil

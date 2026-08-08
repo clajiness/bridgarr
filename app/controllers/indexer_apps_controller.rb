@@ -37,10 +37,10 @@ class IndexerAppsController < ApplicationController
   end
 
   def sync
-    unless @indexer_app.enabled?
+    unless @indexer_app.all_search_modes_enabled?
       return redirect_to(
         preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
-        alert: "Disabled assignments must be previewed and explicitly confirmed before remote search modes are changed.",
+        alert: "Assignments with disabled search modes must be previewed and explicitly confirmed before remote settings are changed.",
         status: :see_other
       )
     end
@@ -64,7 +64,10 @@ class IndexerAppsController < ApplicationController
       cells:,
       action:,
       category_mode: params[:category_mode],
-      custom_categories: params[:custom_categories]
+      custom_categories: params[:custom_categories],
+      enable_rss: params[:enable_rss],
+      enable_automatic_search: params[:enable_automatic_search],
+      enable_interactive_search: params[:enable_interactive_search]
     )
     if result.success?
       redirect_to matrix_return_path, notice: result.message
@@ -147,10 +150,10 @@ class IndexerAppsController < ApplicationController
     end
     return redirect_assignment_syncing unless repaired
 
-    unless @indexer_app.enabled?
+    unless @indexer_app.all_search_modes_enabled?
       return redirect_to(
         preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
-        notice: "Remote association repaired. Review and confirm the disabled desired state before applying it.",
+        notice: "Remote association repaired. Review and confirm the search-mode desired state before applying it.",
         status: :see_other
       )
     end
@@ -196,7 +199,14 @@ class IndexerAppsController < ApplicationController
     end
 
     def indexer_app_params
-      params.expect(indexer_app: [ :enabled, :connection_mode, :category_mode, :custom_categories ])
+      params.expect(indexer_app: [
+        :enable_rss,
+        :enable_automatic_search,
+        :enable_interactive_search,
+        :connection_mode,
+        :category_mode,
+        :custom_categories
+      ])
     end
 
     def indexer_app_redirect_path(indexer_app)
@@ -302,7 +312,7 @@ class IndexerAppsController < ApplicationController
       when "direct", "bridged"
         indexers.select { |indexer| indexer.indexer_apps.any? { |assignment| assignment.connection_mode == params[:filter] } }
       when "disabled"
-        indexers.select { |indexer| !indexer.enabled? || indexer.indexer_apps.any? { |assignment| !assignment.enabled? } }
+        indexers.select { |indexer| !indexer.enabled? || indexer.indexer_apps.any?(&:search_modes_disabled?) }
       when "changed_in_jackett"
         indexers.select { |indexer| indexer.jackett_state.in?(%w[renamed changed disabled]) }
       when "missing_from_jackett"

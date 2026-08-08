@@ -47,4 +47,14 @@ RSpec.describe Arr::IndexerDeleteClient do
     expect(result).not_to be_success
     expect(result.message).to eq("Main Sonarr returned HTTP 404 while trying to remove managed indexer.")
   end
+
+  it "uses the Lidarr v1 endpoint" do
+    arr_app.app_type = "lidarr"
+    connection = FakeArrDeleteConnection.new(ArrDeleteResponse.new(status: 200))
+
+    result = described_class.call(arr_app:, remote_indexer_id: 42, connection:)
+
+    expect(result).to be_success
+    expect(connection.delete_path).to eq("/api/v1/indexer/42")
+  end
 end

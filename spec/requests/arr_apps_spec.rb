@@ -153,7 +153,8 @@ RSpec.describe "Arr apps", type: :request do
     expect(response).to redirect_to(arr_app_path(arr_app))
     expect(Arr::ConnectionTest).to have_received(:call).with(
       base_url: "http://localhost:8989",
-      api_key: "sonarr-api-key"
+      api_key: "sonarr-api-key",
+      app_type: "sonarr"
     )
     expect(flash[:notice]).to eq("Main Sonarr connection works.")
     expect(arr_app.reload.last_status).to eq("ok")

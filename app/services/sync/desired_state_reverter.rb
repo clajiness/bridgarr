@@ -5,10 +5,22 @@ module Sync
 
     OPTIONS = [
       Option.new(
-        key: "enabled",
-        label: "enabled state",
-        setting_keys: %w[enabled],
-        remote_fields: %w[enableRss enableAutomaticSearch enableInteractiveSearch]
+        key: "enable_rss",
+        label: "RSS setting",
+        setting_keys: %w[enable_rss],
+        remote_fields: %w[enableRss]
+      ),
+      Option.new(
+        key: "enable_automatic_search",
+        label: "automatic search setting",
+        setting_keys: %w[enable_automatic_search],
+        remote_fields: %w[enableAutomaticSearch]
+      ),
+      Option.new(
+        key: "enable_interactive_search",
+        label: "interactive search setting",
+        setting_keys: %w[enable_interactive_search],
+        remote_fields: %w[enableInteractiveSearch]
       ),
       Option.new(
         key: "connection_mode",

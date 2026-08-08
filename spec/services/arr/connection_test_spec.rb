@@ -48,7 +48,37 @@ RSpec.describe Arr::ConnectionTest do
     )
 
     expect(result).not_to be_success
-    expect(result.message).to eq("App returned HTTP 401. Check the URL and API key.")
+    expect(result.message).to eq("App returned HTTP 401. Check the API key.")
+  end
+
+  it "checks Lidarr through its v1 status endpoint" do
+    connection = FakeArrConnection.new(
+      ArrResponse.new(status: 200, body: { appName: "Lidarr", version: "3.1.0" }.to_json)
+    )
+
+    result = described_class.call(
+      base_url: "http://localhost:8686",
+      api_key: "lidarr-api-key",
+      app_type: "lidarr",
+      connection:
+    )
+
+    expect(result).to be_success
+    expect(connection.path).to eq("/api/v1/system/status")
+  end
+
+  it "identifies a missing application endpoint separately from an invalid key" do
+    connection = FakeArrConnection.new(ArrResponse.new(status: 404, body: "Not Found"))
+
+    result = described_class.call(
+      base_url: "http://localhost:8686",
+      api_key: "lidarr-api-key",
+      app_type: "lidarr",
+      connection:
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to eq("App returned HTTP 404 for /api/v1/system/status. Check the application type and base URL.")
   end
 
   it "fails when the app does not return JSON" do

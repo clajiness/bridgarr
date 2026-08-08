@@ -184,7 +184,7 @@ module Dashboard
       end
 
       def active_assignments
-        managed_assignments.where(indexer_apps: { enabled: true })
+        managed_assignments
       end
 
       def managed_assignments

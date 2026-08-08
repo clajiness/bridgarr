@@ -69,9 +69,9 @@ module Sync
 
       configuration = Configuration.new(
         "name" => remote_name,
-        "enableRss" => indexer_app.enabled?,
-        "enableAutomaticSearch" => indexer_app.enabled?,
-        "enableInteractiveSearch" => indexer_app.enabled?,
+        "enableRss" => indexer_app.enable_rss?,
+        "enableAutomaticSearch" => indexer_app.enable_automatic_search?,
+        "enableInteractiveSearch" => indexer_app.enable_interactive_search?,
         "baseUrl" => torznab_base_url,
         "apiPath" => "/api",
         "apiKey" => torznab_api_key,

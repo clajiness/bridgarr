@@ -172,9 +172,9 @@ RSpec.describe "Indexers", type: :request do
     expect(flash[:alert]).to eq("Add a Jackett URL before discovering indexers.")
   end
 
-  it "redirects an imported disabled desired state to reconciliation preview" do
+  it "redirects imported disabled search modes to reconciliation preview" do
     assignment = indexer.indexer_apps.first
-    assignment.update!(enabled: false)
+    assignment.update!(enable_rss: false)
     result = Jackett::IndexerImport::Result.new(
       success?: true,
       imported_count: 0,
