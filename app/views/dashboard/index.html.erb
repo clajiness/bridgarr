@@ -78,7 +78,11 @@
                   <span class="mt-1 block text-xs text-slate-500"><%= row.arr_app.app_type.titleize %></span>
                 </td>
                 <td class="px-4 py-4">
-                  <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= enabled_status_classes(assignment.enabled?) %>"><%= assignment.enabled? ? "Enabled" : "Disabled" %></span>
+                  <div class="flex flex-wrap gap-1">
+                    <% assignment_search_mode_badges(assignment).each do |label, enabled| %>
+                      <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= enabled_status_classes(enabled) %>"><%= label %></span>
+                    <% end %>
+                  </div>
                   <p class="mt-2 text-xs text-slate-500"><%= assignment.connection_mode.titleize %> · <%= assignment.category_mode.titleize %> categories</p>
                 </td>
                 <td class="max-w-xs px-4 py-4">

@@ -26,12 +26,26 @@
       </div>
     <% end %>
 
-    <div class="flex items-start gap-3 rounded-md border border-stone-200 bg-stone-50 px-4 py-3">
-      <%= form.checkbox :enabled, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+    <div class="space-y-4 rounded-md border border-stone-200 bg-stone-50 px-4 py-4">
       <div>
-        <%= form.label :enabled, "Enabled in the destination app", class: "text-sm font-medium text-slate-800" %>
-        <p class="mt-1 text-xs leading-5 text-slate-600">When disabled, Bridgarr keeps managing this assignment and turns off RSS, automatic, and interactive searches remotely.</p>
+        <h2 class="text-sm font-semibold text-slate-900">Remote search modes</h2>
+        <p class="mt-1 text-xs leading-5 text-slate-600">These map directly to the indexer controls in the destination Arr application.</p>
       </div>
+
+      <label class="flex items-start gap-3">
+        <%= form.checkbox :enable_rss, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+        <span><strong class="block text-sm font-medium text-slate-800">Enable RSS</strong><span class="mt-1 block text-xs leading-5 text-slate-600">Use this indexer when the destination app periodically looks for releases via RSS sync.</span></span>
+      </label>
+
+      <label class="flex items-start gap-3">
+        <%= form.checkbox :enable_automatic_search, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+        <span><strong class="block text-sm font-medium text-slate-800">Enable automatic search</strong><span class="mt-1 block text-xs leading-5 text-slate-600">Use this indexer for automatic searches started by the destination app or its UI.</span></span>
+      </label>
+
+      <label class="flex items-start gap-3">
+        <%= form.checkbox :enable_interactive_search, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
+        <span><strong class="block text-sm font-medium text-slate-800">Enable interactive search</strong><span class="mt-1 block text-xs leading-5 text-slate-600">Use this indexer when an interactive search is performed.</span></span>
+      </label>
     </div>
 
     <div class="grid gap-4 rounded-md border border-stone-200 bg-stone-50 px-4 py-4 sm:grid-cols-2">

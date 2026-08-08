@@ -18,7 +18,7 @@ RSpec.describe Arr::IndexerInventory do
 
     def get(path)
       paths << path
-      path == Arr::IndexerInventory::INDEXER_PATH ? @indexers_response : @schema_response
+      path.end_with?("/schema") ? @schema_response : @indexers_response
     end
   end
 
@@ -50,7 +50,7 @@ RSpec.describe Arr::IndexerInventory do
     expect(result).to be_success
     expect(result.indexers).to eq([ { "id" => 42 } ])
     expect(result.torznab_schema).to eq(schema)
-    expect(connection.paths).to eq([ described_class::INDEXER_PATH, described_class::SCHEMA_PATH ])
+    expect(connection.paths).to eq([ "/api/v3/indexer", "/api/v3/indexer/schema" ])
   end
 
   it "stops before the schema request when inventory inspection fails" do
@@ -63,7 +63,20 @@ RSpec.describe Arr::IndexerInventory do
 
     expect(result).not_to be_success
     expect(result.http_status).to eq(401)
-    expect(connection.paths).to eq([ described_class::INDEXER_PATH ])
+    expect(connection.paths).to eq([ "/api/v3/indexer" ])
+  end
+
+  it "uses Lidarr v1 inventory endpoints" do
+    arr_app.app_type = "lidarr"
+    connection = FakeInventoryConnection.new(
+      indexers_response: InventoryResponse.new(status: 200, body: [ { "id" => 42 } ].to_json),
+      schema_response: InventoryResponse.new(status: 200, body: [ schema ].to_json)
+    )
+
+    result = described_class.call(arr_app:, connection:)
+
+    expect(result).to be_success
+    expect(connection.paths).to eq([ "/api/v1/indexer", "/api/v1/indexer/schema" ])
   end
 
   it "rejects valid JSON with an unexpected inventory shape" do

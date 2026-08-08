@@ -16,7 +16,7 @@ module Dashboard
       end
 
       def disabled?
-        !assignment.enabled? || !assignment.indexer.enabled? || !assignment.arr_app.enabled?
+        assignment.search_modes_disabled? || !assignment.indexer.enabled? || !assignment.arr_app.enabled?
       end
 
       def last_applied_at
@@ -152,7 +152,7 @@ module Dashboard
         return "not_applicable" if assignment.last_status == "skipped"
         return "needs_apply" if unapplied_plan?(assignment)
         return "needs_apply" if unapplied_api_key_update?(assignment)
-        return "disabled" unless assignment.enabled? && assignment.indexer.enabled? && assignment.arr_app.enabled?
+        return "disabled" unless assignment.any_search_mode_enabled? && assignment.indexer.enabled? && assignment.arr_app.enabled?
         return "unsynced" if assignment.last_synced_at.nil?
 
         "healthy"
@@ -181,7 +181,7 @@ module Dashboard
       end
 
       def disabled_status_detail(assignment)
-        return "Assignment is disabled. The next sync will disable remote search modes." unless assignment.enabled?
+        return "All remote search modes are disabled for this assignment." if assignment.search_modes_disabled?
         return "Indexer is disabled in Bridgarr. Enable it before syncing." unless assignment.indexer.enabled?
 
         "Destination app is disabled in Bridgarr. Enable it before syncing."

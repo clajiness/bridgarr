@@ -2,8 +2,6 @@ module Arr
   class IndexerDeleteClient
     Result = Data.define(:success?, :message, :error, :http_status)
 
-    INDEXER_PATH = "/api/v3/indexer"
-
     def self.call(arr_app:, remote_indexer_id:, connection: nil)
       new(arr_app:, remote_indexer_id:, connection:).call
     end
@@ -11,13 +9,14 @@ module Arr
     def initialize(arr_app:, remote_indexer_id:, connection: nil)
       @arr_app = arr_app
       @remote_indexer_id = remote_indexer_id
+      @routes = ApiRoutes.for(app_type: arr_app.app_type)
       @connection = connection
     end
 
     def call
       return failure("Remote indexer ID is missing.") if remote_indexer_id.blank?
 
-      response = http.delete("#{INDEXER_PATH}/#{remote_indexer_id}")
+      response = http.delete(routes.indexer(remote_indexer_id))
       return success(response.status) if response.success?
 
       failure("#{arr_app.name} returned HTTP #{response.status} while trying to remove managed indexer.", http_status: response.status)
@@ -27,7 +26,7 @@ module Arr
 
     private
 
-      attr_reader :arr_app, :remote_indexer_id, :connection
+      attr_reader :arr_app, :remote_indexer_id, :routes, :connection
 
       def http
         @http ||= connection || Faraday.new(url: arr_app.base_url, headers: { "X-Api-Key" => arr_app.api_key }) do |faraday|

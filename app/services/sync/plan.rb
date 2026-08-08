@@ -138,9 +138,10 @@ module Sync
         changes = changes_between(comparable_remote_attributes, desired.attributes)
         state = changes.empty? ? "unchanged" : "update"
         remote_digest = DesiredConfiguration.digest(comparable_remote_attributes)
-        destructive = disables_remote_search?(remote_attributes, desired.attributes)
+        disabled_search_modes = newly_disabled_search_modes(remote_attributes, desired.attributes)
+        destructive = disabled_search_modes.any?
         message = state == "unchanged" ? "Remote configuration already matches." : update_message(assignment, desired.digest, remote_digest, changes.size)
-        message = "#{message} Remote RSS, automatic search, and interactive search will be disabled." if destructive
+        message = "#{message} #{disabled_search_modes.to_sentence} will be disabled remotely." if destructive
 
         build_item(
           assignment:,
@@ -155,9 +156,12 @@ module Sync
       end
 
       def create_item(assignment, desired)
-        destructive = SEARCH_MODE_FIELDS.any? { |field| desired.attributes[field] == false }
+        disabled_search_modes = SEARCH_MODE_FIELDS.filter_map do |field|
+          FIELD_LABELS.fetch(field) if desired.attributes[field] == false
+        end
+        destructive = disabled_search_modes.any?
         message = if destructive
-          "A managed Generic Torznab indexer will be created with remote RSS, automatic search, and interactive search disabled."
+          "A managed Generic Torznab indexer will be created with #{disabled_search_modes.to_sentence} disabled."
         else
           "A managed Generic Torznab indexer will be created."
         end
@@ -358,9 +362,9 @@ module Sync
         end
       end
 
-      def disables_remote_search?(remote_attributes, desired_attributes)
-        SEARCH_MODE_FIELDS.any? do |field|
-          remote_attributes[field] != false && desired_attributes[field] == false
+      def newly_disabled_search_modes(remote_attributes, desired_attributes)
+        SEARCH_MODE_FIELDS.filter_map do |field|
+          FIELD_LABELS.fetch(field) if remote_attributes[field] != false && desired_attributes[field] == false
         end
       end
 

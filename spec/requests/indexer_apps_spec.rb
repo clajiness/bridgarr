@@ -25,6 +25,10 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("Assignment settings")
     expect(response.body).to include("Connection mode")
     expect(response.body).to include("Category mode")
+    expect(response.body).to include("Enable RSS")
+    expect(response.body).to include("Enable automatic search")
+    expect(response.body).to include("Enable interactive search")
+    expect(response.body).not_to include("Enabled in the destination app")
     expect(response.body).to include("LimeTorrents")
     expect(response.body).to include("Main Radarr")
   end
@@ -38,7 +42,7 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("Assignment matrix")
     expect(response.body).to include("LimeTorrents")
     expect(response.body).to include("Main Radarr")
-    expect(response.body).to include("Enabled")
+    expect(response.body).to include("RSS on", "Automatic on", "Interactive on")
   end
 
   it "paginates assignment matrix rows" do
@@ -77,13 +81,21 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.custom_categories).to eq("2000,8000")
   end
 
-  it "disables an assignment without removing it" do
+  it "updates independent search modes without removing the assignment" do
     patch indexer_app_path(assignment), params: {
-      indexer_app: { enabled: false }
+      indexer_app: {
+        enable_rss: false,
+        enable_automatic_search: true,
+        enable_interactive_search: false
+      }
     }
 
     expect(response).to redirect_to(indexer_path(indexer))
-    expect(assignment.reload).not_to be_enabled
+    expect(assignment.reload).to have_attributes(
+      enable_rss: false,
+      enable_automatic_search: true,
+      enable_interactive_search: false
+    )
     expect(IndexerApp.exists?(assignment.id)).to be(true)
   end
 
@@ -94,7 +106,26 @@ RSpec.describe "Indexer app assignments", type: :request do
     }
 
     expect(response).to redirect_to(indexer_apps_path)
-    expect(IndexerApp.find_by(indexer:, arr_app:)).to be_enabled
+    expect(IndexerApp.find_by(indexer:, arr_app:)).to be_all_search_modes_enabled
+  end
+
+  it "bulk updates selected search modes while preserving keep-existing values" do
+    assignment.update!(enable_interactive_search: false)
+
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}" ],
+      bulk_action: "search_modes",
+      enable_rss: "disable",
+      enable_automatic_search: "keep",
+      enable_interactive_search: "enable"
+    }
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(assignment.reload).to have_attributes(
+      enable_rss: false,
+      enable_automatic_search: true,
+      enable_interactive_search: true
+    )
   end
 
   it "does not preview every assignment when only unassigned cells were selected" do
@@ -121,15 +152,15 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(Sync::BulkSync).not_to have_received(:call)
   end
 
-  it "requires preview before syncing a disabled assignment" do
-    assignment.update!(enabled: false)
+  it "requires preview before syncing an assignment with a disabled search mode" do
+    assignment.update!(enable_automatic_search: false)
     allow(Sync::AssignmentSync).to receive(:call)
 
     post sync_indexer_app_path(assignment)
 
     expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
     expect(response).to have_http_status(:see_other)
-    expect(flash[:alert]).to include("Disabled assignments must be previewed")
+    expect(flash[:alert]).to include("disabled search modes must be previewed")
     expect(Sync::AssignmentSync).not_to have_received(:call)
   end
 
@@ -143,7 +174,7 @@ RSpec.describe "Indexer app assignments", type: :request do
 
     expect(response).to redirect_to(indexer_apps_path)
     expect(flash[:alert]).to eq("Choose a valid bulk action.")
-    expect(assignment.reload).to be_enabled
+    expect(assignment.reload).to be_all_search_modes_enabled
   end
 
   it "returns to the app page when editing from an app" do
@@ -161,11 +192,11 @@ RSpec.describe "Indexer app assignments", type: :request do
   it "returns to the dashboard when editing from the operational table" do
     patch indexer_app_path(assignment), params: {
       return_to: "dashboard",
-      indexer_app: { enabled: false }
+      indexer_app: { enable_interactive_search: false }
     }
 
     expect(response).to redirect_to(root_path)
-    expect(assignment.reload).not_to be_enabled
+    expect(assignment.reload).not_to be_enable_interactive_search
   end
 
   it "shows invalid custom category errors" do
@@ -301,7 +332,7 @@ RSpec.describe "Indexer app assignments", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("1", "Assignment will have remote search modes disabled")
-    expect(response.body).to include("Remote search modes will be disabled")
+    expect(response.body).to include("One or more remote search modes will be disabled")
     expect(response.body).to include("Confirm remote search-mode disablement")
     confirmation = Nokogiri::HTML(response.body).at_css('input[name="confirm_destructive"]')
     expect(confirmation).to be_present
@@ -310,7 +341,7 @@ RSpec.describe "Indexer app assignments", type: :request do
 
   it "offers field, assignment, and preview rollback controls only for local desired-state changes" do
     assignment.update_column(:last_applied_settings, assignment.desired_settings_snapshot)
-    assignment.update!(enabled: false, category_mode: "none")
+    assignment.update!(enable_rss: false, category_mode: "none")
     item = Sync::Plan::Item.new(
       indexer_app: assignment,
       state: "update",
@@ -330,7 +361,7 @@ RSpec.describe "Indexer app assignments", type: :request do
     get preview_indexer_apps_path(assignment_ids: [ assignment.id ])
 
     document = Nokogiri::HTML(response.body)
-    expect(document.at_css('button[name="revert_target"][value$=":enabled"]')).to be_present
+    expect(document.at_css('button[name="revert_target"][value$=":enable_rss"]')).to be_present
     expect(document.at_css('button[name="revert_target"][value$=":categories"]')).to be_present
     expect(document.at_css('button[name="revert_target"][value$=":all"]')).to be_present
     expect(document.at_css('button[name="revert_all"][value="1"]')).to be_present
@@ -496,8 +527,8 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.reload.remote_indexer_id).to be_nil
   end
 
-  it "returns a repaired disabled assignment to preview instead of syncing it" do
-    assignment.update!(enabled: false)
+  it "returns a repaired assignment with disabled search modes to preview instead of syncing it" do
+    assignment.update!(enable_rss: false)
     conflict = Sync::Plan::Item.new(
       indexer_app: assignment,
       state: "conflict",
@@ -515,7 +546,7 @@ RSpec.describe "Indexer app assignments", type: :request do
     post repair_indexer_app_path(assignment), params: { remote_indexer_id: 42 }
 
     expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
-    expect(flash[:notice]).to include("Review and confirm the disabled desired state")
+    expect(flash[:notice]).to include("Review and confirm the search-mode desired state")
     expect(assignment.reload.remote_indexer_id).to eq(42)
     expect(Sync::AssignmentSync).not_to have_received(:call)
   end

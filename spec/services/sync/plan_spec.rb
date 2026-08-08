@@ -89,7 +89,7 @@ RSpec.describe Sync::Plan do
   end
 
   it "flags creation with disabled remote search modes for explicit confirmation" do
-    assignment.update!(enabled: false)
+    assignment.update!(enable_automatic_search: false)
     FakePlanInventory.results[arr_app.id] = inventory(indexers: [])
 
     plan = described_class.call(scope: IndexerApp.where(id: assignment.id), inventory_client: FakePlanInventory, caps_client: FakePlanCaps)
@@ -97,7 +97,7 @@ RSpec.describe Sync::Plan do
 
     expect(item.state).to eq("create")
     expect(item.destructive).to be(true)
-    expect(item.message).to include("will be created with remote RSS, automatic search, and interactive search disabled")
+    expect(item.message).to include("will be created with Automatic search disabled")
     expect(plan.destructive_items).to eq([ item ])
   end
 
@@ -213,7 +213,7 @@ RSpec.describe Sync::Plan do
   end
 
   it "shows redacted field-level updates" do
-    assignment.update!(remote_indexer_id: 42, enabled: false)
+    assignment.update!(remote_indexer_id: 42, enable_rss: false)
     remote = remote_indexer
     remote.fetch("fields").find { |field| field["name"] == "apiKey" }["value"] = "different-secret"
     FakePlanInventory.results[arr_app.id] = inventory(indexers: [ remote ])
@@ -224,7 +224,7 @@ RSpec.describe Sync::Plan do
     expect(item.changes.map { |change| change["field"] }).to include("enableRss", "apiKey")
     expect(item.changes.to_json).not_to include("different-secret", "jackett-secret-key")
     expect(item.destructive).to be(true)
-    expect(item.message).to include("Remote RSS, automatic search, and interactive search will be disabled")
+    expect(item.message).to include("RSS will be disabled remotely")
   end
 
   it "distinguishes remote drift from a local desired-state change" do

@@ -40,7 +40,6 @@ RSpec.describe "Dashboard", type: :request do
     IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: true,
       remote_indexer_id: 42,
       jackett_api_key_version: Setting.jackett_api_key_version,
       last_status: "ok",
@@ -68,12 +67,12 @@ RSpec.describe "Dashboard", type: :request do
     operational_banner = document.at_xpath("//h2[normalize-space()='All systems operational']/ancestor::section[1]")
     in_sync_badge = document.css("span").find { |node| node.text.strip == "In sync" }
     operational_badge = document.css("a").find { |node| node.text.strip == "Operational" }
-    enabled_badge = document.css("span").find { |node| node.text.strip == "Enabled" }
+    rss_badge = document.css("span").find { |node| node.text.strip == "RSS on" }
 
     expect(operational_banner["class"]).to include("border-green-200", "bg-green-50")
     expect(in_sync_badge["class"]).to include("bg-green-50", "text-green-800")
     expect(operational_badge["class"]).to include("bg-green-50", "text-green-800")
-    expect(enabled_badge["class"]).to include("bg-blue-50", "text-blue-800")
+    expect(rss_badge["class"]).to include("bg-blue-50", "text-blue-800")
   end
 
   it "distinguishes an in-sync assignment from failed indexer health" do
@@ -156,16 +155,24 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).to include("query=Dashboard", "per_page=10")
   end
 
-  it "describes a disabled assignment as local desired state" do
+  it "describes disabled search modes as local desired state" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://sonarr.example.test", api_key: "key")
     indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
-    IndexerApp.create!(arr_app:, indexer:, enabled: false, last_synced_at: 1.hour.ago, last_status: "ok")
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      enable_rss: false,
+      enable_automatic_search: false,
+      enable_interactive_search: false,
+      last_synced_at: 1.hour.ago,
+      last_status: "ok"
+    )
 
     get root_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Desired state", "Disabled")
-    expect(response.body).to include("Assignment is disabled. The next sync will disable remote search modes.")
+    expect(response.body).to include("Desired state", "RSS off", "Automatic off", "Interactive off")
+    expect(response.body).to include("All remote search modes are disabled for this assignment.")
     expect(response.body).not_to include("Remote search modes are off")
   end
 
@@ -192,7 +199,6 @@ RSpec.describe "Dashboard", type: :request do
     IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: true,
       connection_mode: "bridged",
       remote_indexer_id: 42,
       last_status: "ok"
@@ -225,7 +231,6 @@ RSpec.describe "Dashboard", type: :request do
     failed_assignment = IndexerApp.create!(
       arr_app: sonarr,
       indexer:,
-      enabled: true,
       category_mode: "custom",
       custom_categories: "8000",
       last_status: "error",
@@ -233,13 +238,14 @@ RSpec.describe "Dashboard", type: :request do
     )
     IndexerApp.create!(
       arr_app: sonarr,
-      indexer: Indexer.create!(name: "EZTV", jackett_id: "eztv", enabled: true),
-      enabled: true
+      indexer: Indexer.create!(name: "EZTV", jackett_id: "eztv", enabled: true)
     )
     IndexerApp.create!(
       arr_app: sonarr,
       indexer: Indexer.create!(name: "ExtraTorrent.st", jackett_id: "extratorrent-st", enabled: true),
-      enabled: false,
+      enable_rss: false,
+      enable_automatic_search: false,
+      enable_interactive_search: false,
       remote_indexer_id: 42,
       last_status: "ok"
     )
@@ -309,7 +315,6 @@ RSpec.describe "Dashboard", type: :request do
     IndexerApp.create!(
       arr_app: sonarr,
       indexer:,
-      enabled: true,
       last_plan_state: "not_applicable",
       last_status: "skipped",
       last_error: "EZTV does not expose Radarr-compatible Torznab categories."

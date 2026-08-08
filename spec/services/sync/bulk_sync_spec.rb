@@ -15,17 +15,17 @@ RSpec.describe Sync::BulkSync do
     ActiveJob::Base.queue_adapter = original_adapter
   end
 
-  it "creates a sync run with enabled assignments and enqueues the coordinator job" do
+  it "creates a sync run with eligible assignments and enqueues the coordinator job" do
     enabled_assignment = create_assignment(indexer_name: "EZTV", arr_app_name: "Sonarr")
     disabled_assignment = create_assignment(indexer_name: "Disabled", arr_app_name: "Radarr", indexer_enabled: false)
-    hidden_disabled_assignment = create_assignment(indexer_name: "Hidden Disabled", arr_app_name: "Sonarr 4K", assignment_enabled: false)
+    search_disabled_assignment = create_assignment(indexer_name: "Search Disabled", arr_app_name: "Sonarr 4K", search_modes_enabled: false)
 
     sync_run = described_class.call
 
     expect(sync_run).to be_persisted
     expect(sync_run.total_count).to eq(2)
-    expect(sync_run.sync_run_items.pluck(:indexer_app_id)).to contain_exactly(enabled_assignment.id, hidden_disabled_assignment.id)
-    expect(sync_run.sync_run_items.pluck(:indexer_name)).to contain_exactly("EZTV", "Hidden Disabled")
+    expect(sync_run.sync_run_items.pluck(:indexer_app_id)).to contain_exactly(enabled_assignment.id, search_disabled_assignment.id)
+    expect(sync_run.sync_run_items.pluck(:indexer_name)).to contain_exactly("EZTV", "Search Disabled")
     expect(sync_run.sync_run_items.pluck(:arr_app_name)).to contain_exactly("Sonarr", "Sonarr 4K")
     expect(sync_run.sync_run_items.pluck(:indexer_app_id)).not_to include(disabled_assignment.id)
     expect(Sync::BulkSyncJob).to have_been_enqueued.with(sync_run.id)
@@ -80,7 +80,7 @@ RSpec.describe Sync::BulkSync do
     expect(Sync::BulkSyncJob).not_to have_been_enqueued
   end
 
-  def create_assignment(indexer_name:, arr_app_name:, indexer_enabled: true, assignment_enabled: true)
+  def create_assignment(indexer_name:, arr_app_name:, indexer_enabled: true, search_modes_enabled: true)
     arr_app = ArrApp.create!(
       name: arr_app_name,
       app_type: "sonarr",
@@ -90,6 +90,12 @@ RSpec.describe Sync::BulkSync do
     )
     indexer = Indexer.create!(name: indexer_name, jackett_id: indexer_name.parameterize, enabled: indexer_enabled)
 
-    IndexerApp.create!(arr_app:, indexer:, enabled: assignment_enabled)
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      enable_rss: search_modes_enabled,
+      enable_automatic_search: search_modes_enabled,
+      enable_interactive_search: search_modes_enabled
+    )
   end
 end

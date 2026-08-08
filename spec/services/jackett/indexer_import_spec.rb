@@ -93,13 +93,19 @@ RSpec.describe Jackett::IndexerImport do
     assignment = IndexerApp.find_by!(indexer: Indexer.find_by!(jackett_id: "first-indexer"), arr_app:)
     expect(result.assigned_count).to eq(1)
     expect(assignment.connection_mode).to eq("direct")
-    expect(assignment).to be_enabled
+    expect(assignment).to be_all_search_modes_enabled
   end
 
-  it "preserves an existing disabled assignment and requires preview before immediate sync" do
+  it "preserves existing disabled search modes and requires preview before immediate sync" do
     arr_app = ArrApp.create!(name: "Main Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
     indexer = Indexer.create!(name: "Existing Indexer", jackett_id: "existing-indexer")
-    assignment = IndexerApp.create!(indexer:, arr_app:, enabled: false)
+    assignment = IndexerApp.create!(
+      indexer:,
+      arr_app:,
+      enable_rss: false,
+      enable_automatic_search: false,
+      enable_interactive_search: false
+    )
     discovery = FakeDiscovery.new(
       Jackett::IndexerDiscovery::Result.new(
         success?: true,
@@ -121,10 +127,10 @@ RSpec.describe Jackett::IndexerImport do
     )
 
     expect(result).to be_success
-    expect(assignment.reload).not_to be_enabled
+    expect(assignment.reload).to be_search_modes_disabled
     expect(result.sync_run).to be_nil
     expect(result.preview_assignment_ids).to eq([ assignment.id ])
-    expect(result.message).to include("preview required before syncing disabled desired state")
+    expect(result.message).to include("preview required before syncing disabled search modes")
     expect(Sync::BulkSync).not_to have_received(:call)
   end
 

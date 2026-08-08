@@ -6,7 +6,11 @@ namespace :bridgarr do
     migration_indexer_app = Class.new(ActiveRecord::Base) do
       self.table_name = "indexer_apps"
     end
-    legacy_assignments = migration_indexer_app.unscoped.where(enabled: nil)
+    search_mode_columns = %w[enable_rss enable_automatic_search enable_interactive_search] & migration_indexer_app.column_names
+    state_columns = search_mode_columns.presence || [ "enabled" ]
+    legacy_assignments = state_columns
+      .map { |column| migration_indexer_app.unscoped.where(column => nil) }
+      .reduce { |scope, candidate| scope.or(candidate) }
     count = legacy_assignments.count
     dry_run = ActiveModel::Type::Boolean.new.cast(ENV["DRY_RUN"])
     confirmed = ENV["CONFIRM"] == "true"
@@ -20,7 +24,7 @@ namespace :bridgarr do
     elsif !confirmed
       puts "No assignments were changed. Re-run with CONFIRM=true to repair local desired state."
     else
-      updated_count = legacy_assignments.update_all(enabled: true)
+      updated_count = legacy_assignments.update_all(state_columns.index_with(true))
       puts "Repaired #{updated_count} local #{'assignment'.pluralize(updated_count)}; no remote sync was started."
     end
 

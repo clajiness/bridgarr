@@ -37,6 +37,9 @@ module ApplicationHelper
   def assignment_custom_settings_description(assignment)
     settings = []
     settings << "Bridged connection" if assignment.connection_mode_bridged?
+    settings << "RSS disabled" unless assignment.enable_rss?
+    settings << "Automatic search disabled" unless assignment.enable_automatic_search?
+    settings << "Interactive search disabled" unless assignment.enable_interactive_search?
 
     if assignment.category_mode_custom?
       settings << "Custom categories: #{assignment.custom_category_ids.join(", ")}"

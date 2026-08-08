@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_07_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_08_100000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key", null: false
     t.string "app_type", null: false
@@ -33,7 +33,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_07_150000) do
     t.string "connection_mode", default: "direct", null: false
     t.datetime "created_at", null: false
     t.text "custom_categories"
-    t.boolean "enabled", default: true, null: false
+    t.boolean "enable_automatic_search", default: true, null: false
+    t.boolean "enable_interactive_search", default: true, null: false
+    t.boolean "enable_rss", default: true, null: false
     t.integer "indexer_id", null: false
     t.integer "jackett_api_key_version"
     t.datetime "last_applied_at"
@@ -50,7 +52,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_07_150000) do
     t.integer "remote_indexer_id"
     t.datetime "updated_at", null: false
     t.index ["arr_app_id"], name: "index_indexer_apps_on_arr_app_id"
-    t.index ["enabled"], name: "index_indexer_apps_on_enabled"
     t.index ["indexer_id", "arr_app_id"], name: "index_indexer_apps_on_indexer_id_and_arr_app_id", unique: true
     t.index ["indexer_id"], name: "index_indexer_apps_on_indexer_id"
     t.index ["last_plan_state"], name: "index_indexer_apps_on_last_plan_state"

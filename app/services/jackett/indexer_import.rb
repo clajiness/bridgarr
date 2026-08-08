@@ -104,15 +104,14 @@ module Jackett
             assignment = IndexerApp.find_or_initialize_by(indexer:, arr_app_id:)
             new_assignment = assignment.new_record?
             assigned_count += 1 if new_assignment
-            attributes = new_assignment ? assignment_attributes.merge(enabled: true) : assignment_attributes
-            assignment.update!(attributes)
+            assignment.update!(assignment_attributes)
             assignments << assignment
           end
         end
       end
 
       assignment_ids = assignments.map(&:id).uniq
-      preview_assignment_ids = if sync_now && assignments.any? { |assignment| !assignment.enabled? }
+      preview_assignment_ids = if sync_now && assignments.any? { |assignment| !assignment.all_search_modes_enabled? }
         assignment_ids
       else
         []
@@ -173,7 +172,7 @@ module Jackett
           "#{skipped_count} unchanged"
         ]
         if preview_assignment_ids.any?
-          parts << "preview required before syncing disabled desired state"
+          parts << "preview required before syncing disabled search modes"
         elsif sync_run
           parts << (sync_run.total_count.positive? ? "sync queued" : "sync already active")
         end

@@ -65,7 +65,9 @@
                       <div class="min-w-0 flex-1 space-y-2">
                         <% if assignment %>
                           <div class="flex flex-wrap gap-2">
-                            <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= assignment_enabled_classes(assignment) %>"><%= assignment.enabled? ? "Enabled" : "Disabled" %></span>
+                            <% assignment_search_mode_badges(assignment).each do |label, enabled| %>
+                              <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= enabled_status_classes(enabled) %>"><%= label %></span>
+                            <% end %>
                             <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= assignment_connection_mode_classes(assignment) %>"><%= assignment.connection_mode.titleize %></span>
                             <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= reconciliation_state_classes(assignment.last_plan_state) %>"><%= reconciliation_state_label(assignment.last_plan_state) %></span>
                           </div>
@@ -95,11 +97,11 @@
       </div>
 
       <div class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
-        <div class="grid gap-3 md:grid-cols-4">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <%= label_tag :bulk_action, "Bulk action", class: "block text-sm font-medium text-slate-700" %>
             <%= select_tag :bulk_action, options_for_select([
-              ["Create assignment", "create"], ["Enable", "enable"], ["Disable", "disable"],
+              ["Create assignment", "create"], ["Update search modes", "search_modes"],
               ["Use direct mode", "direct"], ["Use bridged mode", "bridged"], ["Update categories", "categories"],
               ["Preview / test", "preview"], ["Preview selected sync", "sync"]
             ]), class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
@@ -114,6 +116,23 @@
           </div>
           <div class="flex items-end">
             <%= form.submit "Apply to selected", class: "w-full rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+          </div>
+        </div>
+
+        <div class="mt-4 border-t border-slate-200 pt-4">
+          <p class="text-sm font-medium text-slate-700">Search modes</p>
+          <p class="mt-1 text-xs leading-5 text-slate-500">Used by Update search modes. Keep existing leaves that setting unchanged; unassigned cells are skipped.</p>
+          <div class="mt-3 grid gap-3 md:grid-cols-3">
+            <% [
+              [ :enable_rss, "RSS" ],
+              [ :enable_automatic_search, "Automatic search" ],
+              [ :enable_interactive_search, "Interactive search" ]
+            ].each do |field, label| %>
+              <div>
+                <%= label_tag field, label, class: "block text-sm font-medium text-slate-700" %>
+                <%= select_tag field, options_for_select([["Keep existing", "keep"], ["Enable", "enable"], ["Disable", "disable"]]), class: "mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm" %>
+              </div>
+            <% end %>
           </div>
         </div>
       </div>

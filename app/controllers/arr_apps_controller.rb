@@ -52,7 +52,7 @@ class ArrAppsController < ApplicationController
 
   def test_connection
     started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    result = Arr::ConnectionTest.call(base_url: @arr_app.base_url, api_key: @arr_app.api_key)
+    result = Arr::ConnectionTest.call(base_url: @arr_app.base_url, api_key: @arr_app.api_key, app_type: @arr_app.app_type)
     @arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
 
     if result.success?
@@ -65,7 +65,7 @@ class ArrAppsController < ApplicationController
   def test_connections
     results = ArrApp.order(:name).map do |arr_app|
       started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      result = Arr::ConnectionTest.call(base_url: arr_app.base_url, api_key: arr_app.api_key)
+      result = Arr::ConnectionTest.call(base_url: arr_app.base_url, api_key: arr_app.api_key, app_type: arr_app.app_type)
       arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
       result
     end

@@ -32,8 +32,8 @@ RSpec.describe HealthChecks::Runner do
 
     expect(runner.call).to eq(true)
 
-    expect(arr_test).to have_received(:call).once.with(base_url: enabled_app.base_url, api_key: enabled_app.api_key)
-    expect(arr_test).not_to have_received(:call).with(base_url: disabled_app.base_url, api_key: disabled_app.api_key)
+    expect(arr_test).to have_received(:call).once.with(base_url: enabled_app.base_url, api_key: enabled_app.api_key, app_type: enabled_app.app_type)
+    expect(arr_test).not_to have_received(:call).with(base_url: disabled_app.base_url, api_key: disabled_app.api_key, app_type: disabled_app.app_type)
     expect(indexer_test).to have_received(:call).once.with(
       base_url: "http://jackett.example.test", api_key: "jackett-secret", jackett_id: enabled_indexer.jackett_id
     )
@@ -61,7 +61,7 @@ RSpec.describe HealthChecks::Runner do
 
     runner.call
 
-    expect(arr_test).to have_received(:call).with(base_url: arr_app.base_url, api_key: arr_app.api_key)
+    expect(arr_test).to have_received(:call).with(base_url: arr_app.base_url, api_key: arr_app.api_key, app_type: arr_app.app_type)
     expect(indexer_test).not_to have_received(:call)
     expect(indexer.reload).to have_attributes(
       last_status: "unknown",
@@ -110,9 +110,9 @@ RSpec.describe HealthChecks::Runner do
     first = create_app("Radarr", enabled: true)
     second = create_app("Sonarr", enabled: true)
     allow(jackett_test).to receive(:call).and_return(jackett_result(success: true, http_status: 200))
-    allow(arr_test).to receive(:call).with(base_url: first.base_url, api_key: first.api_key)
+    allow(arr_test).to receive(:call).with(base_url: first.base_url, api_key: first.api_key, app_type: first.app_type)
       .and_raise(StandardError, "request failed?apikey=visible-secret Authorization: Bearer token-secret")
-    allow(arr_test).to receive(:call).with(base_url: second.base_url, api_key: second.api_key)
+    allow(arr_test).to receive(:call).with(base_url: second.base_url, api_key: second.api_key, app_type: second.app_type)
       .and_return(arr_result(success: true, http_status: 204))
 
     expect { runner.call }.not_to raise_error

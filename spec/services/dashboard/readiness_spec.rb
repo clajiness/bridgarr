@@ -26,7 +26,6 @@ RSpec.describe Dashboard::Readiness do
     IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: true,
       remote_indexer_id: 12,
       last_status: "ok",
       last_synced_at: Time.current
@@ -54,7 +53,6 @@ RSpec.describe Dashboard::Readiness do
     IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: true,
       last_status: "skipped",
       last_error: "EZTV does not expose Radarr-compatible Torznab categories.",
       last_synced_at: Time.current
@@ -81,7 +79,6 @@ RSpec.describe Dashboard::Readiness do
     IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: true,
       connection_mode: "bridged",
       remote_indexer_id: 12,
       last_status: "ok",
@@ -112,7 +109,6 @@ RSpec.describe Dashboard::Readiness do
     IndexerApp.create!(
       arr_app:,
       indexer:,
-      enabled: true,
       remote_indexer_id: 12,
       last_status: "error",
       last_synced_at: Time.current

@@ -29,7 +29,7 @@
         <p class="text-3xl font-semibold text-red-950"><%= @plan.destructive_items.size %></p>
         <div>
           <h2 class="font-semibold text-red-950"><%= "assignment".pluralize(@plan.destructive_items.size).capitalize %> will have remote search modes disabled</h2>
-          <p class="mt-1 text-sm leading-6 text-red-900">Applying these changes will disable remote RSS, automatic search, and interactive search. Review each affected assignment below.</p>
+          <p class="mt-1 text-sm leading-6 text-red-900">Applying these changes will disable one or more remote search modes. Review each affected assignment below.</p>
         </div>
       </div>
     </section>
@@ -67,13 +67,14 @@
               </td>
               <td class="px-4 py-4">
                 <p class="font-medium text-slate-950"><%= assignment.indexer.name %></p>
-                <p class="mt-1 text-xs text-slate-500"><%= assignment.arr_app.name %> · <%= assignment.connection_mode.titleize %> · <%= assignment.enabled? ? "Enabled" : "Disabled" %></p>
+                <p class="mt-1 text-xs text-slate-500"><%= assignment.arr_app.name %> · <%= assignment.connection_mode.titleize %></p>
+                <p class="mt-1 text-xs text-slate-500"><%= assignment_search_mode_badges(assignment).map(&:first).join(" · ") %></p>
               </td>
               <td class="px-4 py-4"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= reconciliation_state_classes(item.state) %>"><%= reconciliation_state_label(item.state) %></span></td>
               <td class="px-4 py-4">
                 <p class="text-sm leading-6 text-slate-700"><%= item.message %></p>
                 <% if item.destructive %>
-                  <p class="mt-2 text-xs font-semibold text-red-800">Remote search modes will be disabled.</p>
+                  <p class="mt-2 text-xs font-semibold text-red-800">One or more remote search modes will be disabled.</p>
                 <% end %>
                 <% if item.changes.any? %>
                   <% rendered_revert_option_keys = [] %>
@@ -106,7 +107,7 @@
                       data: { turbo_confirm: "Revert all local desired-state changes for #{assignment.indexer.name} in #{assignment.arr_app.name}?" } %>
                   <% end %>
                   <% if item.state == "conflict" && item.remote_indexer_id.present? %>
-                    <% repair_confirmation = if assignment.enabled?; "Associate this assignment with remote indexer ID #{item.remote_indexer_id} and sync it?"; else; "Associate this assignment with remote indexer ID #{item.remote_indexer_id}? You will return to preview before any remote change."; end %>
+                    <% repair_confirmation = if assignment.all_search_modes_enabled?; "Associate this assignment with remote indexer ID #{item.remote_indexer_id} and sync it?"; else; "Associate this assignment with remote indexer ID #{item.remote_indexer_id}? You will return to preview before any remote change."; end %>
                     <%= link_to "Repair association", repair_indexer_app_path(assignment, remote_indexer_id: item.remote_indexer_id), class: "text-blue-700 hover:text-blue-900", data: { turbo_method: :post, turbo_confirm: repair_confirmation } %>
                   <% elsif item.state == "orphaned" %>
                     <%= link_to "Forget stale association", forget_remote_indexer_app_path(assignment), class: "text-blue-700 hover:text-blue-900", data: { turbo_method: :post, turbo_confirm: "Forget remote indexer ID #{assignment.remote_indexer_id}? This does not delete anything remotely." } %>

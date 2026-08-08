@@ -2,15 +2,14 @@ module Arr
   class ConnectionTest
     Result = Data.define(:success?, :message, :error, :http_status, :app_name, :version)
 
-    STATUS_PATH = "/api/v3/system/status"
-
-    def self.call(base_url:, api_key:, connection: nil)
-      new(base_url:, api_key:, connection:).call
+    def self.call(base_url:, api_key:, app_type: "other", connection: nil)
+      new(base_url:, api_key:, app_type:, connection:).call
     end
 
-    def initialize(base_url:, api_key:, connection: nil)
+    def initialize(base_url:, api_key:, app_type:, connection: nil)
       @base_url = base_url.to_s.strip
       @api_key = api_key.to_s.strip
+      @routes = ApiRoutes.for(app_type:)
       @connection = connection
     end
 
@@ -19,7 +18,7 @@ module Arr
       return failure("Add an app API key before testing.") if api_key.blank?
       return failure("App base URL must start with http:// or https://.") unless valid_base_url?
 
-      response = http.get(STATUS_PATH)
+      response = http.get(routes.status)
       return http_failure(response) unless response.success?
 
       body = JSON.parse(response.body)
@@ -32,7 +31,7 @@ module Arr
 
     private
 
-      attr_reader :base_url, :api_key, :connection
+      attr_reader :base_url, :api_key, :routes, :connection
 
       def http
         @http ||= connection || Faraday.new(url: base_url, headers: { "X-Api-Key" => api_key }) do |faraday|
@@ -56,7 +55,16 @@ module Arr
       end
 
       def http_failure(response)
-        failure("App returned HTTP #{response.status}. Check the URL and API key.", http_status: response.status)
+        message = case response.status
+        when 401, 403
+          "App returned HTTP #{response.status}. Check the API key."
+        when 404
+          "App returned HTTP 404 for #{routes.status}. Check the application type and base URL."
+        else
+          "App returned HTTP #{response.status}. Check the URL and API key."
+        end
+
+        failure(message, http_status: response.status)
       end
 
       def failure(message, http_status: nil)
