@@ -3,34 +3,44 @@
 **The indexer bridge that really ties the stack together.**
 
 Bridgarr is a Jackett-backed Torznab proxy and indexer sync manager for Sonarr,
-Radarr, Lidarr, and compatible apps. Configure Jackett once, import Jackett
-indexers once, assign them to one or more apps, and let Bridgarr create managed
-Generic Torznab indexers.
+Radarr, Lidarr, Whisparr, and compatible apps. Configure Jackett once, import
+Jackett indexers once, assign them to one or more apps, and let Bridgarr create
+managed Generic Torznab indexers.
 
 Bridgarr is not a Prowlarr clone. It is intentionally focused on Jackett-backed
 indexer discovery, assignment, sync, and optional Torznab bridging.
 
 ## Status
 
-Bridgarr is public alpha software. The current alpha includes the core pieces
-needed for a useful homelab deployment:
+Bridgarr is public beta software. Its core workflows are implemented, covered
+by automated tests, and suitable for broader homelab use. Beta still means
+upgrades and less-common combinations of Jackett indexers, *arr versions, and
+deployment layouts may expose compatibility issues, so keep backups and review
+reconciliation previews before applying changes.
+
+The current beta includes:
 
 - Local administrator authentication with privileged CLI provisioning
 - Session timeout, failed-attempt lockout, and password recovery
 - Jackett connection settings and connection testing
 - Jackett indexer discovery and selective import
-- Sonarr, Radarr, Lidarr, and compatible app records
+- Sonarr, Radarr, Lidarr, Whisparr, and compatible app records
+- App-aware API routing, including Lidarr v1 and Sonarr/Radarr/Whisparr v3
 - App connection testing
-- Indexer-to-app assignments
-- Centralized assignment matrix with bookmarked operational filters
+- Indexer-to-app assignments with independent RSS, automatic-search, and
+  interactive-search controls
+- Centralized assignment matrix with bookmarked operational filters and
+  contextual bulk actions
 - Read-only reconciliation previews with redacted field-level changes
 - Guided Jackett import, assignment creation, and optional immediate sync
 - Jackett rename, disabled, and missing-indexer detection
 - Managed Generic Torznab indexer sync
-- Bulk sync jobs with Solid Queue
+- Bulk sync jobs with Solid Queue and a delayed retry for transient failures,
+  including a busy destination SQLite database
 - Direct Jackett-backed app indexers by default
 - Optional bridged Torznab search and download proxying through Bridgarr
-- Proxy activity, sync run history, and dashboard health summaries
+- Proxy activity, sync run history, dashboard health summaries, and live page
+  refreshes where operational state can change in the background
 
 OIDC, multi-user permissions, and deeper production hardening are still future
 work. Use HTTPS through a trusted reverse proxy before exposing Bridgarr outside
@@ -122,8 +132,8 @@ sure the mounted storage directory is writable by UID/GID `1000`.
 5. Test the Jackett connection.
 6. Open **Indexers**, discover from Jackett, and import the indexers you want
    Bridgarr to manage.
-7. Open **Apps**, add your Sonarr/Radarr/Lidarr instances, and test each
-   connection.
+7. Open **Apps**, add your Sonarr/Radarr/Lidarr/Whisparr instances, and test
+   each connection.
 8. Open **Assignments** to review the assignment matrix, or create assignments
    directly during discovery.
 9. Preview reconciliation and apply the safe selected changes.
@@ -140,18 +150,34 @@ and Bridgarr forwards Torznab traffic to Jackett.
 
 ## Setup and Reconciliation
 
-The assignment matrix is Bridgarr's desired-state workspace. Each cell has three
-distinct states:
+The assignment matrix is Bridgarr's desired-state workspace. Each cell is
+either unassigned or a managed assignment. An assigned cell shows the desired
+state of three independent *arr controls—**RSS**, **Automatic search**, and
+**Interactive search**—along with its direct/bridged connection mode and latest
+reconciliation state. New assignments start with all three search modes enabled
+and use direct mode.
 
-- **Unassigned** means Bridgarr does not manage that indexer in the destination.
-- **Enabled** means the assignment is managed and remote RSS, automatic, and
-  interactive searches should be enabled.
-- **Disabled** means the assignment remains managed, but those remote search
-  modes should be disabled.
+Turning off one or more search modes keeps the assignment managed; it does not
+delete the remote indexer. Removing an assignment is a separate action that
+deletes the Bridgarr-managed remote indexer when one is associated and requires
+explicit confirmation.
 
-Removing an assignment is separate from disabling it. Removal deletes the
-Bridgarr-managed remote indexer when one is associated and requires explicit
-confirmation.
+For a bulk change, select one or more matrix cells and then choose a **Bulk
+action**. Bridgarr displays only the controls that belong to that action, counts
+the selected cells, and labels the single action button with what it will do.
+For example, to disable RSS and automatic searching while preserving
+interactive searching:
+
+1. Select the assigned cells.
+2. Choose **Update search modes**.
+3. Set **RSS** and **Automatic search** to **Disable**.
+4. Leave **Interactive search** at **Keep existing**.
+5. Click **Review search modes for _N_ assignments**.
+
+Unassigned cells are skipped by settings updates; use **Create assignment** for
+those cells first. Search-mode, connection-mode, and category changes proceed
+directly to reconciliation preview. The separate indexers-per-page selector
+updates the page automatically and is not a bulk-action control.
 
 Use **Preview** before applying changes. Bridgarr inspects each destination once
 and classifies assignments as create, update, unchanged, not applicable,
@@ -164,8 +190,8 @@ forget action.
 Bulk synchronization starts from this preview. A plan that will turn off remote
 RSS, automatic search, or interactive search prominently reports the number of
 affected assignments and requires explicit confirmation before it can be
-applied. A disabled assignment is local desired state; the dashboard does not
-claim the remote modes are already off unless a reconciliation preview actually
+applied. Search-mode selections are local desired state; the dashboard does not
+claim the remote modes have changed unless a reconciliation preview actually
 inspected the destination.
 
 Successful applies record a digest of the normalized configuration that was
@@ -179,8 +205,9 @@ There are two important URLs, and they are often different:
 
 - **Jackett URL** is the address Bridgarr uses when calling Jackett. This is
   required.
-- **Bridgarr URL** is the address Sonarr, Radarr, Lidarr, and friends use when
-  calling back into Bridgarr. This is only required for bridged assignments.
+- **Bridgarr URL** is the address Sonarr, Radarr, Lidarr, Whisparr, and friends
+  use when calling back into Bridgarr. This is only required for bridged
+  assignments.
 
 For Docker deployments, `localhost` is usually wrong unless everything is in the
 same container. Use a Docker service name on the same network, a container IP, or
@@ -324,6 +351,18 @@ upstream.
 
 ### Upgrading existing installations
 
+#### v0.8.0 independent search modes
+
+The v0.8.0 migration replaces the assignment-level **Enabled** switch with
+independent desired-state controls for RSS, automatic search, and interactive
+search. Existing assignments and their last-applied snapshots are preserved: a
+previously enabled assignment starts with all three modes enabled, while a
+previously disabled assignment starts with all three modes disabled.
+
+After upgrading, open **Assignments** and use **Preview** before applying remote
+changes. You can then adjust any of the three modes independently from an
+assignment's settings or with **Update search modes** in the matrix.
+
 #### v0.6.1 legacy assignment-state repair
 
 Some databases first initialized from a schema shipped before v0.4 stored an
@@ -396,6 +435,8 @@ bridged search or download traffic again. Direct assignments remain unaffected.
 | `SOLID_QUEUE_IN_PUMA` | Docker image: `true` | Runs the Solid Queue supervisor inside the web container. Puma treats an unset value as `false` outside the image. |
 | `ARR_INDEXER_SYNC_TIMEOUT_SECONDS` | `150` | Timeout while Bridgarr waits for an *arr app to create/test a managed indexer. |
 | `ARR_INDEXER_INSPECTION_TIMEOUT_SECONDS` | `15` | Timeout for read-only Arr inventory and schema inspection during reconciliation previews. |
+| `BRIDGARR_SYNC_RETRY_DELAY_SECONDS` | `45` | Delay before the one automatic retry for a retryable assignment sync failure, including a busy destination database. |
+| `BRIDGARR_INDEXER_SYNC_CONCURRENCY_SECONDS` | `600` | Duration of the per-indexer concurrency lock that prevents overlapping syncs for the same imported indexer. |
 | `JACKETT_TORZNAB_TIMEOUT_SECONDS` | `120` | Timeout while Bridgarr waits for Jackett Torznab responses. |
 | `JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS` | `120` | Timeout for each uncached live search used to check indexer health. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
 | `AUTH_SESSION_TIMEOUT_MINUTES` | `30` | Inactivity timeout in minutes. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
@@ -415,8 +456,8 @@ bridged search or download traffic again. Direct assignments remain unaffected.
 | `RAILS_LOG_LEVEL` | `info` | Set to `debug` only while troubleshooting; debug logs can contain operational or personally identifiable data. |
 
 `ARR_INDEXER_SYNC_TIMEOUT_SECONDS` should usually be greater than
-`JACKETT_TORZNAB_TIMEOUT_SECONDS`. During sync, Sonarr/Radarr may call back
-through Bridgarr while Bridgarr is still waiting for the *arr API response.
+`JACKETT_TORZNAB_TIMEOUT_SECONDS`. During sync, an *arr app may call back through
+Bridgarr while Bridgarr is still waiting for the app's API response.
 
 `RAILS_MASTER_KEY` is only needed if you add encrypted Rails credentials that
 the app must read at runtime. The published image can run with
@@ -443,7 +484,13 @@ and start a worker process with:
 bin/jobs
 ```
 
-Bulk sync uses the job system. If jobs stay queued forever, make sure a Solid
+Bulk sync uses the job system. Retryable network, timeout, upstream-availability,
+and destination-database-lock failures receive one delayed retry by default. If
+an *arr application reports `database is locked`, Bridgarr identifies it as a
+temporary destination SQLite problem, waits, and tries the assignment once
+more. Repeated locks usually indicate overlapping app instances, background
+database work, or a database stored on network storage and need attention in
+the destination application. If jobs stay queued forever, make sure a Solid
 Queue worker is running.
 
 The read-only **Jobs** screen shows registered queue processes, current queue
