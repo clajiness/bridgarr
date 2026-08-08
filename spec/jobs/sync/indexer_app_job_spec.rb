@@ -219,6 +219,33 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
     expect(enqueued_indexer_app_jobs).to be_empty
   end
 
+  it "schedules a delayed retry when the destination Arr database is locked" do
+    arr_app = ArrApp.create!(name: "Lidarr", app_type: "lidarr", base_url: "http://localhost:8686", api_key: "lidarr-api-key")
+    indexer = Indexer.create!(name: "SceneTime", jackett_id: "scenetime")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(indexer_app:)
+    database_busy = Sync::IndexerAppSync::Result.new(
+      success?: false,
+      skipped?: false,
+      remote_indexer_id: nil,
+      message: "Lidarr returned HTTP 500 while trying to update Generic Torznab indexer. database is locked",
+      error: "Lidarr returned HTTP 500 while trying to update Generic Torznab indexer. database is locked"
+    )
+    allow(Sync::IndexerAppSync).to receive(:call).and_return(database_busy)
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(sync_run_item.reload).to have_attributes(
+      status: "retrying",
+      attempt_count: 1,
+      error_kind: "destination_database_busy",
+      retryable: true
+    )
+    expect(sync_run_item.next_retry_at).to be_present
+    expect(enqueued_indexer_app_jobs).to include(a_hash_including(job: described_class))
+  end
+
   it "fails after the final retryable attempt without scheduling a third attempt" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
     indexer = Indexer.create!(name: "ExtraTorrent.st", jackett_id: "extratorrent-st")

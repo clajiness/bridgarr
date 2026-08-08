@@ -216,6 +216,33 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(connection.post_path).to eq("/api/v1/indexer")
   end
 
+  it "uses the Lidarr v1 endpoint when updating an existing indexer" do
+    arr_app.app_type = "lidarr"
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ matching_remote_indexer ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json),
+      update_response: ArrIndexerResponse.new(status: 202, body: { id: 42 }.to_json)
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      enable_rss: false,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).to be_success
+    expect(connection.get_paths).to eq([ "/api/v1/indexer", "/api/v1/indexer/schema" ])
+    expect(connection.put_path).to eq("/api/v1/indexer/42")
+  end
+
   it "fails closed when a successful create response omits the remote indexer ID" do
     connection = FakeArrIndexerConnection.new(
       schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
@@ -854,6 +881,36 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(connection.put_headers).to include("Content-Type" => "application/json")
     expect(fields.fetch("baseUrl").fetch("value")).to eq("http://localhost:9117/api/v2.0/indexers/eztv/results/torznab")
     expect(fields.fetch("apiKey").fetch("value")).to eq("jackett-api-key")
+  end
+
+  it "deduplicates identical Arr error details" do
+    connection = FakeArrIndexerConnection.new(
+      indexers_response: ArrIndexerResponse.new(status: 200, body: [ matching_remote_indexer ].to_json),
+      schema_response: ArrIndexerResponse.new(status: 200, body: torznab_schema.to_json),
+      create_response: ArrIndexerResponse.new(status: 201, body: { id: 43 }.to_json),
+      update_response: ArrIndexerResponse.new(
+        status: 500,
+        body: { message: "database is locked", error: "database is locked" }.to_json
+      )
+    )
+
+    result = described_class.call(
+      arr_app:,
+      name: "EZTV",
+      bridgarr_base_url: "http://localhost:3000",
+      jackett_base_url: "http://localhost:9117",
+      jackett_api_key: "jackett-api-key",
+      jackett_id: "eztv",
+      remote_indexer_id: 42,
+      enable_rss: false,
+      connection:,
+      caps_client: FakeTorznabCapsClient
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to eq(
+      "Main Sonarr returned HTTP 500 while trying to update Generic Torznab indexer. database is locked"
+    )
   end
 
   it "keeps the known remote indexer ID when an Arr update succeeds with an empty body" do

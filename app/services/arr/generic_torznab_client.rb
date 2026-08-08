@@ -574,7 +574,12 @@ module Arr
             []
           end
 
-        messages.first(3).join(" ")
+        messages
+          .map { |message| message.to_s.strip }
+          .reject(&:blank?)
+          .uniq
+          .first(3)
+          .join(" ")
       end
 
       def hash_messages(parsed)

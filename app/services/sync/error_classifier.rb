@@ -25,6 +25,8 @@ module Sync
           "authentication"
         elsif challenge_solver_timeout?
           "challenge_solver_timeout"
+        elsif destination_database_busy?
+          "destination_database_busy"
         elsif timeout?
           "timeout"
         elsif unavailable?
@@ -78,6 +80,10 @@ module Sync
         message.match?(/timeout|timed out|Net::ReadTimeout|execution expired/i)
       end
 
+      def destination_database_busy?
+        message.match?(/database (?:table )?is locked|\bSQLITE_(?:BUSY|LOCKED)(?:_[A-Z_]+)?\b/i)
+      end
+
       def unavailable?
         message.match?(/server is unavailable|try again later|\b(502|503|504)\b|bad gateway|service unavailable|gateway timeout/i)
       end
@@ -99,7 +105,7 @@ module Sync
       end
 
       def retryable?(kind)
-        %w[challenge_solver_timeout timeout unavailable network].include?(kind)
+        %w[challenge_solver_timeout timeout destination_database_busy unavailable network].include?(kind)
       end
 
       def summary_for(kind)
@@ -110,6 +116,8 @@ module Sync
           "Indexer validation timed out. The upstream indexer may be slow or unavailable."
         when "unavailable"
           "The upstream indexer or Jackett endpoint was unavailable during validation."
+        when "destination_database_busy"
+          "The destination Arr application's database was temporarily busy."
         when "category_mismatch"
           "The indexer responded, but returned releases did not match the selected categories."
         when "incompatible_categories"
@@ -137,6 +145,8 @@ module Sync
         case kind
         when "challenge_solver_timeout", "timeout", "unavailable"
           "Retry the assignment. If it fails again, test the Jackett indexer and increase timeouts only after confirming the upstream service is healthy."
+        when "destination_database_busy"
+          "Retry after the destination application becomes idle. If this recurs, check for competing app instances, background database work, or a database stored on network storage."
         when "category_mismatch", "incompatible_categories"
           "Review the assignment's category mode and select compatible or custom categories."
         when "authentication"

@@ -171,4 +171,24 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).to include("table-fixed")
     expect(response.body).to include("[overflow-wrap:anywhere]")
   end
+
+  it "does not imply another attempt for a non-retryable failure" do
+    sync_run = SyncRun.create!(status: "failed", total_count: 1, failure_count: 1, started_at: Time.current, finished_at: Time.current)
+    sync_run.sync_run_items.create!(
+      indexer_name: "EZTV",
+      arr_app_name: "Sonarr",
+      status: "failed",
+      attempt_count: 1,
+      max_attempts: 2,
+      error: "Sonarr returned HTTP 401 Unauthorized.",
+      error_kind: "authentication",
+      retryable: false,
+      finished_at: Time.current
+    )
+
+    get sync_run_path(sync_run)
+
+    expect(response.body).to include("1 attempt")
+    expect(response.body).not_to include("Attempt 1 of 2")
+  end
 end

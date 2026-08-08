@@ -17,6 +17,17 @@ RSpec.describe Sync::AssignmentBulkUpdate do
     expect(assignment).to be_connection_mode_direct
   end
 
+  it "skips cells that already have assignments during create" do
+    assignment = IndexerApp.create!(indexer:, arr_app:)
+
+    result = described_class.call(cells: [ [ indexer.id, arr_app.id ] ], action: "create")
+
+    expect(result).to be_success
+    expect(result.changed_count).to eq(0)
+    expect(result.message).to include("No assignments were created", "already assigned")
+    expect(IndexerApp.where(id: assignment.id)).to exist
+  end
+
   it "updates desired state for existing assignments" do
     assignment = IndexerApp.create!(indexer:, arr_app:)
 
@@ -64,6 +75,17 @@ RSpec.describe Sync::AssignmentBulkUpdate do
     expect(result).not_to be_success
     expect(result.message).to include("at least one search mode")
     expect(assignment.reload).to be_all_search_modes_enabled
+  end
+
+  it "rejects setting updates when every selected cell is unassigned" do
+    result = described_class.call(
+      cells: [ [ indexer.id, arr_app.id ] ],
+      action: "search_modes",
+      enable_rss: "disable"
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to include("do not have assignments yet")
   end
 
   it "rolls back every cell when one selected assignment is invalid" do

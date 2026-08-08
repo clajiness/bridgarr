@@ -1,4 +1,6 @@
 class IndexerAppsController < ApplicationController
+  PREVIEW_AFTER_BULK_ACTIONS = %w[direct bridged categories search_modes].freeze
+
   before_action :set_indexer_app, only: %i[ edit update destroy sync repair forget_remote diagnostic ]
 
   def index
@@ -69,7 +71,10 @@ class IndexerAppsController < ApplicationController
       enable_automatic_search: params[:enable_automatic_search],
       enable_interactive_search: params[:enable_interactive_search]
     )
-    if result.success?
+    if result.success? && action.in?(PREVIEW_AFTER_BULK_ACTIONS)
+      assignment_ids = selected_assignment_ids(cells)
+      redirect_to preview_indexer_apps_path(assignment_ids:), notice: "#{result.message} Review the reconciliation preview before applying remote changes."
+    elsif result.success?
       redirect_to matrix_return_path, notice: result.message
     else
       redirect_to matrix_return_path, alert: result.message
