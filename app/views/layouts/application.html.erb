@@ -8,6 +8,8 @@
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%= turbo_refresh_method_tag :morph %>
+    <%= turbo_refresh_scroll_tag :preserve %>
 
     <%= yield :head %>
 
@@ -23,7 +25,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="min-h-screen bg-stone-100 text-slate-950">
+  <body class="min-h-screen bg-stone-100 text-slate-950" data-controller="refresh-safety">
     <header class="border-b border-amber-300/20 bg-stone-950">
       <div class="mx-auto flex max-w-screen-2xl flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <%= render "shared/brand" %>

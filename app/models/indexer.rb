@@ -15,6 +15,8 @@ class Indexer < ApplicationRecord
 
   scope :with_jackett_changes, -> { where(jackett_state: %w[renamed changed disabled missing]) }
 
+  after_commit :broadcast_live_refreshes
+
   def record_health_check_result(result, tested_at: Time.current, duration_ms: nil)
     update!(
       last_status: result.success? ? "ok" : "error",
@@ -47,4 +49,18 @@ class Indexer < ApplicationRecord
       last_request: proxy_requests.recent.first
     }
   end
+
+  private
+
+    def broadcast_live_refreshes
+      %w[dashboard readiness health indexers assignment_matrix].each do |stream|
+        broadcast_refresh_later_to stream
+      end
+
+      broadcast_refresh_later_to "arr_apps" if app_assignment_reference_changed?
+    end
+
+    def app_assignment_reference_changed?
+      destroyed? || previously_new_record? || previous_changes.key?("name") || previous_changes.key?("jackett_id")
+    end
 end

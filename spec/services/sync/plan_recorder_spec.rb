@@ -59,4 +59,17 @@ RSpec.describe Sync::PlanRecorder do
     expect(assignment.last_applied_digest).to eq("previous-desired")
     expect(assignment.last_applied_settings).to eq(original_snapshot)
   end
+
+  it "broadcasts plan state recorded through bulk updates" do
+    plan = Sync::Plan::Result.new(items: [ item(state: "update") ], generated_at: Time.current)
+    allow(Turbo::StreamsChannel).to receive(:broadcast_refresh_later_to)
+
+    described_class.call(plan)
+
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_refresh_later_to).with("dashboard")
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_refresh_later_to).with("readiness")
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_refresh_later_to).with("assignment_matrix")
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_refresh_later_to).with("indexers")
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_refresh_later_to).with("arr_apps")
+  end
 end

@@ -9,7 +9,8 @@ class SyncRun < ApplicationRecord
 
   scope :recent, -> { order(created_at: :desc) }
 
-  after_update_commit -> { broadcast_replace_later_to self }
+  after_update_commit -> { broadcast_replace_later_to self, attributes: { method: :morph } }
+  after_commit :broadcast_live_refreshes
 
   def queued?
     status == "queued"
@@ -88,6 +89,11 @@ class SyncRun < ApplicationRecord
   end
 
   private
+
+    def broadcast_live_refreshes
+      broadcast_refresh_later_to "dashboard"
+      broadcast_refresh_later_to "sync_runs"
+    end
 
     def final_status(successes:, failures:, mismatches:)
       return "succeeded" if failures.zero? && mismatches.zero?

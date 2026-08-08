@@ -8,6 +8,8 @@ class ProxyRequest < ApplicationRecord
   scope :successful, -> { where(http_status: 200..399).where(error: [ nil, "" ]) }
   scope :failed, -> { where("http_status >= ? OR error IS NOT NULL AND error != ''", 400) }
 
+  after_commit :broadcast_dashboard_refresh, on: %i[create destroy], if: :failed?
+
   def successful?
     error.blank? && http_status.to_i.between?(200, 399)
   end
@@ -15,4 +17,10 @@ class ProxyRequest < ApplicationRecord
   def failed?
     !successful?
   end
+
+  private
+
+    def broadcast_dashboard_refresh
+      broadcast_refresh_later_to "dashboard"
+    end
 end

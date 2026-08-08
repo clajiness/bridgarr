@@ -38,7 +38,7 @@ RSpec.describe Sync::AssignmentSync do
     expect(result.sync_run).to eq(sync_run)
     expect(SyncRun.count).to eq(1)
     expect(SyncRunItem.count).to eq(1)
-    expect(enqueued_jobs).to be_empty
+    expect(Sync::IndexerAppJob).not_to have_been_enqueued
   end
 
   it "returns an active bulk sync item instead of creating an individual duplicate" do
@@ -52,7 +52,7 @@ RSpec.describe Sync::AssignmentSync do
     expect(result.sync_run).to eq(sync_run)
     expect(SyncRun.count).to eq(1)
     expect(SyncRunItem.count).to eq(1)
-    expect(enqueued_jobs).to be_empty
+    expect(Sync::IndexerAppJob).not_to have_been_enqueued
   end
 
   def create_assignment

@@ -67,4 +67,15 @@ RSpec.describe Jackett::InventoryReconciler do
 
     expect(indexer.reload.jackett_missing_since).to eq(first_missing_at)
   end
+
+  it "broadcasts bulk missing-state changes that bypass model callbacks" do
+    Indexer.create!(name: "Missing", jackett_id: "missing")
+    allow(Turbo::StreamsChannel).to receive(:broadcast_refresh_later_to)
+
+    described_class.call(records: [])
+
+    %w[dashboard readiness indexers assignment_matrix].each do |stream|
+      expect(Turbo::StreamsChannel).to have_received(:broadcast_refresh_later_to).with(stream)
+    end
+  end
 end

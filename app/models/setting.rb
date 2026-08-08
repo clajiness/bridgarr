@@ -14,9 +14,17 @@ class Setting < ApplicationRecord
   HEALTH_CHECKS_LAST_COMPLETED_AT_KEY = "health_checks.last_completed_at"
   HEALTH_CHECKS_LAST_DURATION_MS_KEY = "health_checks.last_duration_ms"
   HEALTH_CHECKS_LAST_ERROR_KEY = "health_checks.last_error"
+  READINESS_KEYS = [
+    BRIDGARR_BASE_URL_KEY,
+    JACKETT_BASE_URL_KEY,
+    JACKETT_API_KEY_KEY,
+    JACKETT_LAST_STATUS_KEY
+  ].freeze
 
   validates :key, presence: true, uniqueness: true
   validate :proxy_api_key_is_not_the_known_legacy_value
+
+  after_commit :broadcast_live_refreshes
 
   def self.fetch_value(key)
     find_by(key: key)&.value.to_s
@@ -111,6 +119,20 @@ class Setting < ApplicationRecord
   end
 
   private
+
+    def broadcast_live_refreshes
+      broadcast_refresh_later_to "dashboard"
+      broadcast_refresh_later_to "readiness" if key.in?(READINESS_KEYS)
+      broadcast_refresh_later_to "health" if health_setting?
+      if key.in?([ PROXY_API_KEY_VERSION_KEY, JACKETT_API_KEY_VERSION_KEY ])
+        broadcast_refresh_later_to "assignment_matrix"
+      end
+    end
+
+    def health_setting?
+      key.start_with?("health_checks.") ||
+        (key.start_with?("jackett.") && key != JACKETT_API_KEY_VERSION_KEY)
+    end
 
     def proxy_api_key_is_not_the_known_legacy_value
       return unless key == PROXY_API_KEY_KEY && value == "bridgarr"
