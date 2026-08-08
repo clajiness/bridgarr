@@ -35,6 +35,16 @@ module SyncRunsHelper
     error_kind.to_s.tr("_", " ").presence&.titleize
   end
 
+  def sync_run_item_attempt_label(sync_run_item)
+    return if sync_run_item.attempt_count.zero?
+
+    if sync_run_item.running? || sync_run_item.retrying? || sync_run_item.retryable?
+      "Attempt #{sync_run_item.attempt_count} of #{sync_run_item.max_attempts}"
+    else
+      pluralize(sync_run_item.attempt_count, "attempt")
+    end
+  end
+
   def sync_error_summary(sync_run_item)
     return "No error details were recorded." if sync_run_item.error.blank?
 

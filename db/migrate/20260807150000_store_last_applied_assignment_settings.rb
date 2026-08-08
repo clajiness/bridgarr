@@ -12,21 +12,13 @@ class StoreLastAppliedAssignmentSettings < ActiveRecord::Migration[8.1]
       .where.not(last_applied_at: nil)
       .where(last_applied_settings: nil)
       .find_each do |assignment|
-        search_mode_settings = if assignment.has_attribute?("enabled")
-          { "enabled" => assignment.enabled }
-        else
-          {
-            "enable_rss" => assignment.enable_rss,
-            "enable_automatic_search" => assignment.enable_automatic_search,
-            "enable_interactive_search" => assignment.enable_interactive_search
-          }
-        end
         assignment.update_columns(
-          last_applied_settings: search_mode_settings.merge(
+          last_applied_settings: {
+            "enabled" => assignment.enabled,
             "connection_mode" => assignment.connection_mode,
             "category_mode" => assignment.category_mode,
             "custom_categories" => assignment.custom_categories
-          )
+          }
         )
       end
   end

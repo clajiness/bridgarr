@@ -53,18 +53,27 @@ module Sync
       IndexerApp.transaction do
         cells.each do |indexer_id, arr_app_id|
           assignment = IndexerApp.find_by(indexer_id:, arr_app_id:)
-          next unless action == "create" || assignment
+          if action == "create"
+            next if assignment
 
-          assignment ||= IndexerApp.new(indexer_id:, arr_app_id:)
+            assignment = IndexerApp.new(indexer_id:, arr_app_id:)
+          else
+            next unless assignment
+          end
+
           assignment.update!(attributes)
           changed_count += 1
         end
       end
 
+      if changed_count.zero? && action != "create"
+        return failure("The selected cells do not have assignments yet. Create them before updating their settings.")
+      end
+
       Result.new(
         success?: true,
         changed_count:,
-        message: "Updated #{changed_count} matrix #{'cell'.pluralize(changed_count)}.",
+        message: success_message(changed_count),
         error: nil
       )
     rescue ActiveRecord::RecordInvalid => e
@@ -96,6 +105,16 @@ module Sync
       def failure(message)
         message = Secrets::Redactor.call(message)
         Result.new(success?: false, changed_count: 0, message:, error: message)
+      end
+
+      def success_message(changed_count)
+        if action == "create"
+          return "No assignments were created because every selected cell is already assigned." if changed_count.zero?
+
+          "Created #{changed_count} #{'assignment'.pluralize(changed_count)}."
+        else
+          "Updated #{changed_count} #{'assignment'.pluralize(changed_count)}."
+        end
       end
   end
 end

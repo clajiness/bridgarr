@@ -43,6 +43,19 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("LimeTorrents")
     expect(response.body).to include("Main Radarr")
     expect(response.body).to include("RSS on", "Automatic on", "Interactive on")
+    expect(response.body).to include('data-controller="bulk-actions"')
+    expect(response.body).to include("0 cells selected", "Choose a bulk action")
+    expect(response.body).not_to include("Apply to selected")
+
+    document = Nokogiri::HTML(response.body)
+    bulk_form = document.at_css('form[action="/indexer_apps/bulk_update"]')
+    search_modes_panel = bulk_form.at_css('[data-bulk-action="search_modes"]')
+    categories_panel = bulk_form.at_css('[data-bulk-action="categories"]')
+    submit_button = bulk_form.at_css('[data-bulk-actions-target="submit"]')
+    expect(search_modes_panel.key?("hidden")).to be(true)
+    expect(categories_panel.key?("hidden")).to be(true)
+    expect(submit_button.name).to eq("button")
+    expect(submit_button["disabled"]).to eq("disabled")
   end
 
   it "paginates assignment matrix rows" do
@@ -63,6 +76,8 @@ RSpec.describe "Indexer app assignments", type: :request do
     bulk_form = document.at_css('form[action="/indexer_apps/bulk_update"]')
     expect(bulk_form.at_css('input[name="page"]')["value"]).to eq("2")
     expect(bulk_form.at_css('input[name="per_page"]')["value"]).to eq("10")
+    pagination_form = document.at_css('form[data-controller="autosubmit"]')
+    expect(pagination_form.at_css('select[name="per_page"]')["data-action"]).to eq("change->autosubmit#submit")
   end
 
   it "updates assignment category settings" do
@@ -120,12 +135,44 @@ RSpec.describe "Indexer app assignments", type: :request do
       enable_interactive_search: "enable"
     }
 
-    expect(response).to redirect_to(indexer_apps_path)
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to include("Updated 1 assignment", "Review the reconciliation preview")
     expect(assignment.reload).to have_attributes(
       enable_rss: false,
       enable_automatic_search: true,
       enable_interactive_search: true
     )
+  end
+
+  it "updates and previews only assigned cells from a mixed selection" do
+    unassigned_indexer = Indexer.create!(name: "Unassigned", jackett_id: "unassigned")
+    assignment
+
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}", "#{unassigned_indexer.id}:#{arr_app.id}" ],
+      bulk_action: "search_modes",
+      enable_rss: "disable",
+      enable_automatic_search: "keep",
+      enable_interactive_search: "keep"
+    }
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to include("Updated 1 assignment")
+    expect(assignment.reload).not_to be_enable_rss
+    expect(IndexerApp.find_by(indexer: unassigned_indexer, arr_app:)).to be_nil
+  end
+
+  it "does not claim an existing assignment was created" do
+    assignment
+
+    post bulk_update_indexer_apps_path, params: {
+      cells: [ "#{indexer.id}:#{arr_app.id}" ],
+      bulk_action: "create"
+    }
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(flash[:notice]).to include("No assignments were created", "already assigned")
+    expect(IndexerApp.where(indexer:, arr_app:).count).to eq(1)
   end
 
   it "does not preview every assignment when only unassigned cells were selected" do

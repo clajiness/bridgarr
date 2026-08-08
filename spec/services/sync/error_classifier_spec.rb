@@ -60,4 +60,18 @@ RSpec.describe Sync::ErrorClassifier do
     expect(result.summary).to eq("The anti-bot challenge solver could not complete the indexer request before the validation timeout.")
     expect(result).to be_retryable
   end
+
+  it "classifies a destination SQLite lock as retryable" do
+    result = described_class.call("Lidarr returned HTTP 500 while trying to update an indexer. database is locked")
+
+    expect(result.kind).to eq("destination_database_busy")
+    expect(result.summary).to eq("The destination Arr application's database was temporarily busy.")
+    expect(result.recommendation).to include("destination application becomes idle", "competing app instances")
+    expect(result).to be_retryable
+  end
+
+  it "recognizes SQLite busy and locked result names" do
+    expect(described_class.call("SQLITE_BUSY_TIMEOUT").kind).to eq("destination_database_busy")
+    expect(described_class.call("SQLITE_LOCKED_SHAREDCACHE").kind).to eq("destination_database_busy")
+  end
 end
