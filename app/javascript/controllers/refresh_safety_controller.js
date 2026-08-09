@@ -4,16 +4,34 @@ import { Controller } from "@hotwired/stimulus"
 // been submitted. Normal visits and form responses are unaffected.
 export default class extends Controller {
   connect() {
+    document.addEventListener("turbo:before-fetch-response", this.noteFormResponse)
+    document.addEventListener("turbo:render", this.clearFormResponse)
     this.element.addEventListener("turbo:before-morph-element", this.preserveInteractiveRegion)
     this.element.addEventListener("turbo:before-morph-attribute", this.preserveDisclosureState)
   }
 
   disconnect() {
+    document.removeEventListener("turbo:before-fetch-response", this.noteFormResponse)
+    document.removeEventListener("turbo:render", this.clearFormResponse)
     this.element.removeEventListener("turbo:before-morph-element", this.preserveInteractiveRegion)
     this.element.removeEventListener("turbo:before-morph-attribute", this.preserveDisclosureState)
   }
 
+  noteFormResponse = (event) => {
+    if (event.target instanceof HTMLFormElement && event.detail.fetchResponse.isHTML) {
+      this.formResponsePending = true
+    }
+  }
+
+  clearFormResponse = () => {
+    this.formResponsePending = false
+  }
+
   preserveInteractiveRegion = (event) => {
+    // A same-page form redirect is rendered as a morph. It must be allowed to
+    // replace the submitted page even when its submit button still has focus.
+    if (this.formResponsePending) return
+
     const region = event.target
     if (!(region instanceof Element)) return
 
@@ -23,6 +41,8 @@ export default class extends Controller {
   }
 
   preserveDisclosureState = (event) => {
+    if (this.formResponsePending) return
+
     if (event.target instanceof HTMLDetailsElement && event.detail.attributeName === "open") {
       event.preventDefault()
     }
