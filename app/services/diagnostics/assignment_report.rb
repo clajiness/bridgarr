@@ -1,11 +1,12 @@
 module Diagnostics
   class AssignmentReport
-    def self.call(indexer_app:)
-      new(indexer_app:).call
+    def self.call(indexer_app:, sync_run_item: nil)
+      new(indexer_app:, sync_run_item:).call
     end
 
-    def initialize(indexer_app:)
+    def initialize(indexer_app:, sync_run_item: nil)
       @indexer_app = indexer_app
+      @sync_run_item = sync_run_item if sync_run_item&.indexer_app_id == indexer_app.id
     end
 
     def call
@@ -42,41 +43,71 @@ module Diagnostics
 
     private
 
-      attr_reader :indexer_app
+      attr_reader :indexer_app, :sync_run_item
 
       def build_info
         @build_info ||= Bridgarr::BuildInfo.current
       end
 
       def append_error(lines)
-        return if indexer_app.last_error.blank?
+        error = sync_run_item ? sync_run_item.error : indexer_app.last_error
+        return if error.blank?
 
-        classification = Sync::ErrorClassifier.call(indexer_app.last_error, skipped: indexer_app.last_status == "skipped")
+        skipped = sync_run_item ? sync_run_item.skipped? : indexer_app.last_status == "skipped"
+        classification = Sync::ErrorClassifier.call(error, skipped:)
         lines.concat(
           [
             "",
             "Failure kind: #{classification.kind}",
             "Summary: #{classification.summary}",
             "Recommended action: #{classification.recommendation}",
-            "Technical detail: #{indexer_app.last_error}"
+            "Technical detail: #{error}"
           ]
         )
       end
 
       def append_recent_job(lines)
-        item = indexer_app.sync_run_items.order(created_at: :desc).first
+        item = sync_run_item || indexer_app.sync_run_items.order(created_at: :desc, id: :desc).first
         return unless item
 
+        job_label = sync_run_item ? "Selected job" : "Recent job"
         lines.concat(
           [
             "",
-            "Recent job status: #{item.status}",
-            "Recent job action: #{item.planned_action.presence || 'legacy sync'}",
-            "Recent job attempts: #{item.attempt_count}/#{item.max_attempts}",
-            "Recent job error kind: #{item.error_kind.presence || 'none'}",
-            "Recent job error: #{item.error.presence || 'none'}"
+            "#{job_label} status: #{item.status}",
+            "#{job_label} action: #{item.planned_action.presence || 'legacy sync'}",
+            "#{job_label} attempts: #{item.attempt_count}/#{item.max_attempts}",
+            "#{job_label} error kind: #{item.error_kind.presence || 'none'}",
+            "#{job_label} error: #{item.error.presence || 'none'}"
           ]
         )
+        append_category_evidence(lines, item.category_evidence)
+      end
+
+      def append_category_evidence(lines, evidence)
+        return unless evidence.is_a?(Hash)
+
+        evidence = evidence.stringify_keys
+        lines.concat(
+          [
+            "Category mode at attempt: #{evidence['category_mode'].presence || 'unknown'}",
+            "Categories submitted: #{category_ids(evidence['selected_category_ids'])}",
+            "Anime categories submitted: #{category_ids(evidence['selected_anime_category_ids'])}",
+            "Jackett categories advertised: #{category_ids(evidence['jackett_category_ids'], fallback: jackett_category_fallback(evidence))}",
+            "Application default categories: #{category_ids(evidence['arr_default_category_ids'])}",
+            "Application default anime categories: #{category_ids(evidence['arr_default_anime_category_ids'])}",
+            "Used app root fallback: #{evidence['root_fallback'] == true}"
+          ]
+        )
+      end
+
+      def category_ids(value, fallback: "none")
+        ids = Array(value).filter_map { |id| Integer(id, exception: false) }.select(&:positive?).uniq
+        ids.any? ? ids.join(",") : fallback
+      end
+
+      def jackett_category_fallback(evidence)
+        evidence["jackett_categories_checked"] == true ? "none" : "not checked"
       end
 
       def sanitized_url(value)

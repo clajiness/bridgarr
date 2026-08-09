@@ -1,6 +1,6 @@
 module Sync
   class IndexerAppSync
-    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, :action, :desired_digest, keyword_init: true)
+    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, :action, :desired_digest, :category_evidence, keyword_init: true)
 
     REMOTE_NAME_SUFFIX = " (Bridgarr)"
 
@@ -40,12 +40,13 @@ module Sync
           result.remote_indexer_id,
           result.message,
           result.respond_to?(:action) ? result.action : nil,
-          result.respond_to?(:desired_digest) ? result.desired_digest : nil
+          result.respond_to?(:desired_digest) ? result.desired_digest : nil,
+          category_evidence_for(result)
         ))
       elsif result.skipped?
-        record(skipped(result.message))
+        record(skipped(result.message, category_evidence: category_evidence_for(result)))
       else
-        record(failure(result.message))
+        record(failure(result.message, category_evidence: category_evidence_for(result)))
       end
     end
 
@@ -60,7 +61,7 @@ module Sync
         result
       end
 
-      def success(remote_indexer_id, client_message, client_action, desired_digest)
+      def success(remote_indexer_id, client_message, client_action, desired_digest, category_evidence)
         Result.new(
           success?: true,
           skipped?: false,
@@ -68,16 +69,21 @@ module Sync
           message: success_message(client_message),
           error: nil,
           action: client_action,
-          desired_digest:
+          desired_digest:,
+          category_evidence:
         )
       end
 
-      def skipped(message)
-        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, action: nil)
+      def skipped(message, category_evidence: nil)
+        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, action: nil, category_evidence:)
       end
 
-      def failure(message)
-        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, action: nil)
+      def failure(message, category_evidence: nil)
+        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, action: nil, category_evidence:)
+      end
+
+      def category_evidence_for(result)
+        result.category_evidence if result.respond_to?(:category_evidence)
       end
 
       def remote_indexer_name

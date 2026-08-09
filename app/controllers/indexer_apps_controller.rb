@@ -189,8 +189,12 @@ class IndexerAppsController < ApplicationController
   end
 
   def diagnostic
+    sync_run_item = if params[:sync_run_item_id].present?
+      @indexer_app.sync_run_items.find(params.expect(:sync_run_item_id))
+    end
+
     send_data(
-      Diagnostics::AssignmentReport.call(indexer_app: @indexer_app),
+      Diagnostics::AssignmentReport.call(indexer_app: @indexer_app, sync_run_item:),
       filename: "bridgarr-assignment-#{@indexer_app.id}-diagnostic.txt",
       type: "text/plain",
       disposition: "inline"

@@ -1292,5 +1292,15 @@ RSpec.describe Arr::GenericTorznabClient do
     expect(result.message).to eq(
       "Main Sonarr returned HTTP 400 while trying to create Generic Torznab indexer. BaseUrl: Unable to connect to indexer."
     )
+    expect(result.category_evidence).to eq(
+      category_mode: "auto",
+      selected_category_ids: [ 5030, 5040 ],
+      selected_anime_category_ids: [],
+      jackett_category_ids: [ 2000, 5000, 5030, 5040, 5070 ],
+      jackett_categories_checked: true,
+      arr_default_category_ids: [ 5030, 5040 ],
+      arr_default_anime_category_ids: [],
+      root_fallback: false
+    )
   end
 end

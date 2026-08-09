@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_08_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_09_100000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key", null: false
     t.string "app_type", null: false
@@ -109,6 +109,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_100000) do
   create_table "sync_run_items", force: :cascade do |t|
     t.string "arr_app_name"
     t.integer "attempt_count", default: 0, null: false
+    t.json "category_evidence"
     t.datetime "created_at", null: false
     t.text "error"
     t.string "error_kind"

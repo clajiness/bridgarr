@@ -32,8 +32,12 @@
         <p class="mb-1 text-xs font-semibold uppercase tracking-normal text-slate-500"><%= sync_error_kind_label(sync_run_item.error_kind) %></p>
       <% end %>
       <p class="text-sm leading-6 [overflow-wrap:anywhere]"><%= sync_error_summary(sync_run_item) %></p>
-      <p class="mt-1 text-xs leading-5 text-slate-600"><%= sync_error_recommendation(sync_run_item) %></p>
-      <% if sync_run_item.indexer_app.present? %><div class="mt-2"><%= render "indexer_apps/diagnostic_button", assignment: sync_run_item.indexer_app %></div><% end %>
+      <% if sync_run_item.mismatched? %>
+        <%= render "sync_runs/category_mismatch_guidance", sync_run_item: %>
+      <% else %>
+        <p class="mt-1 text-xs leading-5 text-slate-600"><%= sync_error_recommendation(sync_run_item) %></p>
+      <% end %>
+      <% if sync_run_item.indexer_app.present? %><div class="mt-2"><%= render "indexer_apps/diagnostic_button", assignment: sync_run_item.indexer_app, sync_run_item: %></div><% end %>
       <% if sync_run_item.retrying? && sync_run_item.next_retry_at.present? %>
         <p class="mt-1 text-xs leading-5 text-blue-700">Retry scheduled for <%= format_server_timestamp(sync_run_item.next_retry_at) %>.</p>
       <% end %>
