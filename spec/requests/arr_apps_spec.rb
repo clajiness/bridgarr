@@ -78,6 +78,10 @@ RSpec.describe "Arr apps", type: :request do
     expect(response.body).to include("Test connection")
     expect(response.body).to include("Assigned indexers")
     expect(response.body).to include("No indexers assigned to this app yet.")
+    expect(response.body).to include("Remove app from Bridgarr")
+    document = Nokogiri::HTML(response.body)
+    removal_form = document.at_css("form[action='#{arr_app_path(arr_app)}']")
+    expect(removal_form["data-turbo-confirm"]).to include("Managed indexers already in the app will not be removed")
   end
 
   it "shows assigned indexers on the app page" do
@@ -105,6 +109,19 @@ RSpec.describe "Arr apps", type: :request do
     expect(response.body).to include(sync_indexer_app_path(assignment))
     expect(response.body).to include("return_to")
     expect(response.body).to include("arr_app")
+  end
+
+  it "replaces sync with source guidance for an indexer missing from Jackett" do
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv", jackett_state: "missing")
+    assignment = IndexerApp.create!(arr_app:, indexer:, remote_indexer_id: 42, last_status: "ok")
+
+    get arr_app_path(arr_app)
+
+    expect(response).to have_http_status(:ok)
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css("form[action='#{sync_indexer_app_path(assignment)}']")).to be_nil
+    review_link = document.css("a").find { |link| link.text.strip == "Review source" }
+    expect(review_link["href"]).to eq(indexer_path(indexer))
   end
 
   it "paginates assigned indexers on the app page" do
@@ -215,6 +232,53 @@ RSpec.describe "Arr apps", type: :request do
     expect(arr_app.reload.last_status).to eq("error")
   end
 
+  it "continues testing other apps when one connection test raises unexpectedly" do
+    arr_app
+    radarr = ArrApp.create!(
+      name: "Main Radarr",
+      app_type: "radarr",
+      base_url: "http://localhost:7878",
+      api_key: "radarr-api-key"
+    )
+    success = Arr::ConnectionTest::Result.new(
+      success?: true,
+      message: "Sonarr connection works.",
+      error: nil,
+      http_status: 200,
+      app_name: "Sonarr",
+      version: "4.0.0"
+    )
+    allow(Arr::ConnectionTest).to receive(:call) do |base_url:, **|
+      raise "unexpected api-key=radarr-secret" if base_url.include?("7878")
+
+      success
+    end
+
+    post test_connections_arr_apps_path
+
+    expect(response).to redirect_to(arr_apps_path)
+    expect(flash[:notice]).to eq("1 app connected, 1 failed.")
+    expect(arr_app.reload.last_status).to eq("ok")
+    expect(radarr.reload).to have_attributes(
+      last_status: "error",
+      last_error: "Unexpected connection-test failure: unexpected api-key=[REDACTED]"
+    )
+  end
+
+  it "records and reports an unexpected individual connection-test failure" do
+    arr_app
+    allow(Arr::ConnectionTest).to receive(:call).and_raise(StandardError, "unexpected token=secret-value")
+
+    post test_connection_arr_app_path(arr_app)
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(flash[:alert]).to eq("Unexpected connection-test failure: unexpected token=[REDACTED]")
+    expect(arr_app.reload).to have_attributes(
+      last_status: "error",
+      last_error: "Unexpected connection-test failure: unexpected token=[REDACTED]"
+    )
+  end
+
   it "shows failed app connection tests" do
     arr_app
     result = Arr::ConnectionTest::Result.new(
@@ -259,7 +323,11 @@ RSpec.describe "Arr apps", type: :request do
     get edit_arr_app_path(arr_app)
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Edit app")
+    expect(response.body).to include(
+      "Edit app",
+      "Indexers in the previous destination are left unchanged",
+      "does not disable or remove indexers already in the app"
+    )
   end
 
   it "updates an app" do
@@ -279,6 +347,46 @@ RSpec.describe "Arr apps", type: :request do
     expect(arr_app.reload.name).to eq("Updated Sonarr")
   end
 
+  it "explains when changing a destination clears managed remote associations" do
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:, remote_indexer_id: 42, last_status: "ok", last_synced_at: Time.current)
+
+    patch arr_app_path(arr_app), params: {
+      arr_app: {
+        name: arr_app.name,
+        app_type: arr_app.app_type,
+        base_url: "http://replacement-sonarr:8989",
+        api_key: arr_app.api_key,
+        enabled: arr_app.enabled
+      }
+    }
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(flash[:notice]).to include("Cleared 1 remote association", "previous destination were not changed", "reconnect them safely")
+    expect(assignment.reload).to have_attributes(remote_indexer_id: nil, last_plan_state: "create")
+  end
+
+  it "does not update app configuration while one of its assignments is syncing" do
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    patch arr_app_path(arr_app), params: {
+      arr_app: {
+        name: arr_app.name,
+        app_type: arr_app.app_type,
+        base_url: arr_app.base_url,
+        api_key: "replacement-key",
+        enabled: arr_app.enabled
+      }
+    }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include("Wait for active assignment syncs to finish before changing this app")
+    expect(arr_app.reload.api_key).to eq("sonarr-api-key")
+  end
+
   it "destroys an app" do
     arr_app
 
@@ -287,5 +395,22 @@ RSpec.describe "Arr apps", type: :request do
     }.to change(ArrApp, :count).by(-1)
 
     expect(response).to redirect_to(arr_apps_path)
+    expect(flash[:notice]).to eq("App removed from Bridgarr. Existing indexers in the app were not changed.")
+  end
+
+  it "does not destroy an app while one of its assignments is syncing" do
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    expect {
+      delete arr_app_path(arr_app)
+    }.not_to change(ArrApp, :count)
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(flash[:alert]).to eq("Wait for active assignment syncs to finish before removing this app.")
+    expect(arr_app.reload).to be_persisted
+    expect(assignment.reload).to be_persisted
   end
 end

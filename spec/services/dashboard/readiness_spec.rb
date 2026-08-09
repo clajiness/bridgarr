@@ -37,6 +37,80 @@ RSpec.describe Dashboard::Readiness do
     expect(readiness.remaining_count).to eq(0)
   end
 
+  it "keeps ongoing app and indexer health out of setup readiness" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "ok")
+
+    arr_app = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-key",
+      enabled: true,
+      last_status: "error",
+      last_tested_at: Time.current
+    )
+    indexer = Indexer.create!(
+      name: "1337x",
+      jackett_id: "1337x",
+      enabled: true,
+      last_status: "error",
+      last_tested_at: Time.current
+    )
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 12,
+      last_status: "ok",
+      last_synced_at: Time.current
+    )
+
+    readiness = described_class.new
+
+    expect(readiness).to be_complete
+    expect(readiness.items.map(&:label)).not_to include("Application connections", "Indexer health")
+  end
+
+  it "does not require Jackett review for an indexer paused in Bridgarr" do
+    Indexer.create!(
+      name: "Paused source",
+      jackett_id: "paused-source",
+      enabled: false,
+      jackett_state: "missing"
+    )
+
+    expect(described_class.new.items.map(&:label)).not_to include("Jackett changes")
+  end
+
+  it "keeps a previously established Jackett connection ready during a later outage" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "error")
+    Indexer.create!(
+      name: "Previously imported",
+      jackett_id: "previously-imported",
+      enabled: true,
+      jackett_last_seen_at: Time.current
+    )
+
+    jackett_test = described_class.new.items.find { |item| item.label == "Jackett test" }
+
+    expect(jackett_test.complete).to be(true)
+    expect(jackett_test.description).to eq("Connect Bridgarr to Jackett at least once.")
+  end
+
+  it "does not treat a manually entered indexer as a successful Jackett connection" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "error")
+    Indexer.create!(name: "Manual", jackett_id: "manual", enabled: true)
+
+    jackett_test = described_class.new.items.find { |item| item.label == "Jackett test" }
+
+    expect(jackett_test.complete).to be(false)
+  end
+
   it "does not treat skipped assignments as blocking sync readiness" do
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")

@@ -61,12 +61,14 @@ module Jackett
         document = Nokogiri::XML(body) { |config| config.strict.nonet }
         raise Nokogiri::XML::SyntaxError, "missing indexers root" unless document.at_xpath("/indexers")
 
-        document.xpath("/indexers/indexer").filter_map do |indexer|
+        document.xpath("/indexers/indexer").map do |indexer|
           jackett_id = indexer["id"]
           name = indexer.at_xpath("title")&.text
           configured = ActiveModel::Type::Boolean.new.cast(indexer["configured"])
 
-          next if jackett_id.blank? || name.blank?
+          if jackett_id.blank? || name.blank?
+            raise Nokogiri::XML::SyntaxError, "incomplete indexer record"
+          end
 
           IndexerRecord.new(
             name:,

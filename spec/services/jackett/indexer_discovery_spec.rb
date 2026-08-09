@@ -52,7 +52,7 @@ RSpec.describe Jackett::IndexerDiscovery do
     expect(connection.params).to eq(t: "indexers", apikey: "jackett-api-key")
   end
 
-  it "keeps unconfigured indexers visible but ignores incomplete records" do
+  it "keeps unconfigured indexers visible" do
     connection = FakeIndexerConnection.new(
       DiscoveryResponse.new(
         status: 200,
@@ -62,7 +62,6 @@ RSpec.describe Jackett::IndexerDiscovery do
             <indexer id="first-indexer" configured="true">
               <title>First Indexer</title>
             </indexer>
-            <indexer id="missing-name" configured="true"></indexer>
             <indexer id="unconfigured" configured="false">
               <title>Unconfigured</title>
             </indexer>
@@ -79,6 +78,33 @@ RSpec.describe Jackett::IndexerDiscovery do
 
     expect(result.indexers.map(&:jackett_id)).to eq([ "first-indexer", "unconfigured" ])
     expect(result.indexers.last.configured).to be(false)
+  end
+
+  it "fails an incomplete inventory instead of returning a partial list" do
+    connection = FakeIndexerConnection.new(
+      DiscoveryResponse.new(
+        status: 200,
+        body: <<~XML
+          <?xml version="1.0" encoding="UTF-8"?>
+          <indexers>
+            <indexer id="first-indexer" configured="true">
+              <title>First Indexer</title>
+            </indexer>
+            <indexer id="missing-name" configured="true"></indexer>
+          </indexers>
+        XML
+      )
+    )
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      connection:
+    )
+
+    expect(result).not_to be_success
+    expect(result.indexers).to be_empty
+    expect(result.message).to eq("Jackett responded, but Bridgarr could not read the indexer list.")
   end
 
   it "fails when Jackett returns invalid XML" do

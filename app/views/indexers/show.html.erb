@@ -1,5 +1,6 @@
 <% content_for :title, "Showing indexer" %>
 <%= turbo_stream_from "indexers" %>
+<% jackett_availability = Jackett::IndexerAvailability.call(indexer: @indexer) %>
 
 <div class="max-w-4xl space-y-6">
   <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -13,6 +14,37 @@
       <%= link_to "Back", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
     </div>
   </div>
+
+  <% unless jackett_availability.available? %>
+    <% source_unverified = jackett_availability.state == "unverified" %>
+    <% source_heading = { "missing" => "Missing from Jackett", "unverified" => "Needs verification" }.fetch(jackett_availability.state, "Not configured in Jackett") %>
+    <section class="rounded-md border px-5 py-4 shadow-sm <%= source_unverified ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50" %>">
+      <h2 class="font-semibold <%= source_unverified ? "text-amber-950" : "text-red-950" %>"><%= source_heading %></h2>
+      <p class="mt-2 text-sm leading-6 <%= source_unverified ? "text-amber-900" : "text-red-900" %>"><%= jackett_availability.message %></p>
+      <p class="mt-2 text-sm leading-6 <%= source_unverified ? "text-amber-900" : "text-red-900" %>">
+        <% if source_unverified %>
+          Bridgarr cleared source details learned from the previous Jackett connection and paused syncing until this indexer ID is verified.
+        <% else %>
+          Bridgarr kept the assignments and managed destination entries so a temporary Jackett inventory change would not delete them automatically. Searches cannot succeed until the source is restored.
+        <% end %>
+      </p>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <%= link_to source_unverified ? "Discover indexers" : "Check Jackett again",
+          discover_indexers_path,
+          class: class_names(
+            "inline-flex items-center justify-center rounded-md border bg-white px-3 py-2 text-sm font-semibold",
+            source_unverified ? "border-amber-300 text-amber-900 hover:bg-amber-100" : "border-red-300 text-red-900 hover:bg-red-100"
+          ) %>
+        <% unless source_unverified %>
+          <%= button_to "Remove from Bridgarr and apps",
+            @indexer,
+            method: :delete,
+            class: "rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600",
+            form: { data: { turbo_confirm: "Remove this indexer from Bridgarr and remove every managed copy from its assigned apps?" } } %>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
 
   <%= render @indexer %>
 
@@ -164,6 +196,10 @@
                   <%= link_to "Settings", edit_indexer_app_path(assignment), class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
                   <% if active_sync_run_item.present? %>
                     <%= link_to "View sync", sync_run_path(active_sync_run_item.sync_run), class: "inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100" %>
+                  <% elsif !@indexer.enabled? || !assignment.arr_app.enabled? %>
+                    <span class="inline-flex items-center rounded-md border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-slate-500">Sync paused</span>
+                  <% elsif !jackett_availability.available? %>
+                    <span class="inline-flex items-center rounded-md border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-slate-500">Sync unavailable</span>
                   <% else %>
                     <%= button_to "Sync", sync_indexer_app_path(assignment), class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
                   <% end %>
@@ -187,7 +223,9 @@
     <% end %>
   </section>
 
-  <div class="border-t border-slate-200 pt-6">
-    <%= button_to "Remove indexer", @indexer, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", data: { turbo_confirm: "Remove this Bridgarr indexer? Any synced copies in assigned apps will be removed too." } %>
-  </div>
+  <% if jackett_availability.available? || jackett_availability.state == "unverified" %>
+    <div class="border-t border-slate-200 pt-6">
+      <%= button_to "Remove indexer", @indexer, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", form: { data: { turbo_confirm: "Remove this Bridgarr indexer? Any synced copies in assigned apps will be removed too." } } %>
+    </div>
+  <% end %>
 </div>

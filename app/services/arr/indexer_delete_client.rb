@@ -18,6 +18,7 @@ module Arr
 
       response = http.delete(routes.indexer(remote_indexer_id))
       return success(response.status) if response.success?
+      return success(response.status, message: "Managed indexer was already absent from #{arr_app.name}.") if response.status == 404
 
       failure("#{arr_app.name} returned HTTP #{response.status} while trying to remove managed indexer.", http_status: response.status)
     rescue Faraday::Error => e
@@ -37,8 +38,8 @@ module Arr
         end
       end
 
-      def success(http_status)
-        Result.new(success?: true, message: "Managed indexer removed from #{arr_app.name}.", error: nil, http_status:)
+      def success(http_status, message: "Managed indexer removed from #{arr_app.name}.")
+        Result.new(success?: true, message:, error: nil, http_status:)
       end
 
       def failure(message, http_status: nil)

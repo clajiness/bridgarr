@@ -47,4 +47,78 @@ RSpec.describe ArrApp, type: :model do
     expect(arr_app.last_error).to eq("Connection failed")
     expect(arr_app.last_tested_at).to eq(tested_at)
   end
+
+  it "clears remote associations when the destination identity changes" do
+    arr_app.save!
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      last_plan_state: "unchanged",
+      last_synced_at: Time.current,
+      last_applied_at: Time.current,
+      last_applied_digest: "applied",
+      last_applied_settings: { "connection_mode" => "direct" },
+      last_status: "ok"
+    )
+    arr_app.update_columns(
+      last_status: "ok",
+      last_error: nil,
+      last_tested_at: Time.current,
+      last_http_status: 200,
+      last_duration_ms: 25
+    )
+
+    arr_app.update!(base_url: "http://replacement-sonarr:8989")
+
+    expect(assignment.reload).to have_attributes(
+      remote_indexer_id: nil,
+      last_plan_state: "create",
+      last_synced_at: nil,
+      last_applied_at: nil,
+      last_applied_digest: nil,
+      last_applied_settings: nil,
+      last_status: nil
+    )
+    expect(arr_app.reload).to have_attributes(
+      last_status: nil,
+      last_error: nil,
+      last_tested_at: nil,
+      last_http_status: nil,
+      last_duration_ms: nil
+    )
+  end
+
+  it "clears stale connection evidence when the API key changes" do
+    arr_app.save!
+    arr_app.update_columns(
+      last_status: "ok",
+      last_tested_at: Time.current,
+      last_http_status: 200,
+      last_duration_ms: 25
+    )
+
+    arr_app.update!(api_key: "replacement-key")
+
+    expect(arr_app.reload).to have_attributes(
+      last_status: nil,
+      last_tested_at: nil,
+      last_http_status: nil,
+      last_duration_ms: nil
+    )
+  end
+
+  it "does not change app configuration while an assignment is actively syncing" do
+    arr_app.save!
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    expect(arr_app.update(api_key: "replacement-key")).to be(false)
+
+    expect(arr_app.errors.full_messages).to include("Wait for active assignment syncs to finish before changing this app.")
+    expect(arr_app.reload.api_key).to eq("sonarr-api-key")
+  end
 end

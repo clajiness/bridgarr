@@ -42,7 +42,14 @@ module Sync
         sync_run
       end
 
-      Sync::BulkSyncJob.perform_later(sync_run.id) if sync_run.total_count.positive?
+      if sync_run.total_count.positive?
+        begin
+          enqueued_job = Sync::BulkSyncJob.perform_later(sync_run.id)
+          raise ActiveJob::EnqueueError, "the queue adapter rejected the bulk sync" unless enqueued_job
+        rescue StandardError => e
+          sync_run.abandon!(message: "Could not queue bulk sync: #{e.message}")
+        end
+      end
       sync_run
     end
 

@@ -97,6 +97,23 @@ RSpec.describe Sync::DesiredStateReverter do
     expect(assignment.reload.category_mode).to eq("none")
   end
 
+  it "does not revert desired state while the assignment is actively syncing" do
+    assignment.update!(category_mode: "none")
+    item = plan_item(changes: [ { "field" => "categories" } ])
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    result = described_class.call(
+      plan: plan_for(item),
+      requests: { assignment.id => [ "categories" ] },
+      expected_digests: { assignment.id.to_s => "current-plan" }
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to include("active assignment sync")
+    expect(assignment.reload.category_mode).to eq("none")
+  end
+
   it "does not offer rollback without a trustworthy applied snapshot" do
     assignment.update_columns(last_applied_settings: nil, category_mode: "none")
     item = plan_item(changes: [ { "field" => "categories" } ])

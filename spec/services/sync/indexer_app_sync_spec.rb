@@ -177,6 +177,29 @@ RSpec.describe Sync::IndexerAppSync do
     expect(assignment.last_error).to eq("Jackett URL is missing.")
   end
 
+  it "does not call the Arr client for a source missing from Jackett" do
+    indexer.update!(jackett_state: "missing")
+    client = FakeGenericTorznabClient.new(nil)
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result).not_to be_success
+    expect(result.message).to include("missing from Jackett", "indexer ID eztv")
+    expect(client.calls).to be_empty
+    expect(assignment.reload).to have_attributes(last_status: "error", last_error: result.message)
+  end
+
+  it "does not call the Arr client for a source that is unconfigured in Jackett" do
+    indexer.update!(jackett_state: "disabled")
+    client = FakeGenericTorznabClient.new(nil)
+
+    result = described_class.call(indexer_app: assignment, client:)
+
+    expect(result).not_to be_success
+    expect(result.message).to include("not configured in Jackett")
+    expect(client.calls).to be_empty
+  end
+
   it "redacts sync failure details before persisting assignment state" do
     client = FakeGenericTorznabClient.new(
       FakeGenericTorznabClient::Result.new(

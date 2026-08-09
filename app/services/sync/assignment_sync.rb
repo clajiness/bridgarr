@@ -1,6 +1,8 @@
 module Sync
   class AssignmentSync
-    Result = Data.define(:sync_run, :created?)
+    Result = Struct.new(:sync_run, :created?, :error, keyword_init: true)
+
+    PREVIEW_REQUIRED_MESSAGE = "Assignments with disabled search modes must be previewed and explicitly confirmed before remote settings are changed."
 
     def self.call(indexer_app:)
       new(indexer_app:).call
@@ -20,6 +22,10 @@ module Sync
             existing_result = Result.new(sync_run: active_item.sync_run, created?: false)
             next
           end
+          unless indexer_app.all_search_modes_enabled?
+            existing_result = Result.new(sync_run: nil, created?: false, error: PREVIEW_REQUIRED_MESSAGE)
+            next
+          end
 
           sync_run = SyncRun.create!(mode: "assignment", status: "queued")
           sync_run.sync_run_items.create!(
@@ -34,7 +40,12 @@ module Sync
 
       return existing_result if existing_result.present?
 
-      Sync::IndexerAppJob.perform_later(sync_run.sync_run_items.first.id)
+      begin
+        enqueued_job = Sync::IndexerAppJob.perform_later(sync_run.sync_run_items.first.id)
+        raise ActiveJob::EnqueueError, "the queue adapter rejected the assignment sync" unless enqueued_job
+      rescue StandardError => e
+        sync_run.abandon!(message: "Could not queue assignment sync: #{e.message}")
+      end
 
       Result.new(sync_run:, created?: true)
     end

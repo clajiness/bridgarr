@@ -15,6 +15,7 @@ RSpec.describe "Status palette", type: :helper do
   it "uses green for confirmed successful outcomes" do
     healthy_dashboard = double(
       critical_attention?: false,
+      transient_service_degradation_only?: false,
       needs_attention?: false,
       latest_sync_run_active?: false,
       readiness: double(complete?: true),
@@ -39,12 +40,14 @@ RSpec.describe "Status palette", type: :helper do
   it "reserves amber for caution and pending work" do
     expect(status_helper.health_status_classes("stale")).to include("bg-amber-50")
     expect(status_helper.dashboard_assignment_status_classes("mismatch")).to include("bg-amber-50")
+    expect(status_helper.dashboard_assignment_status_classes("source_unverified")).to include("bg-amber-50")
     expect(status_helper.dashboard_assignment_status_classes("needs_apply")).to include("bg-amber-50")
     expect(status_helper.dashboard_assignment_status_classes("unsynced")).to include("bg-amber-50")
     expect(status_helper.queue_job_status_classes("queued")).to include("bg-amber-50")
     expect(status_helper.sync_run_status_classes("queued")).to include("bg-amber-50")
     expect(status_helper.assignment_status_classes(IndexerApp.new)).to include("bg-amber-50")
     expect(status_helper.jackett_state_classes("new")).to include("bg-amber-50")
+    expect(status_helper.jackett_state_classes("unverified")).to include("bg-amber-50")
     expect(status_helper.jackett_state_classes("renamed")).to include("bg-amber-50")
     expect(status_helper.jackett_state_classes("changed")).to include("bg-amber-50")
     expect(status_helper.assignment_error_classes(IndexerApp.new(last_status: "mismatch"))).to eq("text-amber-800")
@@ -65,10 +68,17 @@ RSpec.describe "Status palette", type: :helper do
   end
 
   it "distinguishes warning-only and critical dashboard attention" do
-    warning_dashboard = double(critical_attention?: false, needs_attention?: true)
+    warning_dashboard = double(critical_attention?: false, transient_service_degradation_only?: false, needs_attention?: true)
+    degraded_dashboard = double(
+      critical_attention?: false,
+      transient_service_degradation_only?: true,
+      latest_sync_run_active?: false,
+      readiness: double(complete?: true)
+    )
     critical_dashboard = double(critical_attention?: true)
 
     expect(status_helper.dashboard_operational_classes(warning_dashboard)).to include("border-amber-200", "bg-amber-50")
+    expect(status_helper.dashboard_operational_classes(degraded_dashboard)).to include("border-amber-200", "bg-amber-50")
     expect(status_helper.dashboard_operational_classes(critical_dashboard)).to include("border-red-200", "bg-red-50")
   end
 end

@@ -20,7 +20,7 @@
     <%= form.label :jackett_id, "Jackett Torznab URL or ID", class: "block text-sm font-medium text-slate-700" %>
     <%= form.text_field :jackett_id, placeholder: "http://localhost:9117/api/v2.0/indexers/nzbfinder/results/torznab/", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" %>
     <p class="mt-2 text-xs leading-5 text-slate-500">
-      Paste the Torznab feed URL from Jackett, or enter the indexer ID directly. Bridgarr stores only the indexer ID.
+      Paste the Torznab feed URL from Jackett, or enter the indexer ID directly. Bridgarr stores only the indexer ID. Changing it clears cached Jackett details and marks assignments for a fresh preview.
     </p>
   </div>
 
@@ -28,6 +28,9 @@
     <%= form.checkbox :enabled, class: "h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" %>
     <%= form.label :enabled, class: "text-sm font-medium text-slate-700" %>
   </div>
+  <p class="-mt-4 text-xs leading-5 text-slate-500">
+    Disabling this indexer pauses Bridgarr health checks and syncing. It does not disable or remove indexers already in destination apps.
+  </p>
 
   <fieldset class="space-y-3">
     <legend class="text-sm font-medium text-slate-700">Assigned apps</legend>

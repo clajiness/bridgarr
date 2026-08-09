@@ -106,6 +106,34 @@ RSpec.describe Dashboard::Overview do
     expect(dashboard.assignment_filter_counts.fetch("disabled")).to eq(1)
   end
 
+  it "treats a locally disabled indexer as paused even when its Jackett source is missing" do
+    indexer.update!(enabled: false, jackett_state: "missing")
+    assignment = IndexerApp.create!(arr_app:, indexer:)
+
+    dashboard = described_class.new
+    row = dashboard.assignment_rows.first
+
+    expect(row.assignment).to eq(assignment)
+    expect(row.status).to eq("disabled")
+    expect(row.detail).to eq("Indexer is disabled in Bridgarr. Enable it before syncing.")
+    expect(row).not_to be_attention
+    expect(dashboard.jackett_changes_count).to eq(0)
+    expect(dashboard).not_to be_critical_attention
+  end
+
+  it "reserves a missing Jackett source for critical attention when it blocks an active assignment" do
+    indexer.update!(jackett_state: "missing")
+
+    unassigned_dashboard = described_class.new
+    expect(unassigned_dashboard).to be_needs_attention
+    expect(unassigned_dashboard).not_to be_critical_attention
+
+    IndexerApp.create!(arr_app:, indexer:)
+    assigned_dashboard = described_class.new
+    expect(assigned_dashboard.assignment_rows.first.status).to eq("source_unavailable")
+    expect(assigned_dashboard).to be_critical_attention
+  end
+
   it "keeps invalid and drifted assignments distinct from disabled desired state" do
     invalid_assignment = IndexerApp.create!(
       arr_app:,

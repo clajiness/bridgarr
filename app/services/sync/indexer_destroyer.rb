@@ -9,29 +9,38 @@ module Sync
     def initialize(indexer:, delete_client:)
       @indexer = indexer
       @delete_client = delete_client
+      @removed_count = 0
     end
 
     def call
-      delete_remote_indexers.each do |result|
-        return failure(result.message) unless result.success?
+      return failure("Wait for active assignment syncs to finish before removing this indexer.") if active_assignment_syncs?
+
+      indexer.indexer_apps.includes(:arr_app).order(:id).each do |assignment|
+        assignment.with_lock do
+          return failure("Wait for active assignment syncs to finish before removing this indexer.") if assignment.active_sync?
+
+          if assignment.remote_indexer_id.present?
+            result = delete_client.call(arr_app: assignment.arr_app, remote_indexer_id: assignment.remote_indexer_id)
+            return failure(result.message) unless result.success?
+          end
+
+          assignment.destroy!
+          @removed_count += 1
+        end
       end
 
       indexer.destroy!
       success
+    rescue ActiveRecord::ActiveRecordError => e
+      failure("Could not finish removing the indexer: #{e.message}")
     end
 
     private
 
-      attr_reader :indexer, :delete_client
+      attr_reader :indexer, :delete_client, :removed_count
 
-      def delete_remote_indexers
-        synced_assignments.map do |assignment|
-          delete_client.call(arr_app: assignment.arr_app, remote_indexer_id: assignment.remote_indexer_id)
-        end
-      end
-
-      def synced_assignments
-        indexer.indexer_apps.includes(:arr_app).where.not(remote_indexer_id: nil)
+      def active_assignment_syncs?
+        indexer.indexer_apps.joins(:sync_run_items).merge(SyncRunItem.active).exists?
       end
 
       def success
@@ -39,6 +48,10 @@ module Sync
       end
 
       def failure(message)
+        message = Secrets::Redactor.call(message)
+        if removed_count.positive?
+          message = "Removed #{removed_count} #{'assignment'.pluralize(removed_count)} before cleanup stopped. #{message}"
+        end
         Result.new(success?: false, message:, error: message)
       end
   end

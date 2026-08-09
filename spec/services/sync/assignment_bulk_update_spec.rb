@@ -42,6 +42,25 @@ RSpec.describe Sync::AssignmentBulkUpdate do
     expect(assignment.reload).to have_attributes(category_mode: "custom", custom_categories: "2000,8000")
   end
 
+  it "rolls back bulk desired-state changes when a selected assignment is actively syncing" do
+    active_assignment = IndexerApp.create!(indexer:, arr_app:)
+    other_indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
+    other_assignment = IndexerApp.create!(indexer: other_indexer, arr_app:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: active_assignment, status: "running")
+
+    result = described_class.call(
+      cells: [ [ other_indexer.id, arr_app.id ], [ indexer.id, arr_app.id ] ],
+      action: "search_modes",
+      enable_rss: "disable"
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to include("active assignment sync")
+    expect(active_assignment.reload).to be_enable_rss
+    expect(other_assignment.reload).to be_enable_rss
+  end
+
   it "updates selected search modes while keeping the others unchanged" do
     assignment = IndexerApp.create!(indexer:, arr_app:, enable_interactive_search: false)
 

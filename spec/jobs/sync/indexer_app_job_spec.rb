@@ -56,6 +56,26 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
     expect(sync_run.reload).to have_attributes(status: "succeeded", success_count: 1, failure_count: 0, skipped_count: 0)
   end
 
+  it "does not run the same in-progress item twice when a job is delivered again" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(status: "running", started_at: Time.current, total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(
+      indexer_app:,
+      status: "running",
+      started_at: Time.current,
+      last_attempt_at: Time.current,
+      attempt_count: 1
+    )
+    allow(Sync::IndexerAppSync).to receive(:call)
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(Sync::IndexerAppSync).not_to have_received(:call)
+    expect(sync_run_item.reload).to have_attributes(status: "running", attempt_count: 1)
+  end
+
   it "rechecks a preview-backed plan immediately before mutation" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
     indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
@@ -118,6 +138,35 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
     expect(Sync::IndexerAppSync).not_to have_received(:call)
     expect(sync_run_item.reload).to have_attributes(status: "failed", planned_action: "create")
     expect(sync_run_item.error).to include("plan changed before the job started")
+    expect(sync_run.reload.status).to eq("failed")
+  end
+
+  it "explains when a previewed assignment source disappeared before the job started" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv", jackett_state: "missing")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(indexer_app:, plan_digest: "reviewed-plan", planned_action: "create")
+    source_message = "EZTV is missing from Jackett. Restore indexer ID eztv in Jackett or remove it from Bridgarr before syncing."
+    plan_item = Sync::Plan::Item.new(
+      indexer_app:,
+      state: "invalid",
+      remote_indexer_id: nil,
+      changes: [],
+      message: source_message,
+      desired_digest: nil,
+      remote_digest: nil,
+      plan_digest: "changed-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ plan_item ], generated_at: Time.current))
+    allow(Sync::PlanRecorder).to receive(:call)
+    allow(Sync::IndexerAppSync).to receive(:call)
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(Sync::IndexerAppSync).not_to have_received(:call)
+    expect(sync_run_item.reload).to have_attributes(status: "failed", error: source_message)
     expect(sync_run.reload.status).to eq("failed")
   end
 
@@ -246,6 +295,31 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
     expect(enqueued_indexer_app_jobs).to include(a_hash_including(job: described_class))
   end
 
+  it "fails terminally when a delayed retry cannot be queued" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "ExtraTorrent.st", jackett_id: "extratorrent-st")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(indexer_app:)
+    allow(Sync::IndexerAppSync).to receive(:call).and_raise(Faraday::TimeoutError, "execution expired")
+    configured_job = double("configured retry job")
+    allow(described_class).to receive(:set).and_return(configured_job)
+    allow(configured_job).to receive(:perform_later).and_return(false)
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(sync_run_item.reload).to have_attributes(
+      status: "failed",
+      attempt_count: 1,
+      error: "Could not queue assignment retry: the queue adapter rejected the assignment retry",
+      error_kind: "unknown",
+      retryable: false,
+      next_retry_at: nil
+    )
+    expect(sync_run.reload).to have_attributes(status: "failed", failure_count: 1)
+    expect(enqueued_indexer_app_jobs).to be_empty
+  end
+
   it "fails after the final retryable attempt without scheduling a third attempt" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
     indexer = Indexer.create!(name: "ExtraTorrent.st", jackett_id: "extratorrent-st")
@@ -363,6 +437,30 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
 
     expect(Sync::IndexerAppSync).not_to have_received(:call)
     expect(sync_run_item.reload.attempt_count).to eq(0)
+  end
+
+  it "does not overwrite an abandonment that happens while remote work is in progress" do
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
+    indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(total_count: 1)
+    sync_run_item = sync_run.sync_run_items.create!(indexer_app:)
+    success = Sync::IndexerAppSync::Result.new(
+      success?: true,
+      skipped?: false,
+      remote_indexer_id: 42,
+      message: "1337x synced to Sonarr.",
+      error: nil
+    )
+    allow(Sync::IndexerAppSync).to receive(:call) do
+      sync_run.abandon!(message: "Sync run was abandoned by the user.")
+      success
+    end
+
+    described_class.perform_now(sync_run_item.id)
+
+    expect(sync_run_item.reload).to have_attributes(status: "failed", error: "Sync run was abandoned by the user.")
+    expect(sync_run.reload).to have_attributes(status: "failed", failure_count: 1)
   end
 
   def enqueued_indexer_app_jobs

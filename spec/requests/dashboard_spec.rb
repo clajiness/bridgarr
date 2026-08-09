@@ -82,6 +82,10 @@ RSpec.describe "Dashboard", type: :request do
 
   it "distinguishes an in-sync assignment from failed indexer health" do
     checked_at = Time.current.change(usec: 0)
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "ok")
+    Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, checked_at.iso8601)
     arr_app = ArrApp.create!(
       name: "Radarr",
       app_type: "radarr",
@@ -102,6 +106,7 @@ RSpec.describe "Dashboard", type: :request do
       arr_app:,
       indexer:,
       remote_indexer_id: 42,
+      jackett_api_key_version: Setting.jackett_api_key_version,
       last_status: "ok",
       last_synced_at: checked_at,
       last_applied_at: checked_at
@@ -110,13 +115,136 @@ RSpec.describe "Dashboard", type: :request do
     get root_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Review 1 service")
+    expect(response.body).to include("Everything is tied together")
+    expect(response.body).not_to include("Review 1 service", "Needs attention")
     expect(response.body).to include("Assignment issues", "0")
     expect(response.body).to include("In sync", "Matches desired state")
     expect(response.body).to include("Failed", "Latest live search failed")
     expect(response.body).to include("Checked")
     expect(response.body).to include(health_path)
     expect(response.body).not_to include("Jackett returned HTTP 400")
+
+    document = Nokogiri::HTML(response.body)
+    operational_banner = document.at_xpath("//h2[normalize-space()='Everything is tied together']/ancestor::section[1]")
+    expect(operational_banner["class"]).to include("border-green-200", "bg-green-50")
+  end
+
+  it "uses an automatically retried warning for a transient core service failure" do
+    checked_at = Time.current.change(usec: 0)
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "error")
+    Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, checked_at.iso8601)
+    Setting.write_value(Setting::JACKETT_LAST_HTTP_STATUS_KEY, 503)
+    Setting.write_value(Setting::JACKETT_LAST_ERROR_KEY, "Service unavailable")
+    arr_app = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key",
+      enabled: true,
+      last_status: "ok",
+      last_tested_at: checked_at
+    )
+    indexer = Indexer.create!(
+      name: "1337x",
+      jackett_id: "1337x",
+      enabled: true,
+      jackett_last_seen_at: checked_at,
+      last_status: "ok",
+      last_tested_at: checked_at
+    )
+    IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      jackett_api_key_version: Setting.jackett_api_key_version,
+      last_status: "ok",
+      last_synced_at: checked_at,
+      last_applied_at: checked_at
+    )
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Bridgarr will check again")
+    expect(response.body).to include("1 service had a failed or stale health check")
+    expect(response.body).to include("No action is needed yet; Bridgarr will retry automatically")
+    expect(response.body).not_to include("Finish setup")
+
+    document = Nokogiri::HTML(response.body)
+    operational_banner = document.at_xpath("//h2[normalize-space()='Bridgarr will check again']/ancestor::section[1]")
+    expect(operational_banner["class"]).to include("border-amber-200", "bg-amber-50")
+    expect(operational_banner["class"]).not_to include("border-red-200", "bg-red-50")
+  end
+
+  it "keeps unfinished setup ahead of a retryable service failure" do
+    checked_at = Time.current.change(usec: 0)
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "error")
+    Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, checked_at.iso8601)
+    Setting.write_value(Setting::JACKETT_LAST_HTTP_STATUS_KEY, 503)
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Finish setup")
+    expect(response.body).not_to include("Bridgarr will check again", "No action is needed yet")
+  end
+
+  it "reserves the red banner for an actionable core service failure" do
+    checked_at = Time.current.change(usec: 0)
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "error")
+    Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, checked_at.iso8601)
+    Setting.write_value(Setting::JACKETT_LAST_HTTP_STATUS_KEY, 401)
+    Setting.write_value(Setting::JACKETT_LAST_ERROR_KEY, "Unauthorized")
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Needs attention", "Review 1 service")
+    expect(response.body).not_to include("No action is needed yet")
+
+    document = Nokogiri::HTML(response.body)
+    operational_banner = document.at_xpath("//h2[normalize-space()='Needs attention']/ancestor::section[1]")
+    expect(operational_banner["class"]).to include("border-red-200", "bg-red-50")
+  end
+
+  it "does not downgrade stale rejected credentials to an automatic retry" do
+    checked_at = 2.hours.ago.change(usec: 0)
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-key")
+    Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "error")
+    Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, checked_at.iso8601)
+    Setting.write_value(Setting::JACKETT_LAST_HTTP_STATUS_KEY, 401)
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Needs attention", "Review 1 service")
+    expect(response.body).not_to include("Bridgarr will check again", "No action is needed yet")
+
+    document = Nokogiri::HTML(response.body)
+    operational_banner = document.at_xpath("//h2[normalize-space()='Needs attention']/ancestor::section[1]")
+    expect(operational_banner["class"]).to include("border-red-200", "bg-red-50")
+  end
+
+  it "surfaces a failed health-check cycle as an amber operational warning" do
+    Setting.write_value(Setting::HEALTH_CHECKS_LAST_STARTED_AT_KEY, 10.minutes.ago.iso8601)
+    Setting.write_value(Setting::HEALTH_CHECKS_LAST_ERROR_KEY, "Unexpected health-check failure")
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Needs attention", "Review health check run")
+    expect(response.body).to include(health_path)
+    document = Nokogiri::HTML(response.body)
+    operational_banner = document.at_xpath("//h2[normalize-space()='Needs attention']/ancestor::section[1]")
+    expect(operational_banner["class"]).to include("border-amber-200", "bg-amber-50")
+    expect(operational_banner["class"]).not_to include("border-red-200", "bg-red-50")
   end
 
   it "links Jackett inventory changes to the indexer catalog" do
@@ -135,6 +263,66 @@ RSpec.describe "Dashboard", type: :request do
     readiness_link = readiness_document.css("a").find { |link| link.text.include?("Review Jackett changes") }
 
     expect(readiness_link["href"]).to eq(indexers_path)
+  end
+
+  it "treats a missing Jackett source as assignment attention instead of in sync" do
+    arr_app = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key",
+      last_status: "ok",
+      last_tested_at: Time.current
+    )
+    indexer = Indexer.create!(
+      name: "Missing Indexer",
+      jackett_id: "missing-indexer",
+      jackett_state: "missing",
+      last_status: "unknown",
+      last_tested_at: Time.current
+    )
+    assignment = IndexerApp.create!(
+      arr_app:,
+      indexer:,
+      remote_indexer_id: 42,
+      last_status: "ok",
+      last_synced_at: Time.current,
+      last_applied_at: Time.current
+    )
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Source unavailable", "missing from Jackett", "Review source")
+    expect(response.body).not_to include("Matches desired state")
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css("form[action='#{sync_indexer_app_path(assignment)}']")).to be_nil
+    expect(document.css("a").find { |link| link.text.strip == "Review source" }["href"]).to eq(indexer_path(indexer))
+  end
+
+  it "presents a source awaiting rediscovery as an amber assignment warning" do
+    arr_app = ArrApp.create!(
+      name: "Sonarr",
+      app_type: "sonarr",
+      base_url: "http://sonarr.example.test",
+      api_key: "sonarr-api-key"
+    )
+    indexer = Indexer.create!(
+      name: "Unverified Indexer",
+      jackett_id: "unverified-indexer",
+      jackett_state: "unverified"
+    )
+    assignment = IndexerApp.create!(arr_app:, indexer:, remote_indexer_id: 42, last_status: "ok", last_synced_at: Time.current)
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Needs verification", "not been verified", "Review source")
+    document = Nokogiri::HTML(response.body)
+    badge = document.css("span").find { |node| node.text.strip == "Needs verification" }
+    expect(badge["class"]).to include("border-amber-200", "bg-amber-50")
+    expect(badge["class"]).not_to include("border-red-200", "bg-red-50")
+    expect(document.at_css("form[action='#{sync_indexer_app_path(assignment)}']")).to be_nil
   end
 
   it "paginates filtered assignment rows" do

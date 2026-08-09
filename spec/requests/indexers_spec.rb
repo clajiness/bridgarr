@@ -254,6 +254,58 @@ RSpec.describe "Indexers", type: :request do
     expect(response.body).not_to include("Custom assignment settings:")
   end
 
+  it "explains how to restore or remove an indexer missing from Jackett" do
+    indexer.update!(jackett_state: "missing", jackett_missing_since: 1.hour.ago)
+
+    get indexer_path(indexer)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "Missing from Jackett",
+      "Restore indexer ID first-indexer in Jackett",
+      "Check Jackett again",
+      "Remove from Bridgarr and apps",
+      "Sync unavailable"
+    )
+    expect(response.body).to include(discover_indexers_path)
+    expect(response.body).not_to include(">Remove indexer<")
+    document = Nokogiri::HTML(response.body)
+    removal_form = document.at_css("form[action='#{indexer_path(indexer)}']")
+    expect(removal_form["data-turbo-confirm"]).to include("remove every managed copy")
+  end
+
+  it "explains how to restore an indexer that is no longer configured in Jackett" do
+    indexer.update!(jackett_state: "disabled")
+
+    get indexer_path(indexer)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "Not configured in Jackett",
+      "Configure it in Jackett",
+      "Remove from Bridgarr and apps"
+    )
+  end
+
+  it "presents an unverified source as a rediscovery warning rather than a failure" do
+    indexer.update!(jackett_state: "unverified")
+
+    get indexer_path(indexer)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "Needs verification",
+      "Discover indexers",
+      "paused syncing until this indexer ID is verified",
+      "Remove indexer"
+    )
+    expect(response.body).not_to include("Not configured in Jackett", "Remove from Bridgarr and apps")
+    document = Nokogiri::HTML(response.body)
+    warning = document.at_xpath("//h2[normalize-space()='Needs verification']/ancestor::section[1]")
+    expect(warning["class"]).to include("border-amber-200", "bg-amber-50")
+    expect(warning["class"]).not_to include("border-red-200", "bg-red-50")
+  end
+
   it "paginates app assignments on an indexer" do
     detail_indexer = Indexer.create!(name: "Many Apps", jackett_id: "many-apps")
     12.times do |app_index|
@@ -355,7 +407,11 @@ RSpec.describe "Indexers", type: :request do
     get edit_indexer_path(indexer)
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Edit indexer")
+    expect(response.body).to include(
+      "Edit indexer",
+      "Changing it clears cached Jackett details",
+      "does not disable or remove indexers already in destination apps"
+    )
   end
 
   it "updates an indexer and its assignments" do
@@ -378,11 +434,13 @@ RSpec.describe "Indexers", type: :request do
   it "removes assignments that already have sync run history" do
     indexer
     assignment = indexer.indexer_apps.first
-    sync_run = SyncRun.create!(total_count: 1)
+    sync_run = SyncRun.create!(status: "succeeded", total_count: 1, success_count: 1, finished_at: Time.current)
     sync_run_item = sync_run.sync_run_items.create!(
       indexer_app: assignment,
       indexer_name: indexer.name,
-      arr_app_name: arr_app.name
+      arr_app_name: arr_app.name,
+      status: "succeeded",
+      finished_at: Time.current
     )
 
     patch indexer_path(indexer), params: {

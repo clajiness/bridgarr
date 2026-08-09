@@ -103,7 +103,7 @@ RSpec.describe "Sync runs", type: :request do
     post abandon_sync_run_path(sync_run)
 
     expect(response).to redirect_to(sync_run_path(sync_run))
-    expect(flash[:notice]).to eq("Sync run abandoned.")
+    expect(flash[:notice]).to include("Sync run marked failed", "already in progress may still finish")
     expect(sync_run.reload).to have_attributes(status: "failed", error: "Sync run was abandoned by the user.")
   end
 
@@ -113,6 +113,7 @@ RSpec.describe "Sync runs", type: :request do
 
     get sync_run_path(active_run)
     expect(response.body).to include("Abandon run")
+    expect(response.body).to include("already in progress may still finish")
 
     get sync_run_path(finished_run)
     expect(response.body).not_to include("Abandon run")

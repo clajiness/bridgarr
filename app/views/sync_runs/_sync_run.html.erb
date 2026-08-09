@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
     <h2 class="text-base font-semibold text-slate-950">Run summary</h2>
     <% unless sync_run.complete? %>
-      <%= button_to "Abandon run", abandon_sync_run_path(sync_run), class: "inline-flex w-fit items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50", data: { turbo_confirm: "Mark this unfinished sync run as failed?" } %>
+      <%= button_to "Abandon run", abandon_sync_run_path(sync_run), class: "inline-flex w-fit items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50", data: { turbo_confirm: "Mark this unfinished sync run as failed? A request already in progress may still finish in the destination." } %>
     <% end %>
   </div>
 

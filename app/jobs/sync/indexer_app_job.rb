@@ -29,7 +29,7 @@ module Sync
       sync_run.mark_running!
       return record_missing_assignment(sync_run_item) if sync_run_item.indexer_app.blank?
 
-      sync_run_item.mark_running!
+      return unless sync_run_item.mark_running!
       log_sync_event(
         "Starting indexer app sync",
         sync_run_item:,
@@ -77,14 +77,18 @@ module Sync
         message = "Assignment was removed before sync."
         classification = Sync::ErrorClassifier.call(message)
 
-        sync_run_item.update!(
-          status: "failed",
-          finished_at: Time.current,
-          error: message,
-          error_kind: classification.kind,
-          retryable: classification.retryable?,
-          next_retry_at: nil
-        )
+        sync_run_item.with_lock do
+          next if sync_run_item.terminal?
+
+          sync_run_item.update!(
+            status: "failed",
+            finished_at: Time.current,
+            error: message,
+            error_kind: classification.kind,
+            retryable: classification.retryable?,
+            next_retry_at: nil
+          )
+        end
       end
 
       def record_result(sync_run_item, result)
@@ -107,7 +111,7 @@ module Sync
         item = plan.items.find { |candidate| candidate.indexer_app.id == sync_run_item.indexer_app_id }
         return "The reviewed assignment no longer exists." unless item
         return if ActiveSupport::SecurityUtils.secure_compare(sync_run_item.plan_digest, item.plan_digest)
-        return item.message if item.state == "unreachable"
+        return item.message if item.state.in?(%w[unreachable invalid])
 
         "The reconciliation plan changed before the job started. Review and apply the refreshed plan."
       end
@@ -121,14 +125,18 @@ module Sync
         if should_retry?(sync_run_item, classification)
           schedule_retry(sync_run_item, error:, classification:)
         else
-          sync_run_item.update!(
-            status: "failed",
-            finished_at: Time.current,
-            error:,
-            error_kind: classification.kind,
-            retryable: classification.retryable?,
-            next_retry_at: nil
-          )
+          sync_run_item.with_lock do
+            next if sync_run_item.terminal?
+
+            sync_run_item.update!(
+              status: "failed",
+              finished_at: Time.current,
+              error:,
+              error_kind: classification.kind,
+              retryable: classification.retryable?,
+              next_retry_at: nil
+            )
+          end
         end
       end
 
@@ -139,11 +147,12 @@ module Sync
       def schedule_retry(sync_run_item, error:, classification:)
         retry_at = Time.current + RETRY_DELAY
 
-        sync_run_item.record_retry!(
+        recorded = sync_run_item.record_retry!(
           error:,
           classification:,
           next_retry_at: retry_at
         )
+        return unless recorded
 
         log_sync_event(
           "Scheduled sync retry",
@@ -154,7 +163,29 @@ module Sync
           error_kind: classification.kind
         )
 
-        self.class.set(wait_until: retry_at).perform_later(sync_run_item.id)
+        begin
+          enqueued_job = self.class.set(wait_until: retry_at).perform_later(sync_run_item.id)
+          raise ActiveJob::EnqueueError, "the queue adapter rejected the assignment retry" unless enqueued_job
+        rescue StandardError => e
+          record_retry_enqueue_failure(sync_run_item, e)
+        end
+      end
+
+      def record_retry_enqueue_failure(sync_run_item, exception)
+        error = Secrets::Redactor.call("Could not queue assignment retry: #{exception.message}")
+        sync_run_item.with_lock do
+          return if sync_run_item.terminal?
+
+          sync_run_item.update!(
+            status: "failed",
+            finished_at: Time.current,
+            error:,
+            error_kind: "unknown",
+            retryable: false,
+            next_retry_at: nil
+          )
+        end
+        Rails.logger.error({ message: "Could not queue assignment retry", sync_run_item_id: sync_run_item.id, error: })
       end
 
       def log_sync_event(message, sync_run_item:, **attributes)

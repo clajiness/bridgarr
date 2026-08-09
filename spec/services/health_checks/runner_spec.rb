@@ -8,16 +8,26 @@ RSpec.describe HealthChecks::Runner do
     -> { value += 0.125 }
   end
   let(:jackett_test) { class_double(Jackett::ConnectionTest) }
+  let(:inventory_refresh) { class_double(Jackett::InventoryRefresh) }
   let(:arr_test) { class_double(Arr::ConnectionTest) }
   let(:indexer_test) { class_double(Jackett::IndexerOperationalTest) }
 
   subject(:runner) do
-    described_class.new(jackett_test:, arr_test:, indexer_test:, wall_clock:, monotonic_clock:)
+    described_class.new(jackett_test:, inventory_refresh:, arr_test:, indexer_test:, wall_clock:, monotonic_clock:)
   end
 
   before do
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
     Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-secret")
+    allow(inventory_refresh).to receive(:call).and_return(
+      Jackett::IndexerDiscovery::Result.new(
+        success?: true,
+        indexers: [],
+        message: "Inventory refreshed.",
+        error: nil,
+        http_status: 200
+      )
+    )
   end
 
   it "checks and records every enabled target with HTTP and duration metrics" do
@@ -72,6 +82,96 @@ RSpec.describe HealthChecks::Runner do
     )
     expect(Setting.fetch_value(Setting::JACKETT_LAST_STATUS_KEY)).to eq("error")
     expect(Setting.fetch_value(Setting::JACKETT_LAST_HTTP_STATUS_KEY)).to eq("401")
+    expect(inventory_refresh).not_to have_received(:call)
+  end
+
+  it "refreshes inventory and skips live searches for missing or unconfigured sources" do
+    present = Indexer.create!(name: "Present", jackett_id: "present", enabled: true)
+    missing = Indexer.create!(name: "Missing", jackett_id: "missing", enabled: true)
+    disabled = Indexer.create!(name: "Disabled", jackett_id: "disabled", enabled: true)
+    records = [
+      Jackett::IndexerDiscovery::IndexerRecord.new(name: "Present", jackett_id: "present", configured: true),
+      Jackett::IndexerDiscovery::IndexerRecord.new(name: "Disabled", jackett_id: "disabled", configured: false)
+    ]
+    result = Jackett::IndexerDiscovery::Result.new(
+      success?: true,
+      indexers: records,
+      message: "Inventory refreshed.",
+      error: nil,
+      http_status: 200
+    )
+    allow(jackett_test).to receive(:call).and_return(jackett_result(success: true, http_status: 200))
+    allow(inventory_refresh).to receive(:call) do |seen_at:, **|
+      Jackett::InventoryReconciler.call(records:, seen_at:)
+      result
+    end
+    allow(indexer_test).to receive(:call).and_return(indexer_result(success: true, http_status: 200))
+
+    runner.call
+
+    expect(inventory_refresh).to have_received(:call).with(
+      base_url: "http://jackett.example.test",
+      api_key: "jackett-secret",
+      seen_at: checked_at
+    )
+    expect(indexer_test).to have_received(:call).once.with(hash_including(jackett_id: present.jackett_id))
+    expect(indexer_test).not_to have_received(:call).with(hash_including(jackett_id: missing.jackett_id))
+    expect(indexer_test).not_to have_received(:call).with(hash_including(jackett_id: disabled.jackett_id))
+    expect(missing.reload).to have_attributes(
+      jackett_state: "missing",
+      jackett_missing_since: checked_at,
+      last_status: "unknown",
+      last_error: HealthChecks::Runner::INDEXER_MISSING_MESSAGE
+    )
+    expect(disabled.reload).to have_attributes(
+      jackett_state: "disabled",
+      last_status: "unknown",
+      last_error: HealthChecks::Runner::INDEXER_DISABLED_MESSAGE
+    )
+  end
+
+  it "continues live health checks when the inventory refresh fails" do
+    indexer = Indexer.create!(name: "Present", jackett_id: "present", enabled: true)
+    allow(jackett_test).to receive(:call).and_return(jackett_result(success: true, http_status: 200))
+    allow(inventory_refresh).to receive(:call).and_return(
+      Jackett::IndexerDiscovery::Result.new(
+        success?: false,
+        indexers: [],
+        message: "Inventory request failed.",
+        error: "Inventory request failed.",
+        http_status: 502
+      )
+    )
+    allow(indexer_test).to receive(:call).and_return(indexer_result(success: true, http_status: 200))
+
+    expect { runner.call }.not_to raise_error
+
+    expect(indexer.reload.last_status).to eq("ok")
+    expect(indexer.jackett_state).to eq("unknown")
+  end
+
+  it "does not live-test an unverified source when inventory refresh cannot verify it" do
+    indexer = Indexer.create!(name: "Old source", jackett_id: "old-source", enabled: true, jackett_state: "unverified")
+    allow(jackett_test).to receive(:call).and_return(jackett_result(success: true, http_status: 200))
+    allow(inventory_refresh).to receive(:call).and_return(
+      Jackett::IndexerDiscovery::Result.new(
+        success?: false,
+        indexers: [],
+        message: "Inventory request failed.",
+        error: "Inventory request failed.",
+        http_status: 502
+      )
+    )
+    allow(indexer_test).to receive(:call)
+
+    runner.call
+
+    expect(indexer_test).not_to have_received(:call)
+    expect(indexer.reload).to have_attributes(
+      jackett_state: "unverified",
+      last_status: "unknown",
+      last_error: HealthChecks::Runner::INDEXER_UNVERIFIED_MESSAGE
+    )
   end
 
   it "records Jackett authentication, timeout, malformed-response, and unreachable-host failures" do

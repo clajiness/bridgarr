@@ -147,4 +147,20 @@ RSpec.describe Sync::PlanApplier do
     expect(result).to be_success
     expect(result.sync_run.sync_run_items.pluck(:indexer_app_id)).to eq([ assignment.id ])
   end
+
+  it "reports a coordinator enqueue failure instead of claiming the plan was queued" do
+    allow(Sync::BulkSyncJob).to receive(:perform_later).and_raise(StandardError, "queue unavailable")
+
+    result = described_class.call(
+      plan:,
+      assignment_ids: [ assignment.id ],
+      expected_digests: { assignment.id.to_s => "current-plan" }
+    )
+
+    expect(result).not_to be_success
+    expect(result.sync_run).to have_attributes(status: "failed")
+    expect(result.message).to eq("Could not queue bulk sync: queue unavailable")
+    expect(result.error).to eq(result.message)
+    expect(Sync::BulkSyncJob).not_to have_been_enqueued
+  end
 end

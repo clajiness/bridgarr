@@ -22,6 +22,30 @@ RSpec.describe Jackett::InventoryReconciler do
     expect(missing.jackett_missing_since).to eq(seen_at)
   end
 
+  it "keeps a rename pending across automatic inventory refreshes until it is accepted" do
+    indexer = Indexer.create!(
+      name: "Old Name",
+      jackett_id: "renamed",
+      jackett_name: "Old Name",
+      jackett_source_digest: "accepted-fingerprint",
+      jackett_state: "unchanged"
+    )
+    record = Jackett::IndexerDiscovery::IndexerRecord.new(
+      name: "New Name",
+      jackett_id: "renamed",
+      configured: true,
+      fingerprint: "renamed-fingerprint"
+    )
+
+    2.times { described_class.call(records: [ record ]) }
+
+    expect(indexer.reload).to have_attributes(
+      jackett_name: "New Name",
+      jackett_state: "renamed",
+      jackett_source_digest: "accepted-fingerprint"
+    )
+  end
+
   it "marks an unchanged imported indexer as unchanged" do
     indexer = Indexer.create!(name: "Same", jackett_id: "same")
     record = Jackett::IndexerDiscovery::IndexerRecord.new(name: "Same", jackett_id: "same", configured: true)
@@ -51,7 +75,33 @@ RSpec.describe Jackett::InventoryReconciler do
     described_class.call(records: [ record ])
 
     expect(indexer.reload.jackett_state).to eq("changed")
-    expect(indexer.jackett_source_digest).to eq("new-fingerprint")
+    expect(indexer.jackett_source_digest).to eq("old-fingerprint")
+
+    described_class.call(records: [ record ])
+
+    expect(indexer.reload.jackett_state).to eq("changed")
+    expect(indexer.jackett_source_digest).to eq("old-fingerprint")
+  end
+
+  it "clears an unaccepted source change when Jackett returns to the accepted configuration" do
+    indexer = Indexer.create!(
+      name: "Same",
+      jackett_id: "same",
+      jackett_name: "Same",
+      jackett_configured: true,
+      jackett_source_digest: "accepted-fingerprint",
+      jackett_state: "changed"
+    )
+    record = Jackett::IndexerDiscovery::IndexerRecord.new(
+      name: "Same",
+      jackett_id: "same",
+      configured: true,
+      fingerprint: "accepted-fingerprint"
+    )
+
+    described_class.call(records: [ record ])
+
+    expect(indexer.reload.jackett_state).to eq("unchanged")
   end
 
   it "preserves when an indexer first went missing across later discoveries" do

@@ -55,6 +55,23 @@ RSpec.describe Sync::ErrorClassifier do
     expect(result).not_to be_retryable
   end
 
+  it "classifies unavailable Jackett sources with restore-or-remove guidance" do
+    result = described_class.call("EZTV is missing from Jackett. Restore indexer ID eztv in Jackett or remove it from Bridgarr before syncing.")
+
+    expect(result.kind).to eq("jackett_source_unavailable")
+    expect(result.summary).to include("missing, unconfigured, or not yet verified in Jackett")
+    expect(result.recommendation).to include("Discover indexers again", "restore the same ID", "remove it from Bridgarr")
+    expect(result).not_to be_retryable
+  end
+
+  it "classifies a source awaiting verification after a Jackett URL change" do
+    result = described_class.call("EZTV has not been verified in the current Jackett connection. Discover indexers again before syncing.")
+
+    expect(result.kind).to eq("jackett_source_unavailable")
+    expect(result.recommendation).to include("Discover indexers again")
+    expect(result).not_to be_retryable
+  end
+
   it "classifies challenge solver timeouts as retryable" do
     result = described_class.call("FlareSolverr was unable to process the request. Error solving the challenge. Timeout after 55.0 seconds.")
 

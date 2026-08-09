@@ -49,6 +49,8 @@ module Sync
     def call
       return failure("Enable #{indexer.name} before reconciling this assignment.") unless indexer.enabled?
       return failure("Enable #{arr_app.name} before reconciling this assignment.") unless arr_app.enabled?
+      availability = Jackett::IndexerAvailability.call(indexer:)
+      return failure(availability.message) unless availability.available?
       return failure("Jackett URL is missing.") if jackett_base_url.blank?
       return failure("Jackett API key is missing.") if jackett_api_key.blank?
       return failure("Bridgarr URL is missing for a bridged assignment.") if indexer_app.connection_mode_bridged? && bridgarr_base_url.blank?

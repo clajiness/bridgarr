@@ -37,23 +37,53 @@ class ArrAppsController < ApplicationController
   end
 
   def update
-    if @arr_app.update(arr_app_params)
-      redirect_to @arr_app, notice: "App updated.", status: :see_other
+    remote_association_count = 0
+    updated = @arr_app.with_lock do
+      @arr_app.indexer_apps.lock.load
+      remote_association_count = @arr_app.indexer_apps.where.not(remote_indexer_id: nil).count
+      @arr_app.update(arr_app_params)
+    end
+
+    if updated
+      notice = if remote_association_count.positive? && (@arr_app.saved_change_to_app_type? || @arr_app.saved_change_to_base_url?)
+        "App updated. Cleared #{remote_association_count} remote #{'association'.pluralize(remote_association_count)} because the destination changed. Existing indexers in the previous destination were not changed; preview assignments to reconnect them safely."
+      else
+        "App updated."
+      end
+      redirect_to @arr_app, notice:, status: :see_other
     else
       render :edit, status: :unprocessable_content
     end
   end
 
   def destroy
-    @arr_app.destroy!
+    blocked = false
+    @arr_app.with_lock do
+      assignment_ids = @arr_app.indexer_apps.lock.ids
+      if SyncRunItem.active.where(indexer_app_id: assignment_ids).exists?
+        blocked = true
+      else
+        @arr_app.destroy!
+      end
+    end
 
-    redirect_to arr_apps_path, notice: "App removed.", status: :see_other
+    if blocked
+      return redirect_to(
+        @arr_app,
+        alert: "Wait for active assignment syncs to finish before removing this app.",
+        status: :see_other
+      )
+    end
+
+    redirect_to(
+      arr_apps_path,
+      notice: "App removed from Bridgarr. Existing indexers in the app were not changed.",
+      status: :see_other
+    )
   end
 
   def test_connection
-    started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    result = Arr::ConnectionTest.call(base_url: @arr_app.base_url, api_key: @arr_app.api_key, app_type: @arr_app.app_type)
-    @arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
+    result = test_app_connection(@arr_app)
 
     if result.success?
       redirect_to arr_app_test_redirect_path, notice: "#{@arr_app.name} connection works."
@@ -63,12 +93,7 @@ class ArrAppsController < ApplicationController
   end
 
   def test_connections
-    results = ArrApp.order(:name).map do |arr_app|
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      result = Arr::ConnectionTest.call(base_url: arr_app.base_url, api_key: arr_app.api_key, app_type: arr_app.app_type)
-      arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
-      result
-    end
+    results = ArrApp.order(:name).map { |arr_app| test_app_connection(arr_app) }
 
     successful_count = results.count(&:success?)
     failed_count = results.size - successful_count
@@ -92,6 +117,26 @@ class ArrAppsController < ApplicationController
       else
         @arr_app
       end
+    end
+
+    def test_app_connection(arr_app)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      result = Arr::ConnectionTest.call(base_url: arr_app.base_url, api_key: arr_app.api_key, app_type: arr_app.app_type)
+      arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
+      result
+    rescue StandardError => e
+      message = Secrets::Redactor.call("Unexpected connection-test failure: #{e.message}")
+      result = Arr::ConnectionTest::Result.new(
+        success?: false,
+        message:,
+        error: message,
+        http_status: nil,
+        app_name: nil,
+        version: nil
+      )
+      arr_app.record_connection_test_result(result, duration_ms: elapsed_ms(started_at))
+      Rails.logger.error({ message: "App connection test failed unexpectedly", arr_app_id: arr_app.id, error: message })
+      result
     end
 
     def elapsed_ms(started_at)

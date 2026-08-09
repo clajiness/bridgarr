@@ -22,14 +22,15 @@ module Jackett
 
           state = state_for(indexer, record)
           changed_count += 1 unless state == "unchanged"
-          indexer.update!(
+          attributes = {
             jackett_name: record.name,
             jackett_configured: record.configured,
             jackett_last_seen_at: seen_at,
             jackett_missing_since: nil,
-            jackett_source_digest: record.source_digest,
             jackett_state: state
-          )
+          }
+          attributes[:jackett_source_digest] = record.source_digest if indexer.jackett_source_digest.blank?
+          indexer.update!(attributes)
         end
 
         newly_missing_scope.update_all(jackett_missing_since: seen_at)
@@ -53,8 +54,7 @@ module Jackett
       end
 
       def source_name_changed?(indexer, record)
-        previous_name = indexer.jackett_name.presence || indexer.name
-        previous_name != record.name
+        indexer.name != record.name
       end
 
       def broadcast_live_refreshes

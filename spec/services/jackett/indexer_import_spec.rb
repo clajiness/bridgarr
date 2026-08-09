@@ -134,6 +134,66 @@ RSpec.describe Jackett::IndexerImport do
     expect(Sync::BulkSync).not_to have_received(:call)
   end
 
+  it "does not change an existing assignment while its sync is active" do
+    arr_app = ArrApp.create!(name: "Main Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
+    indexer = Indexer.create!(name: "Existing Indexer", jackett_id: "existing-indexer")
+    assignment = IndexerApp.create!(indexer:, arr_app:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+    discovery = FakeDiscovery.new(
+      Jackett::IndexerDiscovery::Result.new(
+        success?: true,
+        indexers: [ Jackett::IndexerDiscovery::IndexerRecord.new(name: "Existing Indexer", jackett_id: "existing-indexer", configured: true) ],
+        message: "Found 1 configured Jackett indexer.",
+        error: nil,
+        http_status: 200
+      )
+    )
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_ids: [ "existing-indexer" ],
+      arr_app_ids: [ arr_app.id ],
+      category_mode: "none",
+      discovery:
+    )
+
+    expect(result).not_to be_success
+    expect(result.message).to include("active assignment sync")
+    expect(assignment.reload.category_mode).to eq("auto")
+  end
+
+  it "reports an immediate-sync queue failure without rolling back a successful import" do
+    arr_app = ArrApp.create!(name: "Main Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
+    discovery = FakeDiscovery.new(
+      Jackett::IndexerDiscovery::Result.new(
+        success?: true,
+        indexers: [ Jackett::IndexerDiscovery::IndexerRecord.new(name: "First Indexer", jackett_id: "first-indexer", configured: true) ],
+        message: "Found 1 Jackett indexer.",
+        error: nil,
+        http_status: 200
+      )
+    )
+    allow(Sync::BulkSyncJob).to receive(:perform_later).and_raise(StandardError, "queue unavailable")
+
+    result = described_class.call(
+      base_url: "http://localhost:9117",
+      api_key: "jackett-api-key",
+      jackett_ids: [ "first-indexer" ],
+      arr_app_ids: [ arr_app.id ],
+      sync_now: true,
+      discovery:
+    )
+
+    expect(result).to be_success
+    expect(result.sync_run).to have_attributes(status: "failed")
+    expect(result.message).to include("1 indexer imported", "1 assignment created", "Could not queue bulk sync")
+    expect(result.message).not_to include("sync queued")
+    expect(Indexer.find_by(jackett_id: "first-indexer")).to be_present
+    expect(IndexerApp.count).to eq(1)
+  end
+
   it "requires at least one selected Jackett indexer" do
     result = described_class.call(
       base_url: "http://localhost:9117",

@@ -16,6 +16,8 @@ module Sync
     def call
       return record(failure("Enable #{indexer.name} before syncing.")) unless indexer.enabled?
       return record(failure("Enable #{arr_app.name} before syncing.")) unless arr_app.enabled?
+      availability = Jackett::IndexerAvailability.call(indexer:)
+      return record(failure(availability.message)) unless availability.available?
 
       result = client.call(
         arr_app:,

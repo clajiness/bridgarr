@@ -32,7 +32,7 @@ module Secrets
       end
 
       def query_parameter_pattern
-        /([?&;]|&amp;)(#{SENSITIVE_KEY_PATTERN.source})=([^&\s\]\)"'<>]+)/i
+        /([?&;]|&amp;)(#{SENSITIVE_KEY_PATTERN.source})=(?!\[REDACTED\])([^&\s\]\)"'<>]+)/i
       end
 
       def json_value_pattern
@@ -44,7 +44,7 @@ module Secrets
       end
 
       def key_value_pattern
-        /(^|[\s,;])(#{SENSITIVE_KEY_PATTERN.source})(\s*[:=]\s*)([^\s,;\]\)"'<>]+)/i
+        /(^|[\s,;])(#{SENSITIVE_KEY_PATTERN.source})(\s*[:=]\s*)(?!\[REDACTED\])([^\s,;\]\)"'<>]+)/i
       end
 
       def authorization_header_pattern

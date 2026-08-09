@@ -24,7 +24,14 @@ class DashboardController < ApplicationController
   end
 
   def check_all
-    HealthChecks::RunJob.perform_later
+    enqueued_job = HealthChecks::RunJob.perform_later
+    raise ActiveJob::EnqueueError, "the queue adapter rejected the health check" unless enqueued_job
+
     redirect_back fallback_location: root_path, notice: "Health check queued."
+  rescue StandardError => e
+    redirect_back(
+      fallback_location: root_path,
+      alert: Secrets::Redactor.call("Could not queue health check: #{e.message}")
+    )
   end
 end

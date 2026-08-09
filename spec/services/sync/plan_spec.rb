@@ -212,6 +212,23 @@ RSpec.describe Sync::Plan do
     expect(plan.attention_items).to eq([ item ])
   end
 
+  it "marks a missing Jackett source invalid without requesting its capabilities" do
+    indexer.update!(jackett_state: "missing")
+    FakePlanInventory.results[arr_app.id] = inventory(indexers: [ remote_indexer ])
+    allow(FakePlanCaps).to receive(:call)
+
+    item = described_class.call(
+      scope: IndexerApp.where(id: assignment.id),
+      inventory_client: FakePlanInventory,
+      caps_client: FakePlanCaps
+    ).items.fetch(0)
+
+    expect(item.state).to eq("invalid")
+    expect(item).to be_attention
+    expect(item.message).to include("missing from Jackett", "indexer ID eztv")
+    expect(FakePlanCaps).not_to have_received(:call)
+  end
+
   it "shows redacted field-level updates" do
     assignment.update!(remote_indexer_id: 42, enable_rss: false)
     remote = remote_indexer

@@ -29,6 +29,9 @@
         <div>
           <%= form.label :jackett_base_url, "Jackett URL", class: "block text-sm font-medium text-slate-700" %>
           <%= form.url_field :jackett_base_url, value: @jackett_base_url, placeholder: "http://localhost:9117", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" %>
+          <p class="mt-2 text-xs leading-5 text-slate-500">
+            Replacing this URL clears source details learned from the previous server. Discover indexers again before syncing.
+          </p>
         </div>
 
         <div>

@@ -13,9 +13,7 @@ module Dashboard
         sync_item,
         failed_assignments_item,
         orphaned_assignments_item,
-        jackett_changes_item,
-        failed_apps_item,
-        failed_indexers_item
+        jackett_changes_item
       ].compact
     end
 
@@ -57,10 +55,10 @@ module Dashboard
         Item.new(
           key: :settings,
           label: "Jackett test",
-          description: "Confirm Bridgarr can reach Jackett.",
-          complete: Setting.fetch_value(Setting::JACKETT_LAST_STATUS_KEY) == "ok",
+          description: "Connect Bridgarr to Jackett at least once.",
+          complete: Setting.fetch_value(Setting::JACKETT_LAST_STATUS_KEY) == "ok" || Indexer.where.not(jackett_last_seen_at: nil).exists?,
           action_label: "Test Jackett",
-          why: "Discovery, category inspection, health checks, and proxying depend on Jackett."
+          why: "An indexer previously seen in Jackett confirms that Bridgarr connected successfully before; current availability is tracked separately on the health page."
         )
       end
 
@@ -141,45 +139,16 @@ module Dashboard
       end
 
       def jackett_changes_item
-        count = Indexer.with_jackett_changes.count
+        count = Indexer.where(enabled: true).with_jackett_changes.count
         return if count.zero?
 
         Item.new(
           key: :jackett_changes,
           label: "Jackett changes",
-          description: "#{count} imported #{'indexer'.pluralize(count)} changed or disappeared in Jackett.",
+          description: "#{count} imported #{'indexer'.pluralize(count)} need Jackett review or verification.",
           complete: false,
           action_label: "Review Jackett changes",
-          why: "Assignments may point at a renamed, disabled, or missing Jackett source."
-        )
-      end
-
-      def failed_apps_item
-        count = ArrApp.where(enabled: true, last_status: "error").count
-        return if count.zero?
-
-        Item.new(
-          key: :apps,
-          label: "Application connections",
-          description: "#{count} enabled #{'application'.pluralize(count)} failed its latest connection test.",
-          complete: false,
-          action_label: "Edit and retest applications",
-          why: "Bridgarr cannot inspect or apply desired state to an unreachable application."
-        )
-      end
-
-      def failed_indexers_item
-        count = Indexer.where(enabled: true, last_status: "error").count
-        return if count.zero?
-
-        Item.new(
-          key: :assignments,
-          label: "Indexer health",
-          description: "#{count} enabled #{'indexer'.pluralize(count)} failed its latest live check.",
-          complete: false,
-          action_label: "Open unhealthy indexers",
-          why: "A configured assignment cannot return results while its Jackett source is unhealthy.",
-          filter: "unhealthy"
+          why: "Assignments may point at an unverified, renamed, disabled, or missing Jackett source."
         )
       end
 

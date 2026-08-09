@@ -28,7 +28,9 @@
       </p>
       <% if @external_health.last_run_error.present? %>
         <p class="mt-1 text-sm leading-6 text-red-800 [overflow-wrap:anywhere]">Last run failed<% unless @external_health.last_run_duration_ms.nil? %> after <%= health_duration(@external_health.last_run_duration_ms) %><% end %>: <%= @external_health.last_run_error %></p>
-      <% elsif @external_health.incomplete_run? %>
+      <% elsif @external_health.run_in_progress? %>
+        <p class="mt-1 text-sm leading-6 text-blue-800">A health check started <%= format_server_timestamp(@external_health.last_started_at) %> and is still running.</p>
+      <% elsif @external_health.interrupted_run? %>
         <p class="mt-1 text-sm leading-6 text-red-800">A run started <%= format_server_timestamp(@external_health.last_started_at) %> but did not record completion.</p>
       <% end %>
     </div>
