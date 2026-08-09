@@ -56,6 +56,7 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(categories_panel.key?("hidden")).to be(true)
     expect(submit_button.name).to eq("button")
     expect(submit_button["disabled"]).to eq("disabled")
+    expect(response.body).not_to include("manage their desired state")
   end
 
   it "paginates assignment matrix rows" do
@@ -267,6 +268,13 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.media_type).to eq("text/plain")
     expect(response.body).to include("Bridgarr assignment diagnostic report")
     expect(response.body).not_to include("secret-value")
+
+    get indexer_apps_path
+
+    diagnostic_control = Nokogiri::HTML(response.body).at_css('[data-controller="clipboard"]')
+    inline_report = Base64.strict_decode64(diagnostic_control["data-clipboard-report-value"])
+    expect(inline_report).to include("Bridgarr assignment diagnostic report", "Assignment ID: #{assignment.id}")
+    expect(inline_report).not_to include("secret-value")
   end
 
   it "renders a mutation-free reconciliation preview" do
@@ -289,8 +297,52 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Reconciliation preview")
     expect(response.body).to include("No remote configuration was changed")
+    expect(response.body).not_to include("inspection only")
     expect(response.body).to include("Apply selected plan")
     expect(assignment.reload.last_plan_state).to eq("create")
+  end
+
+  it "keeps changed assignments visible while collapsing no-change assignments" do
+    unchanged_assignment = IndexerApp.create!(
+      arr_app:,
+      indexer: Indexer.create!(name: "Already matching", jackett_id: "already-matching")
+    )
+    changed_item = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "create",
+      remote_indexer_id: nil,
+      changes: [],
+      message: "A managed Generic Torznab indexer will be created.",
+      desired_digest: "changed-desired",
+      remote_digest: nil,
+      plan_digest: "changed-plan",
+      destructive: false
+    )
+    unchanged_item = Sync::Plan::Item.new(
+      indexer_app: unchanged_assignment,
+      state: "unchanged",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Remote configuration already matches.",
+      desired_digest: "matching-desired",
+      remote_digest: "matching-desired",
+      plan_digest: "matching-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(
+      Sync::Plan::Result.new(items: [ changed_item, unchanged_item ], generated_at: Time.current)
+    )
+
+    get preview_indexer_apps_path(assignment_ids: [ assignment.id, unchanged_assignment.id ])
+
+    document = Nokogiri::HTML(response.body)
+    review_table = document.at_css('table[data-reconciliation-items="review"]')
+    no_change_details = document.at_css("details[data-no-change-assignments]")
+    expect(review_table.text).to include("LimeTorrents")
+    expect(review_table.text).not_to include("Already matching")
+    expect(no_change_details.text).to include("Show 1 no-change assignment", "Already matching")
+    expect(no_change_details.key?("open")).to be(false)
+    expect(document.css('input[name="assignment_ids[]"]').map { |input| input["value"] }).to eq([ assignment.id.to_s ])
   end
 
   it "clears a persisted false update when Arr masks an unchanged API key" do
@@ -356,7 +408,11 @@ RSpec.describe "Indexer app assignments", type: :request do
     document = Nokogiri::HTML(response.body)
     expect(document.at_css('input[name="assignment_ids[]"]')).to be_nil
     expect(document.at_css('input[type="submit"][value="Apply selected plan"]')).to be_nil
-    expect(response.body).to include("Nothing to apply.")
+    expect(response.body).to include("This assignment already matches.", "Nothing needs to be applied.", "Show 1 no-change assignment")
+    no_change_details = document.at_css("details[data-no-change-assignments]")
+    expect(no_change_details).to be_present
+    expect(no_change_details.key?("open")).to be(false)
+    expect(no_change_details.at_css('table[data-reconciliation-items="no-change"]')).to be_present
     expect(assignment.reload.last_plan_state).to eq("unchanged")
     expect(Dashboard::Overview.new.assignment_rows.first.status).to eq("healthy")
   end
