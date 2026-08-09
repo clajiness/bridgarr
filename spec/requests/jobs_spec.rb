@@ -47,6 +47,8 @@ RSpec.describe "Jobs", type: :request do
       blocked_count: 0,
       running_count: 0,
       failed_count: 1,
+      completed_count: 24,
+      finished_job_retention_days: 30,
       recurring_tasks: [ task ],
       recent_jobs: [ job ],
       processes: [ process ],
@@ -68,10 +70,20 @@ RSpec.describe "Jobs", type: :request do
     expect(response.body).to match(/Past runs.*Future runs/m)
     expect(response.body).to include("Scheduled health checks", "HealthChecks::RunJob", "every 30 minutes", "queue-host")
     expect(response.body).to include(format_server_timestamp(now + 30.minutes), format_server_timestamp(now - 30.minutes))
+    expect(response.body).to include("Queued now", "Running now", "Completed (30 days)", "24")
+    expect(response.body).to include(
+      "Past runs show the 10 most recent recorded executions per schedule.",
+      "Completed jobs become eligible for automatic cleanup after 30 days; failed jobs remain until they are retried or discarded."
+    )
     expect(response.body).to include("Showing 26–50 of 75 retained jobs", "Jobs per page", "Page 2 of 3", "Previous", "Next")
     expect(response.body).to include("apikey=[REDACTED]")
     expect(response.body).not_to include("visible-secret")
     expect(response.body).not_to include("Retry", "Discard", "Delete")
+
+    document = Nokogiri::HTML(response.body)
+    future_runs = document.at_xpath('//h4[normalize-space()="Future runs"]/following-sibling::div//table')
+    expect(future_runs).to be_present
+    expect(future_runs.at_css("th").text).to eq("Scheduled time")
   end
 
   it "explains when the queue database is unavailable" do

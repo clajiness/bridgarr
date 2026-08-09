@@ -58,6 +58,14 @@ module QueueDashboard
       @failed_count || 0
     end
 
+    def completed_count
+      @completed_count || 0
+    end
+
+    def finished_job_retention_days
+      Rails.application.config.x.solid_queue_finished_job_retention_days
+    end
+
     def active_worker_count
       processes.count { |process| process.kind == "worker" && process.active }
     end
@@ -129,6 +137,11 @@ module QueueDashboard
         @blocked_count = SolidQueue::BlockedExecution.count
         @running_count = SolidQueue::ClaimedExecution.count
         @failed_count = SolidQueue::FailedExecution.count
+        @completed_count = SolidQueue::Job.finished.where(finished_at: finished_job_retention_cutoff..).count
+      end
+
+      def finished_job_retention_cutoff
+        finished_job_retention_days.days.ago(now)
       end
 
       def load_processes
@@ -185,7 +198,7 @@ module QueueDashboard
             queue_name: task.queue_name.presence || "default",
             registered: registered_tasks.key?(task.key),
             next_runs: future_runs(task.schedule),
-            past_runs: executions.fetch(task.key, []).first(TASK_HISTORY_LIMIT).map { |execution| build_run(execution) }
+            past_runs: executions.fetch(task.key, []).map { |execution| build_run(execution) }
           )
         end
       end
@@ -210,10 +223,18 @@ module QueueDashboard
       def recurring_executions_for(task_keys)
         return {} if task_keys.empty?
 
-        SolidQueue::RecurringExecution
+        ranked_executions = SolidQueue::RecurringExecution
           .where(task_key: task_keys)
+          .select(
+            "#{SolidQueue::RecurringExecution.table_name}.*",
+            Arel.sql("ROW_NUMBER() OVER (PARTITION BY task_key ORDER BY run_at DESC) AS history_position")
+          )
+
+        SolidQueue::RecurringExecution
+          .from(ranked_executions, SolidQueue::RecurringExecution.table_name)
+          .where(history_position: ..TASK_HISTORY_LIMIT)
           .includes(job: JOB_EXECUTION_ASSOCIATIONS)
-          .order(run_at: :desc)
+          .order(:task_key, run_at: :desc)
           .to_a
           .group_by(&:task_key)
       end

@@ -79,6 +79,7 @@ services:
       SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
       TZ: America/Chicago
       SOLID_QUEUE_IN_PUMA: "true"
+      SOLID_QUEUE_FINISHED_JOB_RETENTION_DAYS: "30"
       ARR_INDEXER_SYNC_TIMEOUT_SECONDS: "150"
       JACKETT_TORZNAB_TIMEOUT_SECONDS: "120"
       JACKETT_INDEXER_HEALTH_TIMEOUT_SECONDS: "120"
@@ -433,6 +434,7 @@ bridged search or download traffic again. Direct assignments remain unaffected.
 | `SECRET_KEY_BASE` | none | Required for production Rails sessions and cookies. Use a long random value. |
 | `TZ` | Docker image: `UTC` | Controls the process timezone used when Bridgarr renders timestamps; non-container deployments inherit the host default when unset. |
 | `SOLID_QUEUE_IN_PUMA` | Docker image: `true` | Runs the Solid Queue supervisor inside the web container. Puma treats an unset value as `false` outside the image. |
+| `SOLID_QUEUE_FINISHED_JOB_RETENTION_DAYS` | `30` | Rolling retention window for completed Solid Queue jobs. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
 | `ARR_INDEXER_SYNC_TIMEOUT_SECONDS` | `150` | Timeout while Bridgarr waits for an *arr app to create/test a managed indexer. |
 | `ARR_INDEXER_INSPECTION_TIMEOUT_SECONDS` | `15` | Timeout for read-only Arr inventory and schema inspection during reconciliation previews. |
 | `BRIDGARR_SYNC_RETRY_DELAY_SECONDS` | `45` | Delay before the one automatic retry for a retryable assignment sync failure, including a busy destination database. |
@@ -494,9 +496,13 @@ the destination application. If jobs stay queued forever, make sure a Solid
 Queue worker is running.
 
 The read-only **Jobs** screen shows registered queue processes, current queue
-counts, recent retained jobs, recurring-task history, and the next five times
-for each recurring schedule. Past runs follow Solid Queue's existing retention
-window; Bridgarr does not create a separate job-history table.
+counts, completed-job counts, recent retained jobs, recurring-task history, and
+the next five times for each recurring schedule. Completed jobs remain available
+for a rolling 30 days by default; set `SOLID_QUEUE_FINISHED_JOB_RETENTION_DAYS`
+to another positive whole number of days when a different retention window is
+needed. Each recurring schedule shows its 10 latest retained runs, while the
+paginated recent-jobs table provides the full retained history. Bridgarr does
+not create a separate job-history table.
 
 ## Health Checks
 

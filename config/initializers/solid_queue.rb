@@ -1,0 +1,5 @@
+require Rails.root.join("lib/bridgarr/job_retention_configuration")
+
+finished_job_retention_days = Bridgarr::JobRetentionConfiguration.finished_job_retention_days
+Rails.application.config.x.solid_queue_finished_job_retention_days = finished_job_retention_days
+SolidQueue.clear_finished_jobs_after = finished_job_retention_days.days

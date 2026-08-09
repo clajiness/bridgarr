@@ -21,6 +21,8 @@ RSpec.describe QueueDashboard::Overview do
     )
     finished_job = create_job(class_name: "HealthChecks::RunJob", scheduled_at: now - 30.minutes)
     finish_job(finished_job, at: now - 29.minutes)
+    stale_finished_job = create_job(class_name: "StaleFinishedJob", scheduled_at: now - 31.days)
+    finish_job(stale_finished_job, at: now - 31.days)
     SolidQueue::RecurringExecution.create!(job: finished_job, task_key: task.key, run_at: now - 30.minutes)
     failed_job = create_job(class_name: "Sync::BulkSyncJob", scheduled_at: now - 5.minutes)
     fail_job(failed_job, "GET /api?apikey=visible-secret Authorization: Bearer token-secret")
@@ -43,7 +45,9 @@ RSpec.describe QueueDashboard::Overview do
       scheduled_count: 1,
       blocked_count: 0,
       running_count: 0,
-      failed_count: 1
+      failed_count: 1,
+      completed_count: 1,
+      finished_job_retention_days: 30
     )
     expect(recurring_task).to have_attributes(handler: "HealthChecks::RunJob", registered: true)
     expect(recurring_task.next_runs.length).to eq(5)
@@ -87,6 +91,47 @@ RSpec.describe QueueDashboard::Overview do
     expect(overview).to be_previous_page
     expect(overview).not_to be_next_page
     expect(overview.recent_jobs.map(&:id)).to eq(jobs.reverse.drop(10).map(&:id))
+  end
+
+  it "loads only the recurring executions displayed for each task" do
+    now = Time.current.change(usec: 0)
+    tasks = 2.times.map do |task_index|
+      SolidQueue::RecurringTask.create!(
+        key: "bounded_history_#{task_index}",
+        class_name: "HealthChecks::RunJob",
+        schedule: "every hour",
+        queue_name: "default"
+      )
+    end
+
+    expected_run_times = tasks.to_h do |task|
+      run_times = 12.times.map do |run_index|
+        run_at = now - run_index.minutes
+        job = create_job(class_name: task.class_name, scheduled_at: run_at)
+        finish_job(job, at: run_at + 1.second)
+        SolidQueue::RecurringExecution.create!(job:, task_key: task.key, run_at:)
+        run_at
+      end
+
+      [ task.key, run_times.first(described_class::TASK_HISTORY_LIMIT) ]
+    end
+
+    instantiated_execution_count = 0
+    subscription = ActiveSupport::Notifications.subscribe("instantiation.active_record") do |event|
+      if event.payload[:class_name] == "SolidQueue::RecurringExecution"
+        instantiated_execution_count += event.payload[:record_count]
+      end
+    end
+
+    overview = described_class.new(now:)
+
+    expect(instantiated_execution_count).to eq(tasks.size * described_class::TASK_HISTORY_LIMIT)
+    tasks.each do |task|
+      runs = overview.recurring_tasks.find { |item| item.key == task.key }.past_runs
+      expect(runs.map(&:run_at)).to eq(expected_run_times.fetch(task.key))
+    end
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscription) if subscription
   end
 
   private
