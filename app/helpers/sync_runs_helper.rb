@@ -69,4 +69,99 @@ module SyncRunsHelper
       "text-slate-700"
     end
   end
+
+  def sync_category_mismatch_explanation(sync_run_item)
+    evidence = sync_category_evidence(sync_run_item)
+
+    case evidence["category_mode"]
+    when "auto"
+      if sync_category_support_confirmed?(evidence)
+        "Auto mode selected categories that Jackett reports as supported. Retry once before changing them; the lack of matching releases may be temporary."
+      else
+        "Auto mode selected categories from the app defaults and Jackett capabilities. Retry once before changing them."
+      end
+    when "custom"
+      "Custom mode sent the saved category IDs exactly as entered. Retry once, then review those IDs if the mismatch continues."
+    when "none"
+      "None mode sent no categories. Some apps return no releases for that setting, so review the category mode before retrying."
+    else
+      "This can be temporary, so retry once before changing the assignment's categories."
+    end
+  end
+
+  def sync_category_mode(sync_run_item)
+    sync_category_evidence(sync_run_item)["category_mode"].to_s.titleize
+  end
+
+  def sync_category_ids_sent(sync_run_item)
+    evidence = sync_category_evidence(sync_run_item)
+    standard = normalized_category_ids(evidence["selected_category_ids"])
+    anime = normalized_category_ids(evidence["selected_anime_category_ids"])
+    parts = []
+    parts << standard.join(", ") if standard.any?
+    parts << "Anime: #{anime.join(', ')}" if anime.any?
+
+    parts.presence&.join(" · ") || "No category IDs"
+  end
+
+  def sync_category_support(sync_run_item)
+    evidence = sync_category_evidence(sync_run_item)
+
+    case evidence["category_mode"]
+    when "auto"
+      if sync_category_support_confirmed?(evidence)
+        "Selected IDs were advertised by Jackett"
+      elsif evidence["jackett_categories_checked"] == true
+        "Some selected IDs were not advertised by Jackett"
+      else
+        "Jackett support was not checked"
+      end
+    when "custom"
+      "Not checked in Custom mode"
+    when "none"
+      "Not needed in None mode"
+    else
+      "Not available"
+    end
+  end
+
+  def sync_category_selection_basis(sync_run_item)
+    evidence = sync_category_evidence(sync_run_item)
+
+    case evidence["category_mode"]
+    when "auto"
+      evidence["root_fallback"] ? "Compatible app root category" : "Compatible app defaults"
+    when "custom"
+      "Saved custom IDs"
+    when "none"
+      "Categories disabled"
+    else
+      "Not available"
+    end
+  end
+
+  def sync_category_evidence?(sync_run_item)
+    IndexerApp::CATEGORY_MODES.include?(sync_category_evidence(sync_run_item)["category_mode"])
+  end
+
+  private
+
+    def sync_category_evidence(sync_run_item)
+      evidence = sync_run_item.category_evidence
+      evidence.is_a?(Hash) ? evidence.stringify_keys : {}
+    end
+
+    def sync_category_support_confirmed?(evidence)
+      return false unless evidence["jackett_categories_checked"] == true
+
+      selected = normalized_category_ids(evidence["selected_category_ids"]) +
+        normalized_category_ids(evidence["selected_anime_category_ids"])
+      advertised = normalized_category_ids(evidence["jackett_category_ids"])
+
+      selected.any? && (selected - advertised).empty?
+    end
+
+    def normalized_category_ids(value)
+      Array(value).filter_map { |id| Integer(id, exception: false) }.select(&:positive?).uniq
+    end
 end

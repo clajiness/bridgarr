@@ -12,6 +12,8 @@ RSpec.describe Sync::ErrorClassifier do
     result = described_class.call("Query successful, but no results in the configured categories were returned from your indexer.")
 
     expect(result.kind).to eq("category_mismatch")
+    expect(result.summary).to eq("The app's validation search returned no releases in the selected categories.")
+    expect(result.recommendation).to include("Retry the assignment once", "review its category settings")
     expect(result).not_to be_retryable
   end
 

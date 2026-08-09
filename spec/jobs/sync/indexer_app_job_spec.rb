@@ -274,13 +274,31 @@ RSpec.describe Sync::IndexerAppJob, type: :job do
       skipped?: false,
       remote_indexer_id: nil,
       message: "Query successful, but no results in the configured categories were returned from your indexer.",
-      error: "Query successful, but no results in the configured categories were returned from your indexer."
+      error: "Query successful, but no results in the configured categories were returned from your indexer.",
+      category_evidence: {
+        category_mode: "auto",
+        selected_category_ids: [ 2000, 2010 ],
+        selected_anime_category_ids: [],
+        jackett_category_ids: [ 2000, 2010, 8000 ],
+        jackett_categories_checked: true,
+        arr_default_category_ids: [ 2000, 2010 ],
+        arr_default_anime_category_ids: [],
+        root_fallback: false,
+        internal_note: "must not be persisted"
+      }
     )
     allow(Sync::IndexerAppSync).to receive(:call).and_return(result)
 
     described_class.perform_now(sync_run_item.id)
 
     expect(sync_run_item.reload).to have_attributes(status: "mismatched", attempt_count: 1, error_kind: "category_mismatch", retryable: false)
+    expect(sync_run_item.category_evidence).to include(
+      "category_mode" => "auto",
+      "selected_category_ids" => [ 2000, 2010 ],
+      "jackett_category_ids" => [ 2000, 2010, 8000 ],
+      "jackett_categories_checked" => true
+    )
+    expect(sync_run_item.category_evidence).not_to have_key("internal_note")
     expect(sync_run.reload).to have_attributes(status: "mismatched", failure_count: 0, mismatch_count: 1)
     expect(enqueued_indexer_app_jobs).to be_empty
   end

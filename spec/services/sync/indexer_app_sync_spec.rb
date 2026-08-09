@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe Sync::IndexerAppSync do
   class FakeGenericTorznabClient
-    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, keyword_init: true)
+    Result = Struct.new(:success?, :skipped?, :remote_indexer_id, :message, :error, :category_evidence, keyword_init: true)
 
     attr_reader :calls
 
@@ -221,7 +221,8 @@ RSpec.describe Sync::IndexerAppSync do
         skipped?: false,
         remote_indexer_id: nil,
         message: "Query successful, but no results in the configured categories were returned from your indexer.",
-        error: "Query successful, but no results in the configured categories were returned from your indexer."
+        error: "Query successful, but no results in the configured categories were returned from your indexer.",
+        category_evidence: { category_mode: "auto", selected_category_ids: [ 5000 ] }
       )
     )
 
@@ -229,6 +230,7 @@ RSpec.describe Sync::IndexerAppSync do
 
     expect(result).not_to be_success
     expect(result).not_to be_skipped
+    expect(result.category_evidence).to eq(category_mode: "auto", selected_category_ids: [ 5000 ])
     expect(assignment.reload.last_status).to eq("mismatch")
     expect(assignment.last_error).to include("no results in the configured categories")
   end

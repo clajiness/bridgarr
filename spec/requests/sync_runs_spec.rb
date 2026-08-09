@@ -139,6 +139,79 @@ RSpec.describe "Sync runs", type: :request do
     expect(response.body).not_to include("super-secret-key")
   end
 
+  it "explains a category mismatch without overwhelming the user" do
+    arr_app = ArrApp.create!(name: "Radarr", app_type: "radarr", base_url: "http://localhost:7878", api_key: "radarr-api-key")
+    indexer = Indexer.create!(name: "LimeTorrents", jackett_id: "limetorrents")
+    indexer_app = IndexerApp.create!(arr_app:, indexer:, last_status: "mismatch")
+    sync_run = SyncRun.create!(status: "mismatched", total_count: 1, mismatch_count: 1, started_at: Time.current, finished_at: Time.current)
+    sync_run_item = sync_run.sync_run_items.create!(
+      indexer_app:,
+      indexer_name: indexer.name,
+      arr_app_name: arr_app.name,
+      status: "mismatched",
+      error: "Query successful, but no results in the configured categories were returned from your indexer.",
+      error_kind: "category_mismatch",
+      finished_at: Time.current,
+      category_evidence: {
+        category_mode: "auto",
+        selected_category_ids: [ 2000, 2010 ],
+        selected_anime_category_ids: [],
+        jackett_category_ids: [ 2000, 2010, 2040, 8000 ],
+        jackett_categories_checked: true,
+        arr_default_category_ids: [ 2000, 2010 ],
+        arr_default_anime_category_ids: [],
+        root_fallback: false
+      }
+    )
+
+    get sync_run_path(sync_run)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "Auto mode selected categories that Jackett reports as supported",
+      "Retry assignment",
+      "Review categories",
+      "Show category details",
+      "2000, 2010",
+      "Selected IDs were advertised by Jackett",
+      "Compatible app defaults"
+    )
+    expect(response.body).not_to include("2000, 2010, 2040, 8000")
+
+    document = Nokogiri::HTML(response.body)
+    expect(document.at_css("form[action='#{sync_indexer_app_path(indexer_app)}'][method='post']")).to be_present
+    expect(document.at_css("a[href='#{edit_indexer_app_path(indexer_app)}']").text).to eq("Review categories")
+    expect(document.at_xpath('//summary[normalize-space()="Show category details"]/parent::details').key?("open")).to be(false)
+    diagnostic_control = document.at_css('[data-controller="clipboard"]')
+    diagnostic_report = Base64.strict_decode64(diagnostic_control["data-clipboard-report-value"])
+    expected_diagnostic_path = diagnostic_indexer_app_path(indexer_app, format: :text, sync_run_item_id: sync_run_item.id)
+    expect(diagnostic_control.at_css('[data-clipboard-target="fallback"]')["href"]).to eq(expected_diagnostic_path)
+    expect(diagnostic_report).to include("Failure kind: category_mismatch", "Selected job status: mismatched", "Categories submitted: 2000,2010")
+
+    get expected_diagnostic_path
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Failure kind: category_mismatch", "Selected job status: mismatched", "Categories submitted: 2000,2010")
+  end
+
+  it "gives legacy mismatches safe guidance without inventing category details" do
+    sync_run = SyncRun.create!(status: "mismatched", total_count: 1, mismatch_count: 1, started_at: Time.current, finished_at: Time.current)
+    sync_run.sync_run_items.create!(
+      indexer_name: "Legacy indexer",
+      arr_app_name: "Radarr",
+      status: "mismatched",
+      error: "Query successful, but no results in the configured categories were returned from your indexer.",
+      error_kind: "category_mismatch",
+      finished_at: Time.current
+    )
+
+    get sync_run_path(sync_run)
+
+    expect(response).to have_http_status(:ok)
+    expect(Nokogiri::HTML(response.body).text).to include("This can be temporary, so retry once before changing the assignment's categories.")
+    expect(response.body).not_to include("Show category details", "Retry assignment", "Review categories")
+  end
+
   it "renders retrying items with wrapped sanitized technical details" do
     arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "sonarr-api-key")
     indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")

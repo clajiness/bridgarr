@@ -80,6 +80,7 @@ class SyncRunItem < ApplicationRecord
       finished_at: nil,
       error: nil,
       error_kind: nil,
+      category_evidence: nil,
       retryable: false
     )
   end
@@ -94,7 +95,8 @@ class SyncRunItem < ApplicationRecord
       error: sanitized_error,
       error_kind: classification&.kind,
       retryable: classification&.retryable? || false,
-      next_retry_at: nil
+      next_retry_at: nil,
+      category_evidence: category_evidence_from(result)
     }
     if planned_action.blank? && result.respond_to?(:action) && result.action.present?
       attributes[:planned_action] = result.action
@@ -143,5 +145,29 @@ class SyncRunItem < ApplicationRecord
       return "mismatched" if classification&.kind == "category_mismatch"
 
       "failed"
+    end
+
+    def category_evidence_from(result)
+      return unless result.respond_to?(:category_evidence)
+      return unless result.category_evidence.respond_to?(:to_h)
+
+      evidence = result.category_evidence.to_h.stringify_keys
+      category_mode = evidence["category_mode"].to_s
+      return unless IndexerApp::CATEGORY_MODES.include?(category_mode)
+
+      {
+        "category_mode" => category_mode,
+        "selected_category_ids" => normalized_category_evidence_ids(evidence["selected_category_ids"]),
+        "selected_anime_category_ids" => normalized_category_evidence_ids(evidence["selected_anime_category_ids"]),
+        "jackett_category_ids" => normalized_category_evidence_ids(evidence["jackett_category_ids"]),
+        "jackett_categories_checked" => evidence["jackett_categories_checked"] == true,
+        "arr_default_category_ids" => normalized_category_evidence_ids(evidence["arr_default_category_ids"]),
+        "arr_default_anime_category_ids" => normalized_category_evidence_ids(evidence["arr_default_anime_category_ids"]),
+        "root_fallback" => evidence["root_fallback"] == true
+      }
+    end
+
+    def normalized_category_evidence_ids(value)
+      Array(value).filter_map { |id| Integer(id, exception: false) }.select(&:positive?).uniq
     end
 end

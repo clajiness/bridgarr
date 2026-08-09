@@ -1,6 +1,6 @@
 module Arr
   class GenericTorznabClient
-    Result = Data.define(:success?, :skipped?, :remote_indexer_id, :message, :error, :http_status, :action, :desired_digest)
+    Result = Data.define(:success?, :skipped?, :remote_indexer_id, :message, :error, :http_status, :action, :desired_digest, :category_evidence)
 
     REQUIRED_TORZNAB_FIELDS = %w[baseUrl apiPath apiKey].freeze
     PRIVATE_FIELD_VALUE = "********"
@@ -504,7 +504,8 @@ module Arr
           error: nil,
           http_status:,
           action:,
-          desired_digest: desired_configuration_digest
+          desired_digest: desired_configuration_digest,
+          category_evidence: current_category_evidence
         )
       end
 
@@ -514,7 +515,17 @@ module Arr
 
       def skipped(message)
         message = Secrets::Redactor.call(message)
-        Result.new(success?: false, skipped?: true, remote_indexer_id: nil, message:, error: message, http_status: nil, action: nil, desired_digest: nil)
+        Result.new(
+          success?: false,
+          skipped?: true,
+          remote_indexer_id: nil,
+          message:,
+          error: message,
+          http_status: nil,
+          action: nil,
+          desired_digest: nil,
+          category_evidence: current_category_evidence
+        )
       end
 
       def http_failure(response, action)
@@ -527,7 +538,40 @@ module Arr
 
       def failure(message, http_status: nil)
         message = Secrets::Redactor.call(message)
-        Result.new(success?: false, skipped?: false, remote_indexer_id: nil, message:, error: message, http_status:, action: nil, desired_digest: nil)
+        Result.new(
+          success?: false,
+          skipped?: false,
+          remote_indexer_id: nil,
+          message:,
+          error: message,
+          http_status:,
+          action: nil,
+          desired_digest: nil,
+          category_evidence: current_category_evidence
+        )
+      end
+
+      def current_category_evidence
+        return unless @category_policy
+
+        categories_field = torznab_schema_field?("categories")
+        anime_categories_field = torznab_schema_field?("animeCategories")
+        return unless categories_field || anime_categories_field
+
+        {
+          category_mode:,
+          selected_category_ids: categories_field ? category_ids : [],
+          selected_anime_category_ids: anime_categories_field ? anime_category_ids : [],
+          jackett_category_ids: (torznab_category_ids unless category_policy_manual?),
+          jackett_categories_checked: !category_policy_manual? && torznab_caps_result.success?,
+          arr_default_category_ids:,
+          arr_default_anime_category_ids:,
+          root_fallback: category_policy.root_fallback?
+        }
+      end
+
+      def torznab_schema_field?(field_name)
+        torznab_schema.fetch("fields", []).any? { |field| field["name"] == field_name }
       end
 
       def desired_configuration_digest
