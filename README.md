@@ -3,9 +3,9 @@
 **The indexer bridge that really ties the stack together.**
 
 Bridgarr is a Jackett-backed Torznab proxy and indexer sync manager for Sonarr,
-Radarr, Lidarr, Whisparr, and compatible apps. Configure Jackett once, import
-Jackett indexers once, assign them to one or more apps, and let Bridgarr create
-managed Generic Torznab indexers.
+Radarr, Lidarr, Whisparr, and compatible apps. Configure Jackett once, discover
+its configured indexers, assign them to one or more apps, and let Bridgarr
+create and maintain managed Generic Torznab indexers.
 
 Bridgarr is not a Prowlarr clone. It is intentionally focused on Jackett-backed
 indexer discovery, assignment, sync, and optional Torznab bridging.
@@ -23,7 +23,7 @@ The current beta includes:
 - Local administrator authentication with privileged CLI provisioning
 - Session timeout, failed-attempt lockout, and password recovery
 - Jackett connection settings and connection testing
-- Jackett indexer discovery and selective import
+- Jackett indexer discovery, selective import, and reusable assignment setup
 - Sonarr, Radarr, Lidarr, Whisparr, and compatible app records
 - App-aware API routing, including Lidarr v1 and Sonarr/Radarr/Whisparr v3
 - App connection testing
@@ -31,8 +31,12 @@ The current beta includes:
   interactive-search controls
 - Centralized assignment matrix with bookmarked operational filters and
   contextual bulk actions
-- Read-only reconciliation previews with redacted field-level changes
-- Guided Jackett import, assignment creation, and optional immediate sync
+- Review-first reconciliation previews with redacted field-level changes and
+  explicit association repair, local revert, and remote apply actions
+- Guided Jackett import, assignment creation or update, and optional immediate
+  sync
+- App-aware category selection, a readable Jackett category catalog, and
+  category-mismatch guidance
 - Jackett rename, disabled, and missing-indexer detection
 - Managed Generic Torznab indexer sync
 - Bulk sync jobs with Solid Queue and a delayed retry for transient failures,
@@ -41,6 +45,8 @@ The current beta includes:
 - Optional bridged Torznab search and download proxying through Bridgarr
 - Proxy activity, sync run history, dashboard health summaries, and live page
   refreshes where operational state can change in the background
+- Read-only Solid Queue operations with worker and job-state counts, retained
+  history, and past and future recurring-run tables
 
 OIDC, multi-user permissions, and deeper production hardening are still future
 work. Use HTTPS through a trusted reverse proxy before exposing Bridgarr outside
@@ -131,13 +137,15 @@ sure the mounted storage directory is writable by UID/GID `1000`.
    Jackett.
 4. Paste the Jackett API key from the Jackett dashboard.
 5. Test the Jackett connection.
-6. Open **Indexers**, discover from Jackett, and import the indexers you want
-   Bridgarr to manage.
-7. Open **Apps**, add your Sonarr/Radarr/Lidarr/Whisparr instances, and test
+6. Open **Apps**, add your Sonarr/Radarr/Lidarr/Whisparr instances, and test
    each connection.
-8. Open **Assignments** to review the assignment matrix, or create assignments
-   directly during discovery.
-9. Preview reconciliation and apply the safe selected changes.
+7. Open **Indexers**, choose **Discover and assign**, select the configured
+   Jackett indexers and destination apps, and review the desired settings.
+8. Choose whether to **Create assignments and sync immediately**. Leave it
+   selected to queue the initial sync, or clear it and use **Assignments** to
+   preview first.
+9. Open **Assignments** to review the matrix and preview later changes before
+   applying them.
 10. In the *arr app, test the new `Indexer (Bridgarr)` Generic Torznab indexer.
 
 By default, managed *arr indexers point directly at Jackett. This keeps Jackett
@@ -151,12 +159,19 @@ and Bridgarr forwards Torznab traffic to Jackett.
 
 ## Setup and Reconciliation
 
+Indexer discovery is reusable. Indexers already stored in Bridgarr are shown as
+**In Bridgarr · Up to date** and left unchecked by default. Selecting one again
+does not create a duplicate: Bridgarr accepts its current Jackett name, creates
+missing assignments for the selected destinations, and updates the selected
+assignments with the connection and category settings shown in the discovery
+form. Destinations that are not selected are not changed.
+
 The assignment matrix is Bridgarr's desired-state workspace. Each cell is
 either unassigned or a managed assignment. An assigned cell shows the desired
 state of three independent *arr controls—**RSS**, **Automatic search**, and
 **Interactive search**—along with its direct/bridged connection mode and latest
 reconciliation state. New assignments start with all three search modes enabled
-and use direct mode.
+and use direct connection and automatic category modes.
 
 Turning off one or more search modes keeps the assignment managed; it does not
 delete the remote indexer. Removing an assignment is a separate action that
@@ -180,13 +195,37 @@ those cells first. Search-mode, connection-mode, and category changes proceed
 directly to reconciliation preview. The separate indexers-per-page selector
 updates the page automatically and is not a bulk-action control.
 
+### Category modes
+
+- **Auto** uses the destination app's default Generic Torznab categories that
+  the Jackett indexer advertises as supported. When necessary, Bridgarr can use
+  a compatible app-wide root category instead.
+- **Custom** configures the destination app with the comma-separated positive
+  category IDs saved on the assignment.
+- **None** sends empty category lists for manual troubleshooting. Some apps may
+  reject that configuration or return no releases.
+
+Assignment settings show the category names and IDs reported by that Jackett
+indexer, including which custom IDs are selected and whether any selected IDs
+were not advertised. Bridgarr briefly caches the catalog and can show the last
+successful copy if Jackett cannot be refreshed. A category-mismatch result gives
+a short explanation and links to retry or review the assignment; the exact mode
+and category selection used for that attempt remain available under
+**Show category details**.
+
 Use **Preview** before applying changes. Bridgarr inspects each destination once
 and classifies assignments as create, update, unchanged, not applicable,
-conflict, orphaned, unreachable, or invalid. Category-incompatible assignments
-are not applicable and do not require attention. Previewing does not change
-remote applications. Apply rechecks the plan and refuses a stale preview.
-Unmanaged overlaps and stale remote associations require an explicit repair or
-forget action.
+conflict, orphaned, unreachable, or invalid. Unchanged assignments are counted
+but kept in a collapsed **No change** section so the actionable rows stay in
+view. Auto-mode assignments without compatible categories are not applicable
+and are not applied; review their category settings if that result is
+unexpected.
+
+Opening a preview does not change remote applications. Its explicit actions can
+revert reviewed fields to Bridgarr's last successfully applied local state,
+forget a stale local association, or repair an association to an existing
+remote indexer. The repair confirmation states whether it will also queue a
+sync. Applying a plan rechecks it and refuses a stale preview.
 
 Bulk synchronization starts from this preview. A plan that will turn off remote
 RSS, automatic search, or interactive search prominently reports the number of
@@ -198,7 +237,8 @@ inspected the destination.
 Successful applies record a digest of the normalized configuration that was
 verified or sent. Later previews use it to distinguish local desired-state
 changes from remote drift without persisting raw API keys. Failure views can
-copy a redacted diagnostic report suitable for a GitHub issue.
+copy a redacted diagnostic report suitable for a GitHub issue; when browser
+clipboard access is unavailable, Bridgarr offers the report in a separate tab.
 
 ## Network Notes
 
@@ -350,82 +390,21 @@ reaches Rails. Configure the proxy to log the path without the query string or
 to redact the `apikey` parameter. Bridgarr cannot sanitize logs produced
 upstream.
 
-### Upgrading existing installations
+## Upgrading
 
-#### v0.8.0 independent search modes
-
-The v0.8.0 migration replaces the assignment-level **Enabled** switch with
-independent desired-state controls for RSS, automatic search, and interactive
-search. Existing assignments and their last-applied snapshots are preserved: a
-previously enabled assignment starts with all three modes enabled, while a
-previously disabled assignment starts with all three modes disabled.
-
-After upgrading, open **Assignments** and use **Preview** before applying remote
-changes. You can then adjust any of the three modes independently from an
-assignment's settings or with **Update search modes** in the matrix.
-
-#### v0.6.1 legacy assignment-state repair
-
-Some databases first initialized from a schema shipped before v0.4 stored an
-assignment's `enabled` value as `NULL`, even though the original migration
-intended new assignments to default to enabled. Before v0.6 that value was not a
-user-facing desired-state setting and synchronization always enabled the three
-remote search modes. v0.6 began interpreting the unset value as disabled.
-
-The v0.6.1 migration automatically changes only those legacy `NULL` values to
-`true` and restores the database default/not-null constraint. A stored `false`
-is left unchanged because it may be an intentional v0.6-or-later disable. The
-repair is idempotent, changes only Bridgarr's local desired state, and does not
-inspect or synchronize any remote application.
-
-The same narrow repair can be audited manually when automatic migrations are
-disabled. Dry-run is explicit, and mutation requires confirmation:
-
-```bash
-docker compose exec -e DRY_RUN=true bridgarr bin/rails bridgarr:repair_legacy_assignment_state
-docker compose exec -e CONFIRM=true bridgarr bin/rails bridgarr:repair_legacy_assignment_state
-```
-
-For a non-container deployment:
-
-```bash
-DRY_RUN=true bin/rails bridgarr:repair_legacy_assignment_state
-CONFIRM=true bin/rails bridgarr:repair_legacy_assignment_state
-```
-
-After upgrading or running the task, use **Preview changes** and review the plan
-before applying any remote synchronization. If a row is stored as `false`
-rather than `NULL`, Bridgarr cannot safely infer whether that was an intentional
-v0.6 choice; review that assignment manually instead of bulk-repairing it.
-
-Existing application settings, assignments, and sync history are preserved,
-but the upgrade must be completed while untrusted network access is blocked:
+Back up the persistent storage mounted at `/rails/storage`, then pull and
+restart the container:
 
 ```bash
 docker compose pull bridgarr
 docker compose up -d bridgarr
-docker compose exec bridgarr bin/rails bridgarr:admin:create
 ```
 
 With the published image's default server command, container startup runs
 `bin/rails db:prepare` before Rails starts. If the server command is overridden,
-run `docker compose exec bridgarr bin/rails db:prepare` before the administrator
-task. Do not restore untrusted access merely because the container is healthy:
-sign in, verify the management UI, and resynchronize every existing bridged
-assignment first.
-
-The upgrade replaces a missing or former known `bridgarr` Torznab proxy key
-with a new cryptographically random per-install key. The former value is never
-retained or accepted. Existing synced bridged assignments are marked as
-requiring resynchronization, and their searches and downloads fail securely
-until each assignment is synced again. Direct Jackett assignments do not use
-the proxy key and remain unaffected.
-
-Fresh installations also generate a cryptographically random per-install proxy
-key automatically; there is no operator-supplied default. To replace it later,
-use **Settings → Rotate proxy API key**. Rotation immediately invalidates the
-previous key, so resynchronize every bridged assignment before relying on
-bridged search or download traffic again. Direct assignments remain unaffected.
+run `docker compose run --rm bridgarr bin/rails db:prepare` before starting the
+web process. Sign in and verify the dashboard before relying on the upgraded
+installation.
 
 ## Runtime Settings
 
@@ -435,6 +414,7 @@ bridged search or download traffic again. Direct assignments remain unaffected.
 | `TZ` | Docker image: `UTC` | Controls the process timezone used when Bridgarr renders timestamps; non-container deployments inherit the host default when unset. |
 | `SOLID_QUEUE_IN_PUMA` | Docker image: `true` | Runs the Solid Queue supervisor inside the web container. Puma treats an unset value as `false` outside the image. |
 | `SOLID_QUEUE_FINISHED_JOB_RETENTION_DAYS` | `30` | Rolling retention window for completed Solid Queue jobs. Must match `[1-9][0-9]*` exactly; invalid values stop startup. |
+| `JOB_CONCURRENCY` | `1` | Number of Solid Queue worker processes; each process has three worker threads. Increase cautiously with SQLite. |
 | `ARR_INDEXER_SYNC_TIMEOUT_SECONDS` | `150` | Timeout while Bridgarr waits for an *arr app to create/test a managed indexer. |
 | `ARR_INDEXER_INSPECTION_TIMEOUT_SECONDS` | `15` | Timeout for read-only Arr inventory and schema inspection during reconciliation previews. |
 | `BRIDGARR_SYNC_RETRY_DELAY_SECONDS` | `45` | Delay before the one automatic retry for a retryable assignment sync failure, including a busy destination database. |
@@ -497,12 +477,14 @@ Queue worker is running.
 
 The read-only **Jobs** screen shows registered queue processes, current queue
 counts, completed-job counts, recent retained jobs, recurring-task history, and
-the next five times for each recurring schedule. Completed jobs remain available
-for a rolling 30 days by default; set `SOLID_QUEUE_FINISHED_JOB_RETENTION_DAYS`
-to another positive whole number of days when a different retention window is
-needed. Each recurring schedule shows its 10 latest retained runs, while the
-paginated recent-jobs table provides the full retained history. Bridgarr does
-not create a separate job-history table.
+the next five times for each recurring schedule. Completed jobs become eligible
+for automatic cleanup after a rolling 30 days by default; failed jobs remain
+until they are retried or discarded. Set
+`SOLID_QUEUE_FINISHED_JOB_RETENTION_DAYS` to another positive whole number of
+days when a different completed-job retention window is needed. Each recurring
+schedule shows its 10 latest retained runs, while the paginated recent-jobs
+table provides the full retained history. Bridgarr does not create a separate
+job-history table.
 
 ## Health Checks
 
@@ -544,12 +526,12 @@ Pushes to `main` publish:
 - `main`
 - `sha-<commit>`
 
-Stable version tags publish semver image tags and update `latest`. For example, pushing Git tag
-`v0.3.3` publishes image tags like:
+Stable version tags publish semver image tags and update `latest`. For example,
+pushing Git tag `v0.9.0` publishes image tags like:
 
 - `latest`
-- `0.3.3`
-- `0.3`
+- `0.9.0`
+- `0.9`
 
 The image tags intentionally omit the leading `v`.
 
@@ -598,12 +580,18 @@ and *arr API keys, and the generated Torznab proxy key like passwords. The
 Torznab routes are intentionally reachable without an administrator session and
 depend on that proxy key, while `/up` is intentionally unauthenticated.
 
+Fresh installations generate a cryptographically random per-install proxy key;
+there is no operator-supplied default. To replace it, use **Settings → Rotate
+proxy API key**. Rotation immediately invalidates the previous key, so
+resynchronize every bridged assignment before relying on bridged search or
+download traffic again. Direct assignments remain unaffected.
+
 ## Roadmap
 
 Likely follow-up work:
 
-- clearer readiness and troubleshooting flows
-- retention controls for sync/proxy history
-- more compatibility checks before syncing indexers to apps
-- better deployment examples
+- additional guided remediation for less-common sync failures
+- retention controls for sync and proxy-activity history
+- additional compatibility checks before syncing indexers to apps
+- deployment examples for split workers and common reverse proxies
 - OIDC and multi-user authorization
