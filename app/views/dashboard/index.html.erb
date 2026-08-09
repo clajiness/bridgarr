@@ -21,7 +21,7 @@
     </div>
     <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
       <% unless @dashboard.readiness.complete? %><%= link_to "Setup", readiness_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
-      <% if @dashboard.external_services_health.attention_count.positive? || @dashboard.health_checks_pending? %><%= link_to "Health", health_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
+      <% if @dashboard.external_services_health.attention_count.positive? || @dashboard.health_checks_pending? || @dashboard.health_cycle_attention? %><%= link_to "Health", health_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
       <% if @dashboard.latest_sync_run_needs_attention? || @dashboard.latest_sync_run_active? %><%= link_to "Sync run", sync_run_path(@dashboard.latest_sync_run), class: "text-slate-700 hover:text-slate-950" %><% end %>
       <% if @dashboard.jackett_changes_count.positive? %><%= link_to "Jackett changes", indexers_path, class: "text-slate-700 hover:text-slate-950" %><% end %>
       <% if @dashboard.proxy_failures_count.positive? %><%= link_to "Proxy failures", proxy_activity_path(status: "failed"), class: "text-slate-700 hover:text-slate-950" %><% end %>
@@ -102,7 +102,13 @@
                 <td class="px-4 py-4 text-right">
                   <div class="flex flex-wrap justify-end gap-x-3 gap-y-2 text-xs font-semibold">
                     <%= link_to "Preview", preview_indexer_apps_path(assignment_ids: [ assignment.id ]), class: "text-blue-700 hover:text-blue-900" %>
-                    <%= button_to "Sync", sync_indexer_app_path(assignment), method: :post, class: "cursor-pointer text-slate-700 hover:text-slate-950", form: { class: "inline" } %>
+                    <% if !row.indexer.enabled? || !row.arr_app.enabled? %>
+                      <span class="text-slate-500">Sync paused</span>
+                    <% elsif Jackett::IndexerAvailability.call(indexer: row.indexer).available? %>
+                      <%= button_to "Sync", sync_indexer_app_path(assignment), method: :post, class: "cursor-pointer text-slate-700 hover:text-slate-950", form: { class: "inline" } %>
+                    <% else %>
+                      <%= link_to "Review source", row.indexer, class: row.status == "source_unverified" ? "text-amber-800 hover:text-amber-950" : "text-red-700 hover:text-red-900" %>
+                    <% end %>
                     <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "dashboard"), class: "text-slate-700 hover:text-slate-950" %>
                     <% if row.attention? || assignment.last_error.present? %><%= render "indexer_apps/diagnostic_button", assignment: %><% end %>
                   </div>

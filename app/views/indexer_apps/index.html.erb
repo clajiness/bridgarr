@@ -48,7 +48,7 @@
                 <th class="sticky left-0 z-10 bg-white px-4 py-4 text-left">
                   <%= link_to indexer.name, indexer, class: "font-semibold text-slate-950 hover:underline" %>
                   <span class="mt-1 block font-mono text-xs font-normal text-slate-500"><%= indexer.jackett_id %></span>
-                  <% if indexer.jackett_state.in?(%w[renamed changed disabled missing]) %>
+                  <% if indexer.jackett_state.in?(%w[unverified renamed changed disabled missing]) %>
                     <span class="mt-2 inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(indexer.jackett_state) %>"><%= indexer.jackett_state.humanize %></span>
                   <% end %>
                 </th>

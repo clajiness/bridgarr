@@ -3,11 +3,19 @@
 
   <% if sync_run_item.indexer_app.present? %>
     <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-semibold">
-      <%= button_to "Retry assignment",
-        sync_indexer_app_path(sync_run_item.indexer_app),
-        class: "text-blue-700 hover:text-blue-900",
-        form_class: "inline",
-        data: { turbo_confirm: "Retry this assignment using its current settings?" } %>
+      <% if !sync_run_item.indexer_app.indexer.enabled? || !sync_run_item.indexer_app.arr_app.enabled? %>
+        <span class="text-slate-500">Sync paused</span>
+      <% elsif (source_availability = Jackett::IndexerAvailability.call(indexer: sync_run_item.indexer_app.indexer)).available? %>
+        <%= button_to "Retry assignment",
+          sync_indexer_app_path(sync_run_item.indexer_app),
+          class: "text-blue-700 hover:text-blue-900",
+          form_class: "inline",
+          data: { turbo_confirm: "Retry this assignment using its current settings?" } %>
+      <% else %>
+        <%= link_to "Review source",
+          sync_run_item.indexer_app.indexer,
+          class: source_availability.state == "unverified" ? "text-amber-800 hover:text-amber-950" : "text-red-700 hover:text-red-900" %>
+      <% end %>
       <%= link_to "Review categories",
         edit_indexer_app_path(sync_run_item.indexer_app),
         class: "text-blue-700 hover:text-blue-900" %>

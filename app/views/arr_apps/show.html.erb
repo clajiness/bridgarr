@@ -84,6 +84,15 @@
                   <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "arr_app"), class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
                   <% if active_sync_run_item.present? %>
                     <%= link_to "View sync", sync_run_path(active_sync_run_item.sync_run), class: "inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100" %>
+                  <% elsif !@arr_app.enabled? || !assignment.indexer.enabled? %>
+                    <span class="inline-flex items-center rounded-md border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-slate-500">Sync paused</span>
+                  <% elsif !(source_availability = Jackett::IndexerAvailability.call(indexer: assignment.indexer)).available? %>
+                    <%= link_to "Review source",
+                      assignment.indexer,
+                      class: class_names(
+                        "inline-flex items-center justify-center rounded-md border px-3 py-1.5 text-xs font-semibold",
+                        source_availability.state == "unverified" ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100" : "border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                      ) %>
                   <% else %>
                     <%= button_to "Sync", sync_indexer_app_path(assignment), params: { return_to: "arr_app" }, class: "rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-stone-50" %>
                   <% end %>
@@ -108,6 +117,6 @@
   </section>
 
   <div class="border-t border-slate-200 pt-6">
-    <%= button_to "Remove app", @arr_app, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", data: { turbo_confirm: "Remove this app?" } %>
+    <%= button_to "Remove app from Bridgarr", @arr_app, method: :delete, class: "rounded-md bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600", form: { data: { turbo_confirm: "Remove this app from Bridgarr? Managed indexers already in the app will not be removed." } } %>
   </div>
 </div>

@@ -115,6 +115,17 @@ RSpec.describe IndexerApp, type: :model do
     expect(assignment.last_inspected_at).to be_nil
   end
 
+  it "does not change desired state while the assignment is actively syncing" do
+    assignment = described_class.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    expect(assignment.update(enable_rss: false)).to be(false)
+
+    expect(assignment.errors.full_messages).to include("Wait for the active assignment sync to finish before changing its settings.")
+    expect(assignment.reload).to be_enable_rss
+  end
+
   it "records skipped sync results" do
     assignment = described_class.create!(arr_app: arr_app, indexer: indexer)
     result = Sync::IndexerAppSync::Result.new(

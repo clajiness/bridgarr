@@ -33,7 +33,7 @@
             <tr>
               <td class="px-4 py-3 font-medium text-slate-950">
                 <%= link_to indexer.name, indexer, class: "hover:underline" %>
-                <% if indexer.jackett_state.in?(%w[renamed changed disabled missing]) %><span class="mt-1 inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(indexer.jackett_state) %>"><%= indexer.jackett_state.humanize %> in Jackett</span><% end %>
+                <% if indexer.jackett_state.in?(%w[unverified renamed changed disabled missing]) %><span class="mt-1 inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(indexer.jackett_state) %>"><%= indexer.jackett_state.humanize %> in Jackett</span><% end %>
               </td>
               <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= indexer.jackett_id %></td>
               <td class="px-4 py-3 text-slate-700"><%= indexer.arr_apps.map(&:name).to_sentence.presence || "None" %></td>

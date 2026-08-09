@@ -21,6 +21,8 @@ module Sync
           "remote_conflict"
         elsif orphaned?
           "orphaned"
+        elsif jackett_source_unavailable?
+          "jackett_source_unavailable"
         elsif authentication?
           "authentication"
         elsif challenge_solver_timeout?
@@ -64,6 +66,10 @@ module Sync
 
       def orphaned?
         message.match?(/remote indexer id .* no longer exists|stale remote association/i)
+      end
+
+      def jackett_source_unavailable?
+        message.match?(/missing from Jackett|not configured in Jackett|not been verified in the current Jackett connection/i)
       end
 
       def authentication?
@@ -130,6 +136,8 @@ module Sync
           "A remote indexer overlaps this assignment but is not safely associated with it."
         when "orphaned"
           "The assignment points to a remote indexer that no longer exists."
+        when "jackett_source_unavailable"
+          "The source indexer is missing, unconfigured, or not yet verified in Jackett."
         when "invalid_configuration"
           "The indexer configuration was rejected or incomplete."
         when "network"
@@ -159,6 +167,8 @@ module Sync
           "Preview reconciliation and explicitly repair the remote association before syncing."
         when "orphaned"
           "Preview reconciliation, then forget the stale association or repair it to the correct remote indexer."
+        when "jackett_source_unavailable"
+          "Discover indexers again. If the source is absent, restore the same ID in Jackett or remove it from Bridgarr and its destination apps."
         when "invalid_configuration"
           "Open assignment settings, correct the rejected value, and preview reconciliation again."
         when "network"

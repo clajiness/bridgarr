@@ -48,6 +48,31 @@ RSpec.describe SyncRun, type: :model do
     expect(queued_item.reload).to have_attributes(status: "failed", error: "No worker was running.")
   end
 
+  it "preserves a completed result when abandonment uses a stale run instance" do
+    sync_run = described_class.create!(status: "running", started_at: Time.current, total_count: 1)
+    item = create_sync_run_item(sync_run:)
+    item.update!(status: "succeeded", finished_at: Time.current)
+
+    sync_run.abandon!(message: "A late abandon request.")
+
+    expect(sync_run.reload).to have_attributes(
+      status: "succeeded",
+      total_count: 1,
+      success_count: 1,
+      failure_count: 0,
+      error: nil
+    )
+  end
+
+  it "does not restart a terminal run through a stale instance" do
+    sync_run = described_class.create!(status: "queued")
+    stale_run = described_class.find(sync_run.id)
+    sync_run.update!(status: "failed", finished_at: Time.current, error: "Queue failed.")
+
+    expect(stale_run.mark_running!).to be(false)
+    expect(stale_run.reload).to have_attributes(status: "failed", error: "Queue failed.")
+  end
+
   it "counts not-applicable items without degrading a successful run" do
     sync_run = described_class.create!(status: "running", started_at: Time.current)
     successful_item = create_sync_run_item(sync_run:)

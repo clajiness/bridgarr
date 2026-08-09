@@ -83,4 +83,55 @@ RSpec.describe Indexer, type: :model do
     expect(indexer.reload.jackett_categories).to eq(categories)
     expect(indexer.jackett_category_catalog_source).to eq("test-source")
   end
+
+  it "marks assigned destinations for reconciliation when its remote identity changes" do
+    indexer = described_class.create!(name: "First Indexer", jackett_id: "first-indexer")
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
+    synced = IndexerApp.create!(indexer:, arr_app:, remote_indexer_id: 42, last_plan_state: "unchanged", last_inspected_at: Time.current)
+
+    indexer.update!(name: "Renamed Indexer")
+
+    expect(synced.reload).to have_attributes(last_plan_state: "update", last_inspected_at: nil)
+  end
+
+  it "clears discovery and health metadata when its Jackett ID changes" do
+    indexer = described_class.create!(
+      name: "First Indexer",
+      jackett_id: "first-indexer",
+      jackett_name: "First Indexer",
+      jackett_configured: true,
+      jackett_last_seen_at: Time.current,
+      jackett_source_digest: "old-source",
+      jackett_state: "unchanged",
+      jackett_category_catalog: [ { "id" => 2000, "name" => "Movies" } ],
+      last_status: "ok",
+      last_tested_at: Time.current
+    )
+
+    indexer.update!(jackett_id: "replacement-indexer")
+
+    expect(indexer).to have_attributes(
+      jackett_state: "unknown",
+      jackett_name: nil,
+      jackett_configured: nil,
+      jackett_last_seen_at: nil,
+      jackett_source_digest: nil,
+      jackett_category_catalog: nil,
+      last_status: nil,
+      last_tested_at: nil
+    )
+  end
+
+  it "does not change indexer configuration while an assignment is actively syncing" do
+    indexer = described_class.create!(name: "First Indexer", jackett_id: "first-indexer")
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://localhost:8989", api_key: "key")
+    assignment = IndexerApp.create!(indexer:, arr_app:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    expect(indexer.update(name: "Changed during sync")).to be(false)
+
+    expect(indexer.errors.full_messages).to include("Wait for active assignment syncs to finish before changing this indexer.")
+    expect(indexer.reload.name).to eq("First Indexer")
+  end
 end

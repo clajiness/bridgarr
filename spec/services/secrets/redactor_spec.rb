@@ -65,4 +65,10 @@ RSpec.describe Secrets::Redactor do
     expect(redacted).to include("password=[REDACTED]", "client_secret: [REDACTED]", '"db_password":"[REDACTED]"')
     expect(redacted).not_to include("hunter2", "deployment-secret", "legacy-password")
   end
+
+  it "does not alter an already redacted message" do
+    message = "GET http://example.test/api?apikey=[REDACTED] api-key=[REDACTED] Authorization: Bearer [REDACTED]"
+
+    expect(described_class.call(described_class.call(message))).to eq(message)
+  end
 end

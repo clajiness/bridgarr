@@ -17,7 +17,11 @@ RSpec.describe "Settings", type: :request do
     document = Nokogiri::HTML(response.body)
     main_column = document.at_css('[data-settings-column="main"]')
     sidebar = document.at_css('[data-settings-column="sidebar"]')
-    expect(main_column.text).to include("Connection settings", "Bridged proxy authentication")
+    expect(main_column.text).to include(
+      "Connection settings",
+      "Bridged proxy authentication",
+      "Discover indexers again before syncing"
+    )
     expect(sidebar.text).to include("Jackett connection", "Build info")
   end
 
@@ -47,6 +51,51 @@ RSpec.describe "Settings", type: :request do
     expect(Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY)).to eq("http://localhost:3000")
     expect(Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY)).to eq("http://localhost:9117")
     expect(Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)).to eq("jackett-api-key")
+  end
+
+  it "rolls back every connection setting when one value cannot be saved" do
+    Setting.write_value(Setting::BRIDGARR_BASE_URL_KEY, "http://original-bridgarr:9697")
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://original-jackett:9117")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "original-key")
+    allow(Setting).to receive(:write_value).and_call_original
+    allow(Setting).to receive(:write_value)
+      .with(Setting::JACKETT_API_KEY_KEY, "replacement-key")
+      .and_raise(ActiveRecord::RecordInvalid.new(Setting.new))
+
+    patch settings_path, params: {
+      settings: {
+        bridgarr_base_url: "http://replacement-bridgarr:9697",
+        jackett_base_url: "http://replacement-jackett:9117",
+        jackett_api_key: "replacement-key"
+      }
+    }
+
+    expect(response).to redirect_to(settings_path)
+    expect(flash[:alert]).to include("Could not save connection settings")
+    expect(Setting.fetch_value(Setting::BRIDGARR_BASE_URL_KEY)).to eq("http://original-bridgarr:9697")
+    expect(Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY)).to eq("http://original-jackett:9117")
+    expect(Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)).to eq("original-key")
+  end
+
+  it "does not change connection settings while an assignment sync is active" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://original-jackett:9117")
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://sonarr:8989", api_key: "key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    patch settings_path, params: {
+      settings: {
+        bridgarr_base_url: "http://replacement-bridgarr:9697",
+        jackett_base_url: "http://replacement-jackett:9117",
+        jackett_api_key: "replacement-key"
+      }
+    }
+
+    expect(response).to redirect_to(settings_path)
+    expect(flash[:alert]).to include("active assignment syncs")
+    expect(Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY)).to eq("http://original-jackett:9117")
   end
 
   it "tracks Jackett API key rotations without treating an unchanged save as a rotation" do
@@ -111,6 +160,17 @@ RSpec.describe "Settings", type: :request do
     expect(flash[:alert]).not_to include("visible-secret", "auth-secret")
   end
 
+  it "records and reports an unexpected Jackett connection-test failure" do
+    allow(Jackett::ConnectionTest).to receive(:call).and_raise(StandardError, "unexpected token=secret-value")
+
+    post test_jackett_settings_path
+
+    expect(response).to redirect_to(settings_path)
+    expect(flash[:alert]).to eq("Unexpected Jackett connection-test failure: unexpected token=[REDACTED]")
+    expect(Setting.fetch_value(Setting::JACKETT_LAST_STATUS_KEY)).to eq("error")
+    expect(Setting.fetch_value(Setting::JACKETT_LAST_ERROR_KEY)).to eq(flash[:alert])
+  end
+
   it "shows the saved Jackett connection status" do
     Setting.write_value(Setting::JACKETT_LAST_STATUS_KEY, "ok")
     Setting.write_value(Setting::JACKETT_LAST_TESTED_AT_KEY, "2026-07-04T12:00:00Z")
@@ -135,6 +195,37 @@ RSpec.describe "Settings", type: :request do
     expect(Setting.fetch_value(Setting::PROXY_API_KEY_KEY)).to eq("new-proxy-key")
     expect(Setting.proxy_api_key_version).to eq(2)
     expect(flash[:notice]).to include("Preview and apply all bridged assignments")
+  end
+
+  it "does not rotate the proxy API key while an assignment sync is active" do
+    Setting.write_value(Setting::PROXY_API_KEY_KEY, "old-proxy-key")
+    Setting.write_value(Setting::PROXY_API_KEY_VERSION_KEY, 1)
+    arr_app = ArrApp.create!(name: "Sonarr", app_type: "sonarr", base_url: "http://sonarr:8989", api_key: "key")
+    indexer = Indexer.create!(name: "EZTV", jackett_id: "eztv")
+    assignment = IndexerApp.create!(arr_app:, indexer:, connection_mode: "bridged")
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    post rotate_proxy_api_key_settings_path
+
+    expect(response).to redirect_to(settings_path)
+    expect(flash[:alert]).to include("active assignment syncs")
+    expect(Setting.fetch_value(Setting::PROXY_API_KEY_KEY)).to eq("old-proxy-key")
+    expect(Setting.proxy_api_key_version).to eq(1)
+  end
+
+  it "reports a proxy-key persistence failure without losing the current key" do
+    Setting.write_value(Setting::PROXY_API_KEY_KEY, "old-proxy-key")
+    Setting.write_value(Setting::PROXY_API_KEY_VERSION_KEY, 1)
+    allow(Setting).to receive(:rotate_proxy_api_key!)
+      .and_raise(ActiveRecord::StatementInvalid, "database token=visible-secret is busy")
+
+    post rotate_proxy_api_key_settings_path
+
+    expect(response).to redirect_to(settings_path)
+    expect(flash[:alert]).to eq("Could not rotate the proxy API key: database token=[REDACTED] is busy")
+    expect(Setting.fetch_value(Setting::PROXY_API_KEY_KEY)).to eq("old-proxy-key")
+    expect(Setting.proxy_api_key_version).to eq(1)
   end
 
   it "warns when bridged assignments require the new proxy key" do

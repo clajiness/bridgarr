@@ -25,7 +25,7 @@ module IndexersHelper
     case state.to_s
     when "unchanged"
       "border-green-200 bg-green-50 text-green-800"
-    when "new", "renamed", "changed"
+    when "new", "unverified", "renamed", "changed"
       "border-amber-200 bg-amber-50 text-amber-900"
     when "disabled", "missing"
       "border-red-200 bg-red-50 text-red-800"

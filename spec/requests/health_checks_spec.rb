@@ -23,6 +23,29 @@ RSpec.describe "Health checks", type: :request do
     expect(response.body).to include("Health check queued.")
   end
 
+  it "reports a redacted queue failure instead of claiming the check was queued" do
+    allow(HealthChecks::RunJob).to receive(:perform_later).and_raise(
+      StandardError,
+      "queue unavailable api-key=secret-value"
+    )
+
+    post health_checks_path
+
+    expect(response).to redirect_to(root_path)
+    expect(flash[:alert]).to eq("Could not queue health check: queue unavailable api-key=[REDACTED]")
+    expect(flash[:notice]).to be_nil
+  end
+
+  it "reports when the queue adapter silently rejects the health check" do
+    allow(HealthChecks::RunJob).to receive(:perform_later).and_return(false)
+
+    post health_checks_path
+
+    expect(response).to redirect_to(root_path)
+    expect(flash[:alert]).to eq("Could not queue health check: the queue adapter rejected the health check")
+    expect(flash[:notice]).to be_nil
+  end
+
   it "renders current health, calculated staleness, and redacted errors" do
     now = Time.current
     Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://jackett.example.test")
@@ -84,7 +107,7 @@ RSpec.describe "Health checks", type: :request do
 
     get root_path
 
-    expect(response.body).to include("Needs attention", "Review 2 services.")
+    expect(response.body).to include("Needs attention", "Review 1 service.")
     expect(response.body).to include(health_path)
     expect(response.body).not_to include("Failing Sonarr", "Stale Indexer", "HTTP 401")
   end
@@ -100,8 +123,18 @@ RSpec.describe "Health checks", type: :request do
     expect(response.body).not_to include("visible-secret", "auth-secret")
   end
 
-  it "shows when a started run never recorded completion" do
+  it "shows a recently started health check as still running" do
     started_at = 10.minutes.ago
+    Setting.write_value(Setting::HEALTH_CHECKS_LAST_STARTED_AT_KEY, started_at.iso8601)
+
+    get health_path
+
+    expect(response.body).to include("A health check started", "is still running")
+    expect(response.body).not_to include("did not record completion")
+  end
+
+  it "shows when an old started run never recorded completion" do
+    started_at = 3.hours.ago
     Setting.write_value(Setting::HEALTH_CHECKS_LAST_STARTED_AT_KEY, started_at.iso8601)
 
     get health_path

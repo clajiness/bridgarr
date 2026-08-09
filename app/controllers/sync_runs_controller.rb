@@ -28,6 +28,6 @@ class SyncRunsController < ApplicationController
     sync_run = SyncRun.find(params.expect(:id))
     sync_run.abandon!(message: "Sync run was abandoned by the user.")
 
-    redirect_to sync_run_path(sync_run), notice: "Sync run abandoned."
+    redirect_to sync_run_path(sync_run), notice: "Sync run marked failed. A request already in progress may still finish in the destination."
   end
 end

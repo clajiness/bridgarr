@@ -61,7 +61,11 @@ module Sync
             next unless assignment
           end
 
-          assignment.update!(attributes)
+          if assignment.persisted?
+            assignment.with_lock { assignment.update!(attributes) }
+          else
+            assignment.update!(attributes)
+          end
           changed_count += 1
         end
       end

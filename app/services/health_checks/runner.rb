@@ -4,6 +4,9 @@ module HealthChecks
 
     INDEXER_SKIPPED_MESSAGE = "Indexer check skipped because Jackett is unavailable."
     INDEXER_NOT_CONFIGURED_MESSAGE = "Indexer check skipped because Jackett is not configured."
+    INDEXER_MISSING_MESSAGE = "Live search skipped because this indexer is missing from Jackett."
+    INDEXER_DISABLED_MESSAGE = "Live search skipped because this indexer is not configured in Jackett."
+    INDEXER_UNVERIFIED_MESSAGE = "Live search skipped until this indexer is verified in the current Jackett connection."
 
     def self.call(**options)
       new(**options).call
@@ -11,12 +14,14 @@ module HealthChecks
 
     def initialize(
       jackett_test: Jackett::ConnectionTest,
+      inventory_refresh: Jackett::InventoryRefresh,
       arr_test: Arr::ConnectionTest,
       indexer_test: Jackett::IndexerOperationalTest,
       wall_clock: -> { Time.current },
       monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
     )
       @jackett_test = jackett_test
+      @inventory_refresh = inventory_refresh
       @arr_test = arr_test
       @indexer_test = indexer_test
       @wall_clock = wall_clock
@@ -29,6 +34,7 @@ module HealthChecks
       Setting.write_value(Setting::HEALTH_CHECKS_LAST_ERROR_KEY, nil)
 
       jackett_available = check_jackett
+      refresh_indexer_inventory if jackett_available
       check_arr_apps
       check_indexers(jackett_available:)
 
@@ -45,7 +51,7 @@ module HealthChecks
 
     private
 
-      attr_reader :jackett_test, :arr_test, :indexer_test, :wall_clock, :monotonic_clock
+      attr_reader :jackett_test, :inventory_refresh, :arr_test, :indexer_test, :wall_clock, :monotonic_clock
 
       def check_jackett
         return nil unless Setting.jackett_configured?
@@ -63,6 +69,25 @@ module HealthChecks
         ArrApp.where(enabled: true).order(:id).find_each do |arr_app|
           check_arr_app(arr_app)
         end
+      end
+
+      def refresh_indexer_inventory
+        result = inventory_refresh.call(
+          base_url: jackett_base_url,
+          api_key: jackett_api_key,
+          seen_at: wall_time
+        )
+        return if result.success?
+
+        Rails.logger.warn({
+          message: "Could not refresh Jackett indexer inventory during health checks",
+          error: Secrets::Redactor.call(result.message)
+        })
+      rescue StandardError => e
+        Rails.logger.warn({
+          message: "Could not refresh Jackett indexer inventory during health checks",
+          error: Secrets::Redactor.call(e.message)
+        })
       end
 
       def check_arr_app(arr_app)
@@ -87,6 +112,16 @@ module HealthChecks
       end
 
       def check_indexer(indexer)
+        if indexer.jackett_state == "unverified"
+          return indexer.record_unknown_health!(INDEXER_UNVERIFIED_MESSAGE, tested_at: wall_time)
+        end
+        if indexer.jackett_state == "missing"
+          return indexer.record_unknown_health!(INDEXER_MISSING_MESSAGE, tested_at: wall_time)
+        end
+        if indexer.jackett_state == "disabled"
+          return indexer.record_unknown_health!(INDEXER_DISABLED_MESSAGE, tested_at: wall_time)
+        end
+
         started = monotonic_time
         result = indexer_test.call(base_url: jackett_base_url, api_key: jackett_api_key, jackett_id: indexer.jackett_id)
         indexer.record_health_check_result(result, tested_at: wall_time, duration_ms: elapsed_ms(started))

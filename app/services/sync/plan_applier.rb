@@ -33,6 +33,15 @@ module Sync
         scope: IndexerApp.where(id: applyable_items.map { |item| item.indexer_app.id }),
         plan_items: applyable_items
       )
+      if sync_run.status == "failed"
+        return Result.new(
+          success?: false,
+          sync_run:,
+          message: sync_run.error,
+          error: sync_run.error,
+          stale_assignment_ids: []
+        )
+      end
       message = if sync_run.total_count.positive?
         "Queued #{sync_run.total_count} reconciliation #{'change'.pluralize(sync_run.total_count)}."
       else

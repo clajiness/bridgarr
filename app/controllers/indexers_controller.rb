@@ -12,13 +12,12 @@ class IndexersController < ApplicationController
   end
 
   def discover
-    result = Jackett::IndexerDiscovery.call(
+    result = Jackett::InventoryRefresh.call(
       base_url: Setting.fetch_value(Setting::JACKETT_BASE_URL_KEY),
       api_key: Setting.fetch_value(Setting::JACKETT_API_KEY_KEY)
     )
 
     if result.success?
-      Jackett::InventoryReconciler.call(records: result.indexers)
       @jackett_indexers = result.indexers.select(&:configured)
       @existing_by_jackett_id = Indexer.where(jackett_id: @jackett_indexers.map(&:jackett_id)).index_by(&:jackett_id)
       @arr_apps = ArrApp.where(enabled: true).order(:name)
@@ -47,7 +46,11 @@ class IndexersController < ApplicationController
       else
         indexer_apps_path
       end
-      redirect_to destination, notice: result.message
+      if result.sync_run&.status == "failed"
+        redirect_to destination, alert: result.message
+      else
+        redirect_to destination, notice: result.message
+      end
     else
       redirect_to indexers_path, alert: result.message
     end

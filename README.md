@@ -178,6 +178,20 @@ delete the remote indexer. Removing an assignment is a separate action that
 deletes the Bridgarr-managed remote indexer when one is associated and requires
 explicit confirmation.
 
+Removing an app from Bridgarr only removes Bridgarr's local app record and
+assignments. It does not delete indexers already present in that app. Remove
+the assignments or their Bridgarr indexers first when remote cleanup is wanted.
+
+Disabling an app or indexer pauses Bridgarr health checks and synchronization
+for it; existing remote indexers are left unchanged. Changing an app's type or
+base URL clears Bridgarr's local remote-ID associations so an ID from the old
+destination cannot be reused accidentally in the new one. Indexers in the old
+destination remain untouched. Changing a Jackett indexer ID clears its cached
+discovery and health details and sends its assignments back through preview.
+Replacing the global Jackett URL also clears source details learned from the
+previous server and blocks those assignments until indexer discovery verifies
+their IDs in the new Jackett instance.
+
 For a bulk change, select one or more matrix cells and then choose a **Bulk
 action**. Bridgarr displays only the controls that belong to that action, counts
 the selected cells, and labels the single action button with what it will do.
@@ -492,17 +506,26 @@ Bridgarr schedules a full external-services health check every 30 minutes. A
 working Solid Queue worker is required for scheduled checks and for the
 dashboard's **Check all now** action, which only enqueues the background job.
 
-The cycle checks Jackett plus enabled applications and enabled imported
-indexers. Indexer checks issue a small, uncached Torznab search so they verify
-the full Bridgarr-to-Jackett-to-tracker path instead of only loading Torznab
-capabilities. A valid search must return at least one release. Disabled
+After Jackett passes its connection check, each health cycle attempts to refresh
+the imported indexer inventory. Deleted or unconfigured Jackett sources are
+marked automatically, kept in Bridgarr for safe review, and blocked from syncing
+until they are restored or deliberately removed. Bridgarr never cascade-deletes
+assignments or destination indexers merely because a source disappeared from
+one inventory response.
+
+The cycle checks Jackett plus enabled applications and available enabled
+imported indexers. Known missing or unconfigured sources are skipped with a
+clear reason. Other indexer checks issue a small, uncached Torznab search so they
+verify the full Bridgarr-to-Jackett-to-tracker path instead of only loading
+Torznab capabilities. A valid search must return at least one release. Disabled
 applications and indexers are skipped. Results older than 90 minutes are shown
 as stale on the dashboard.
 
-After upgrading from a version that checked only Torznab capabilities, use
-**Check all now** once. Existing saved results do not identify which check
-produced them, so they may temporarily appear as **Operational** and **Live
-search** until the first new health cycle refreshes them.
+An individual indexer's failed or stale live-search check remains visible in
+its dashboard row and on the health page, but does not turn the global dashboard
+banner red. Core service failures are shown as an automatically retried warning;
+red is reserved for actionable conditions such as rejected credentials or an
+assignment that cannot be reconciled safely.
 
 ## Proxy Activity
 

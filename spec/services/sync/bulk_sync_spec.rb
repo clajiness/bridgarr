@@ -80,6 +80,41 @@ RSpec.describe Sync::BulkSync do
     expect(Sync::BulkSyncJob).not_to have_been_enqueued
   end
 
+  it "terminalizes every item when the coordinator cannot be queued" do
+    first_assignment = create_assignment(indexer_name: "EZTV", arr_app_name: "Sonarr")
+    second_assignment = create_assignment(indexer_name: "1337x", arr_app_name: "Radarr")
+    allow(Sync::BulkSyncJob).to receive(:perform_later).and_raise(
+      StandardError,
+      "queue rejected api-key=secret-value"
+    )
+
+    sync_run = described_class.call
+
+    expect(sync_run.reload).to have_attributes(
+      status: "failed",
+      total_count: 2,
+      failure_count: 2,
+      error: "Could not queue bulk sync: queue rejected api-key=[REDACTED]"
+    )
+    expect(sync_run.sync_run_items.pluck(:status)).to eq(%w[failed failed])
+    expect(first_assignment.reload).not_to be_active_sync
+    expect(second_assignment.reload).not_to be_active_sync
+  end
+
+  it "terminalizes every item when the queue adapter returns false" do
+    assignment = create_assignment(indexer_name: "EZTV", arr_app_name: "Sonarr")
+    allow(Sync::BulkSyncJob).to receive(:perform_later).and_return(false)
+
+    sync_run = described_class.call
+
+    expect(sync_run.reload).to have_attributes(
+      status: "failed",
+      failure_count: 1,
+      error: "Could not queue bulk sync: the queue adapter rejected the bulk sync"
+    )
+    expect(assignment.reload).not_to be_active_sync
+  end
+
   def create_assignment(indexer_name:, arr_app_name:, indexer_enabled: true, search_modes_enabled: true)
     arr_app = ArrApp.create!(
       name: arr_app_name,

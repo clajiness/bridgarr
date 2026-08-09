@@ -1,6 +1,6 @@
 class Indexer < ApplicationRecord
   JACKETT_ID_FORMAT = /\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/
-  JACKETT_STATES = %w[unknown unchanged renamed changed disabled missing].freeze
+  JACKETT_STATES = %w[unknown unverified unchanged renamed changed disabled missing].freeze
   JACKETT_CATEGORY_LIMIT = 500
   JACKETT_CATEGORY_NAME_LIMIT = 160
 
@@ -15,8 +15,11 @@ class Indexer < ApplicationRecord
 
   normalizes :jackett_id, with: ->(jackett_id) { Jackett::IndexerIdParser.call(jackett_id) }
 
-  scope :with_jackett_changes, -> { where(jackett_state: %w[renamed changed disabled missing]) }
+  scope :with_jackett_changes, -> { where(jackett_state: %w[unverified renamed changed disabled missing]) }
 
+  before_validation :reset_jackett_metadata_for_id_change, on: :update
+  validate :configuration_does_not_change_during_active_sync, on: :update
+  after_update :mark_assignments_for_reconciliation, if: :remote_configuration_changed?
   after_commit :broadcast_live_refreshes
 
   def record_health_check_result(result, tested_at: Time.current, duration_ms: nil)
@@ -85,6 +88,47 @@ class Indexer < ApplicationRecord
   end
 
   private
+
+    def configuration_does_not_change_during_active_sync
+      return unless configuration_changing?
+      return unless indexer_apps.joins(:sync_run_items).merge(SyncRunItem.active).exists?
+
+      errors.add(:base, "Wait for active assignment syncs to finish before changing this indexer.")
+    end
+
+    def configuration_changing?
+      will_save_change_to_name? || will_save_change_to_jackett_id? || will_save_change_to_enabled?
+    end
+
+    def remote_configuration_changed?
+      saved_change_to_name? || saved_change_to_jackett_id?
+    end
+
+    def mark_assignments_for_reconciliation
+      now = Time.current
+      attributes = { last_inspected_at: nil, last_desired_digest: nil, updated_at: now }
+      indexer_apps.where(remote_indexer_id: nil).update_all(attributes.merge(last_plan_state: "create"))
+      indexer_apps.where.not(remote_indexer_id: nil).update_all(attributes.merge(last_plan_state: "update"))
+    end
+
+    def reset_jackett_metadata_for_id_change
+      return unless will_save_change_to_jackett_id?
+
+      self.jackett_name = nil
+      self.jackett_configured = nil
+      self.jackett_last_seen_at = nil
+      self.jackett_missing_since = nil
+      self.jackett_source_digest = nil
+      self.jackett_state = "unknown"
+      self.jackett_category_catalog = nil
+      self.jackett_category_catalog_refreshed_at = nil
+      self.jackett_category_catalog_source = nil
+      self.last_status = nil
+      self.last_error = nil
+      self.last_tested_at = nil
+      self.last_http_status = nil
+      self.last_duration_ms = nil
+    end
 
     def broadcast_live_refreshes
       %w[dashboard readiness health indexers assignment_matrix].each do |stream|

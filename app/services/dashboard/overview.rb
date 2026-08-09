@@ -2,7 +2,7 @@ module Dashboard
   class Overview
     PROXY_ACTIVITY_WINDOW = 24.hours
     FILTERS = %w[all attention unsynced disabled].freeze
-    ATTENTION_STATUSES = %w[conflict orphaned unreachable invalid failed mismatch needs_apply].freeze
+    ATTENTION_STATUSES = %w[conflict orphaned source_unverified source_unavailable unreachable invalid failed mismatch needs_apply].freeze
 
     AssignmentRow = Data.define(:assignment, :status, :detail, :active_sync_item) do
       delegate :indexer, :arr_app, to: :assignment
@@ -94,27 +94,31 @@ module Dashboard
     end
 
     def jackett_changes_count
-      @jackett_changes_count ||= Indexer.with_jackett_changes.count
+      @jackett_changes_count ||= Indexer.where(enabled: true).with_jackett_changes.count
     end
 
     def needs_attention?
-      attention_assignments_count.positive? ||
-        external_services_health.attention_count.positive? ||
-        latest_sync_run_needs_attention? ||
-        proxy_failures_count.positive? ||
-        jackett_changes_count.positive?
+      workflow_attention? || external_services_health.service_attention_count.positive?
     end
 
     def critical_attention?
-      all_assignment_rows.any? { |row| row.status.in?(%w[conflict orphaned unreachable invalid failed]) } ||
-        external_services_health.failed_count.positive? ||
-        latest_sync_run_needs_attention? ||
-        proxy_failures_count.positive? ||
-        Indexer.where(jackett_state: %w[disabled missing]).exists?
+      all_assignment_rows.any? { |row| row.status.in?(%w[conflict orphaned source_unavailable unreachable invalid failed]) } ||
+        external_services_health.actionable_service_failure_count.positive? ||
+        latest_sync_run_needs_attention?
+    end
+
+    def transient_service_degradation_only?
+      external_services_health.service_attention_count.positive? &&
+        external_services_health.actionable_service_failure_count.zero? &&
+        !workflow_attention?
     end
 
     def health_checks_pending?
-      external_services_health.unknown_count.positive?
+      external_services_health.service_unknown_count.positive?
+    end
+
+    def health_cycle_attention?
+      external_services_health.last_run_error.present? || external_services_health.interrupted_run?
     end
 
     private
@@ -133,6 +137,14 @@ module Dashboard
         end
       end
 
+      def workflow_attention?
+        attention_assignments_count.positive? ||
+          latest_sync_run_needs_attention? ||
+          proxy_failures_count.positive? ||
+          jackett_changes_count.positive? ||
+          health_cycle_attention?
+      end
+
       def build_assignment_row(assignment, active_sync_item)
         status = assignment_status(assignment, active_sync_item)
         AssignmentRow.new(
@@ -144,6 +156,9 @@ module Dashboard
       end
 
       def assignment_status(assignment, active_sync_item)
+        return "disabled" unless assignment.indexer.enabled? && assignment.arr_app.enabled?
+        return "source_unverified" if assignment.indexer.jackett_state == "unverified"
+        return "source_unavailable" unless Jackett::IndexerAvailability.call(indexer: assignment.indexer).available?
         return assignment.last_plan_state if assignment.last_plan_state.in?(%w[conflict orphaned unreachable invalid])
         return "syncing" if active_sync_item
         return "not_applicable" if assignment.last_plan_state == "not_applicable"
@@ -152,7 +167,7 @@ module Dashboard
         return "not_applicable" if assignment.last_status == "skipped"
         return "needs_apply" if unapplied_plan?(assignment)
         return "needs_apply" if unapplied_api_key_update?(assignment)
-        return "disabled" unless assignment.any_search_mode_enabled? && assignment.indexer.enabled? && assignment.arr_app.enabled?
+        return "disabled" unless assignment.any_search_mode_enabled?
         return "unsynced" if assignment.last_synced_at.nil?
 
         "healthy"
@@ -162,6 +177,7 @@ module Dashboard
         case status
         when "conflict" then "Overlapping remote indexer"
         when "orphaned" then "Remote indexer is missing"
+        when "source_unverified", "source_unavailable" then Jackett::IndexerAvailability.call(indexer: assignment.indexer).message
         when "unreachable" then "Destination could not be inspected"
         when "invalid" then "Desired configuration is incomplete"
         when "failed", "mismatch"

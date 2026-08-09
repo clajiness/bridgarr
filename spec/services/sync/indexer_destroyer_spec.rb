@@ -75,4 +75,40 @@ RSpec.describe Sync::IndexerDestroyer do
     expect(result.message).to eq("Main Sonarr returned HTTP 500 while trying to remove managed indexer.")
     expect(Indexer.exists?(indexer.id)).to be(true)
   end
+
+  it "does not remove an indexer while one of its assignments is syncing" do
+    assignment = indexer.indexer_apps.find_by!(arr_app: sonarr)
+    assignment.update!(remote_indexer_id: 42)
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    result = described_class.call(indexer:, delete_client: FakeDestroyIndexerDeleteClient)
+
+    expect(result).not_to be_success
+    expect(result.message).to include("active assignment syncs")
+    expect(FakeDestroyIndexerDeleteClient.calls).to be_empty
+    expect(Indexer.exists?(indexer.id)).to be(true)
+  end
+
+  it "records completed assignment removals when a later remote cleanup fails" do
+    sonarr_assignment = indexer.indexer_apps.find_by!(arr_app: sonarr)
+    radarr_assignment = indexer.indexer_apps.find_by!(arr_app: radarr)
+    sonarr_assignment.update!(remote_indexer_id: 42)
+    radarr_assignment.update!(remote_indexer_id: 43)
+    allow(FakeDestroyIndexerDeleteClient).to receive(:call) do |arr_app:, **|
+      if arr_app == radarr
+        FakeDestroyIndexerDeleteClient::Result.new(success?: false, message: "Radarr returned HTTP 500.", error: "Radarr returned HTTP 500.")
+      else
+        FakeDestroyIndexerDeleteClient::Result.new(success?: true, message: "Removed.", error: nil)
+      end
+    end
+
+    result = described_class.call(indexer:, delete_client: FakeDestroyIndexerDeleteClient)
+
+    expect(result).not_to be_success
+    expect(result.message).to eq("Removed 1 assignment before cleanup stopped. Radarr returned HTTP 500.")
+    expect(IndexerApp.exists?(sonarr_assignment.id)).to be(false)
+    expect(IndexerApp.exists?(radarr_assignment.id)).to be(true)
+    expect(Indexer.exists?(indexer.id)).to be(true)
+  end
 end

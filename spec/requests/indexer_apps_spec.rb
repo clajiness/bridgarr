@@ -155,6 +155,19 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(assignment.custom_categories).to eq("2000,8000")
   end
 
+  it "does not update assignment settings while its sync is active" do
+    sync_run = SyncRun.create!(status: "running", total_count: 1)
+    sync_run.sync_run_items.create!(indexer_app: assignment, status: "running")
+
+    patch indexer_app_path(assignment), params: {
+      indexer_app: { category_mode: "none" }
+    }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include("Wait for the active assignment sync to finish before changing its settings")
+    expect(assignment.reload.category_mode).to eq("auto")
+  end
+
   it "updates independent search modes without removing the assignment" do
     patch indexer_app_path(assignment), params: {
       indexer_app: {
@@ -271,14 +284,52 @@ RSpec.describe "Indexer app assignments", type: :request do
 
   it "requires preview before syncing an assignment with a disabled search mode" do
     assignment.update!(enable_automatic_search: false)
-    allow(Sync::AssignmentSync).to receive(:call)
 
     post sync_indexer_app_path(assignment)
 
     expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
     expect(response).to have_http_status(:see_other)
     expect(flash[:alert]).to include("disabled search modes must be previewed")
+    expect(SyncRun.count).to eq(0)
+  end
+
+  it "refuses to queue a sync for an indexer missing from Jackett" do
+    assignment
+    indexer.update!(jackett_state: "missing")
+    allow(Sync::AssignmentSync).to receive(:call)
+
+    post sync_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(flash[:alert]).to include("missing from Jackett", "indexer ID limetorrents")
     expect(Sync::AssignmentSync).not_to have_received(:call)
+    expect(SyncRun.count).to eq(0)
+  end
+
+  it "refuses to queue a sync for an indexer disabled in Bridgarr" do
+    assignment
+    indexer.update!(enabled: false)
+    allow(Sync::AssignmentSync).to receive(:call)
+
+    post sync_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(indexer_path(indexer))
+    expect(flash[:alert]).to eq("Enable LimeTorrents in Bridgarr before syncing.")
+    expect(Sync::AssignmentSync).not_to have_received(:call)
+    expect(SyncRun.count).to eq(0)
+  end
+
+  it "refuses to queue a sync for an app disabled in Bridgarr" do
+    assignment
+    arr_app.update!(enabled: false)
+    allow(Sync::AssignmentSync).to receive(:call)
+
+    post sync_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(arr_app_path(arr_app))
+    expect(flash[:alert]).to eq("Enable Main Radarr in Bridgarr before syncing.")
+    expect(Sync::AssignmentSync).not_to have_received(:call)
+    expect(SyncRun.count).to eq(0)
   end
 
   it "rejects unknown matrix actions without changing assignments" do
@@ -777,6 +828,50 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
     expect(flash[:alert]).to include("active assignment sync")
     expect(assignment.reload.remote_indexer_id).to eq(42)
+  end
+
+  it "refuses a stale forget action when the remote association is no longer orphaned" do
+    assignment.update!(remote_indexer_id: 42)
+    current = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "unchanged",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Remote configuration already matches.",
+      desired_digest: "desired",
+      remote_digest: "desired",
+      plan_digest: "current-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ current ], generated_at: Time.current))
+
+    post forget_remote_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:alert]).to include("association changed", "refreshed plan")
+    expect(assignment.reload.remote_indexer_id).to eq(42)
+  end
+
+  it "forgets an association only after a fresh plan confirms it is orphaned" do
+    assignment.update!(remote_indexer_id: 42)
+    orphaned = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "orphaned",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Remote indexer is missing.",
+      desired_digest: "desired",
+      remote_digest: nil,
+      plan_digest: "orphaned-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ orphaned ], generated_at: Time.current))
+
+    post forget_remote_indexer_app_path(assignment)
+
+    expect(response).to redirect_to(preview_indexer_apps_path(assignment_ids: [ assignment.id ]))
+    expect(flash[:notice]).to include("Forgot the stale remote association")
+    expect(assignment.reload.remote_indexer_id).to be_nil
   end
 
   it "rechecks active sync state immediately before repairing an association" do

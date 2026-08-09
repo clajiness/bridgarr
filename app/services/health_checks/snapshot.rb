@@ -1,8 +1,12 @@
 module HealthChecks
   class Snapshot
     STALE_AFTER = 90.minutes
+    RUN_STALE_AFTER = 2.hours
     COUNTED_STATUSES = %w[ok error unknown stale].freeze
     PERSISTED_STATUSES = %w[ok error unknown].freeze
+    SERVICE_KINDS = %i[jackett arr_app].freeze
+    ACTION_REQUIRED_HTTP_STATUSES = [ 401, 403 ].freeze
+    ACTION_REQUIRED_ERROR_PATTERN = /\b(?:401|403)\b|unauthorized|forbidden|invalid api key|api key is invalid/i
 
     Item = Data.define(
       :kind,
@@ -45,6 +49,27 @@ module HealthChecks
       failed_count + stale_count
     end
 
+    def service_attention_count
+      count_in(service_health_items, %w[error stale])
+    end
+
+    def service_unknown_count
+      count_in(service_health_items, "unknown")
+    end
+
+    def indexer_attention_count
+      count_in(indexer_health_items, %w[error stale])
+    end
+
+    def actionable_service_failure_count
+      service_health_items.count do |item|
+        item.status.in?(%w[error stale]) && (
+          ACTION_REQUIRED_HTTP_STATUSES.include?(item.last_http_status) ||
+          item.last_error.to_s.match?(ACTION_REQUIRED_ERROR_PATTERN)
+        )
+      end
+    end
+
     def needs_attention?
       attention_count.positive?
     end
@@ -69,10 +94,31 @@ module HealthChecks
       last_started_at.present? && (last_completed_at.blank? || last_started_at > last_completed_at)
     end
 
+    def run_in_progress?
+      incomplete_run? && last_run_error.blank? && last_started_at >= RUN_STALE_AFTER.ago(now)
+    end
+
+    def interrupted_run?
+      incomplete_run? && last_run_error.blank? && !run_in_progress?
+    end
+
     private
 
       def count(status)
         items.count { |item| item.status == status }
+      end
+
+      def count_in(selected_items, statuses)
+        statuses = Array(statuses)
+        selected_items.count { |item| statuses.include?(item.status) }
+      end
+
+      def service_health_items
+        items.select { |item| SERVICE_KINDS.include?(item.kind) }
+      end
+
+      def indexer_health_items
+        items.select { |item| item.kind == :indexer }
       end
 
       def jackett_item

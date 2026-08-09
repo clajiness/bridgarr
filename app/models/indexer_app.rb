@@ -19,6 +19,7 @@ class IndexerApp < ApplicationRecord
   validates :last_plan_state, inclusion: { in: PLAN_STATES }, allow_nil: true
   validate :custom_categories_are_category_id_list
   validate :custom_categories_are_present_for_custom_mode
+  validate :desired_state_does_not_change_during_active_sync, on: :update
 
   scope :with_enabled_parents, -> do
     joins(:indexer, :arr_app).where(indexers: { enabled: true }, arr_apps: { enabled: true })
@@ -168,16 +169,26 @@ class IndexerApp < ApplicationRecord
     end
 
     def mark_changed_desired_state
-      return unless will_save_change_to_enable_rss? ||
+      return unless desired_state_changing?
+
+      self.last_plan_state = remote_indexer_id.present? ? "update" : "create"
+      self.last_inspected_at = nil
+      self.last_desired_digest = nil
+    end
+
+    def desired_state_does_not_change_during_active_sync
+      return unless desired_state_changing? && sync_run_items.active.exists?
+
+      errors.add(:base, "Wait for the active assignment sync to finish before changing its settings.")
+    end
+
+    def desired_state_changing?
+      will_save_change_to_enable_rss? ||
         will_save_change_to_enable_automatic_search? ||
         will_save_change_to_enable_interactive_search? ||
         will_save_change_to_connection_mode? ||
         will_save_change_to_category_mode? ||
         will_save_change_to_custom_categories?
-
-      self.last_plan_state = remote_indexer_id.present? ? "update" : "create"
-      self.last_inspected_at = nil
-      self.last_desired_digest = nil
     end
 
     def custom_categories_are_category_id_list

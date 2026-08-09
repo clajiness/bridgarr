@@ -69,20 +69,25 @@ class SyncRunItem < ApplicationRecord
   end
 
   def mark_running!
-    now = Time.current
+    with_lock do
+      return false unless queued? || retrying?
 
-    update!(
-      status: "running",
-      started_at: started_at || now,
-      last_attempt_at: now,
-      next_retry_at: nil,
-      attempt_count: attempt_count + 1,
-      finished_at: nil,
-      error: nil,
-      error_kind: nil,
-      category_evidence: nil,
-      retryable: false
-    )
+      now = Time.current
+      update!(
+        status: "running",
+        started_at: started_at || now,
+        last_attempt_at: now,
+        next_retry_at: nil,
+        attempt_count: attempt_count + 1,
+        finished_at: nil,
+        error: nil,
+        error_kind: nil,
+        category_evidence: nil,
+        retryable: false
+      )
+    end
+
+    true
   end
 
   def record_result!(result, finished_at: Time.current)
@@ -102,7 +107,13 @@ class SyncRunItem < ApplicationRecord
       attributes[:planned_action] = result.action
     end
 
-    update!(attributes)
+    with_lock do
+      return false if terminal?
+
+      update!(attributes)
+    end
+
+    true
   end
 
   def planned_changes
@@ -113,14 +124,20 @@ class SyncRunItem < ApplicationRecord
   end
 
   def record_retry!(error:, classification:, next_retry_at:)
-    update!(
-      status: "retrying",
-      finished_at: nil,
-      error: Secrets::Redactor.call(error),
-      error_kind: classification.kind,
-      retryable: true,
-      next_retry_at:
-    )
+    with_lock do
+      return false if terminal?
+
+      update!(
+        status: "retrying",
+        finished_at: nil,
+        error: Secrets::Redactor.call(error),
+        error_kind: classification.kind,
+        retryable: true,
+        next_retry_at:
+      )
+    end
+
+    true
   end
 
   def to_partial_path

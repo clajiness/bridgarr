@@ -81,7 +81,7 @@ module Jackett
           if indexer.persisted?
             changed = indexer.name != jackett_indexer.name ||
               indexer.jackett_source_digest.present? && indexer.jackett_source_digest != jackett_indexer.source_digest ||
-              indexer.jackett_state.in?(%w[renamed changed disabled missing])
+              indexer.jackett_state.in?(%w[unverified renamed changed disabled missing])
             indexer.name = jackett_indexer.name
             changed ? updated_count += 1 : skipped_count += 1
           else
@@ -104,7 +104,11 @@ module Jackett
             assignment = IndexerApp.find_or_initialize_by(indexer:, arr_app_id:)
             new_assignment = assignment.new_record?
             assigned_count += 1 if new_assignment
-            assignment.update!(assignment_attributes)
+            if new_assignment
+              assignment.update!(assignment_attributes)
+            else
+              assignment.with_lock { assignment.update!(assignment_attributes) }
+            end
             assignments << assignment
           end
         end
@@ -171,7 +175,9 @@ module Jackett
           "#{assigned_count} #{'assignment'.pluralize(assigned_count)} created",
           "#{skipped_count} unchanged"
         ]
-        if preview_assignment_ids.any?
+        if sync_run&.status == "failed"
+          parts << sync_run.error
+        elsif preview_assignment_ids.any?
           parts << "preview required before syncing disabled search modes"
         elsif sync_run
           parts << (sync_run.total_count.positive? ? "sync queued" : "sync already active")

@@ -22,7 +22,9 @@ class IndexerAppsController < ApplicationController
   end
 
   def update
-    if @indexer_app.update(indexer_app_params)
+    updated = @indexer_app.with_lock { @indexer_app.update(indexer_app_params) }
+
+    if updated
       redirect_to indexer_app_redirect_path(@indexer_app), notice: "Assignment settings saved.", status: :see_other
     else
       @category_catalog = Jackett::CategoryCatalog.cached(indexer: @indexer_app.indexer)
@@ -41,15 +43,42 @@ class IndexerAppsController < ApplicationController
   end
 
   def sync
-    unless @indexer_app.all_search_modes_enabled?
+    unless @indexer_app.indexer.enabled?
       return redirect_to(
-        preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
-        alert: "Assignments with disabled search modes must be previewed and explicitly confirmed before remote settings are changed.",
+        @indexer_app.indexer,
+        alert: "Enable #{@indexer_app.indexer.name} in Bridgarr before syncing.",
+        status: :see_other
+      )
+    end
+    unless @indexer_app.arr_app.enabled?
+      return redirect_to(
+        @indexer_app.arr_app,
+        alert: "Enable #{@indexer_app.arr_app.name} in Bridgarr before syncing.",
+        status: :see_other
+      )
+    end
+
+    availability = Jackett::IndexerAvailability.call(indexer: @indexer_app.indexer)
+    unless availability.available?
+      return redirect_to(
+        @indexer_app.indexer,
+        alert: availability.message,
         status: :see_other
       )
     end
 
     result = Sync::AssignmentSync.call(indexer_app: @indexer_app)
+    if result.error.present?
+      return redirect_to(
+        preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
+        alert: result.error,
+        status: :see_other
+      )
+    end
+
+    if result.sync_run.status == "failed"
+      return redirect_to sync_run_path(result.sync_run), alert: result.sync_run.error
+    end
     notice = result.created? ? "Assignment sync queued." : "Assignment sync is already queued."
 
     redirect_to sync_run_path(result.sync_run), notice:
@@ -167,11 +196,34 @@ class IndexerAppsController < ApplicationController
 
     result = Sync::AssignmentSync.call(indexer_app: @indexer_app)
 
+    if result.error.present?
+      return redirect_to(
+        preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
+        alert: result.error,
+        status: :see_other
+      )
+    end
+
+    if result.sync_run.status == "failed"
+      return redirect_to sync_run_path(result.sync_run), alert: result.sync_run.error
+    end
+
     redirect_to sync_run_path(result.sync_run), notice: "Remote association repaired; reconciliation queued."
   end
 
   def forget_remote
     return redirect_assignment_syncing if @indexer_app.active_sync?
+
+    plan = Sync::Plan.call(scope: IndexerApp.where(id: @indexer_app.id))
+    Sync::PlanRecorder.call(plan)
+    item = plan.items.find { |candidate| candidate.indexer_app.id == @indexer_app.id }
+    unless item&.state == "orphaned"
+      return redirect_to(
+        preview_indexer_apps_path(assignment_ids: [ @indexer_app.id ]),
+        alert: "The stale remote association changed. Review the refreshed plan before forgetting it.",
+        status: :see_other
+      )
+    end
 
     forgotten = @indexer_app.with_lock do
       next false if @indexer_app.active_sync?
@@ -325,7 +377,7 @@ class IndexerAppsController < ApplicationController
       when "disabled"
         indexers.select { |indexer| !indexer.enabled? || indexer.indexer_apps.any?(&:search_modes_disabled?) }
       when "changed_in_jackett"
-        indexers.select { |indexer| indexer.jackett_state.in?(%w[renamed changed disabled]) }
+        indexers.select { |indexer| indexer.jackett_state.in?(%w[unverified renamed changed disabled]) }
       when "missing_from_jackett"
         indexers.select { |indexer| indexer.jackett_state == "missing" }
       when "orphaned"
