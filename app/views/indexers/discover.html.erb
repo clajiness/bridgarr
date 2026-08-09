@@ -17,12 +17,12 @@
       <section class="overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm">
         <div class="border-b border-slate-200 px-4 py-3">
           <h2 class="font-semibold text-slate-950">1. Choose Jackett indexers</h2>
-          <p class="mt-1 text-sm text-slate-600">Selecting an existing changed indexer accepts its current Jackett name.</p>
+          <p class="mt-1 text-sm text-slate-600">Select indexers to create or update assignments. Existing indexers are reused, not duplicated. If an indexer changed in Jackett, selecting it also accepts its current name.</p>
         </div>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
-              <tr><th class="px-4 py-3">Use</th><th class="px-4 py-3">Name</th><th class="px-4 py-3">Jackett ID</th><th class="px-4 py-3">Discovery state</th></tr>
+              <tr><th class="px-4 py-3">Select</th><th class="px-4 py-3">Name</th><th class="px-4 py-3">Jackett ID</th><th class="px-4 py-3">Discovery state</th></tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
               <% @jackett_indexers.each do |jackett_indexer| %>
@@ -35,7 +35,7 @@
                     <% if existing && existing.name != jackett_indexer.name %><span class="mt-1 block text-xs font-normal text-slate-500">Previously <%= existing.name %></span><% end %>
                   </td>
                   <td class="px-4 py-3 font-mono text-xs text-slate-700"><%= jackett_indexer.jackett_id %></td>
-                  <td class="px-4 py-3"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(state) %>"><%= if existing && state == "unchanged"; "Already imported · Unchanged"; elsif state == "new"; "Ready to import · New"; else; state.humanize; end %></span></td>
+                  <td class="px-4 py-3"><span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold <%= jackett_state_classes(state) %>"><%= if existing && state == "unchanged"; "In Bridgarr · Up to date"; elsif state == "new"; "Ready to import · New"; else; state.humanize; end %></span></td>
                 </tr>
               <% end %>
             </tbody>
@@ -84,7 +84,7 @@
 
       <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <%= link_to "Cancel", indexers_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
-        <%= submit_tag "Import and create assignments", class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
+        <%= submit_tag "Create or update assignments", class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
       </div>
     <% end %>
   <% else %>
