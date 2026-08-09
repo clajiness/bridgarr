@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+@theme {
+  --color-white: #fffdf8;
+  --color-bridgarr-cream: #f4ede2;
+  --color-bridgarr-espresso: #1d140f;
+  --color-bridgarr-coffee: #6f351f;
+  --color-bridgarr-gold: #d6a84b;
+}
+
+@layer components {
+  .brand-shell {
+    background-color: var(--color-bridgarr-cream);
+    background-image: radial-gradient(circle at 8% 0%, rgb(214 168 75 / 0.11), transparent 30rem);
+  }
+
+  .brand-header {
+    background-color: var(--color-bridgarr-espresso);
+    background-image: linear-gradient(110deg, rgb(214 168 75 / 0.1), transparent 36%);
+  }
+
+  .brand-rug-stripe {
+    background-color: var(--color-bridgarr-coffee);
+    background-image:
+      linear-gradient(45deg, var(--color-bridgarr-gold) 25%, transparent 25%, transparent 75%, var(--color-bridgarr-gold) 75%),
+      linear-gradient(45deg, rgb(255 241 211 / 0.45) 25%, transparent 25%, transparent 75%, rgb(255 241 211 / 0.45) 75%);
+    background-position: 0 0, 8px 8px;
+    background-size: 16px 16px;
+  }
+
+  .brand-wordmark {
+    letter-spacing: 0.015em;
+    text-shadow: 0 1px 18px rgb(214 168 75 / 0.12);
+  }
+}

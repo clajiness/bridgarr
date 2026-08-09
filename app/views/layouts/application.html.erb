@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= content_for(:title) || "Bridgarr" %></title>
+    <title><%= bridgarr_page_title %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Bridgarr">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="<%= bridgarr_tagline %>">
+    <meta name="theme-color" content="#1d140f">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= turbo_refresh_method_tag :morph %>
@@ -13,20 +15,19 @@
 
     <%= yield :head %>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+    <%= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
 
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="<%= asset_path("bridgarr-mark.svg") %>" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
+    <link rel="apple-touch-icon" href="/icon-maskable.png">
 
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="min-h-screen bg-stone-100 text-slate-950" data-controller="refresh-safety">
-    <header class="border-b border-amber-300/20 bg-stone-950">
+  <body class="brand-shell min-h-screen text-slate-950" data-controller="refresh-safety">
+    <header class="brand-header shadow-sm">
       <div class="mx-auto flex max-w-screen-2xl flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <%= render "shared/brand" %>
 
@@ -56,6 +57,7 @@
           </div>
         <% end %>
       </div>
+      <div class="brand-rug-stripe h-1 opacity-70" aria-hidden="true"></div>
     </header>
 
     <main class="mx-auto max-w-screen-2xl px-5 py-8">

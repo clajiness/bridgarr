@@ -6,14 +6,15 @@ RSpec.describe "Dashboard", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Dashboard")
+    expect(response.body).to include("<title>Dashboard · Bridgarr</title>")
     expect(response.body).to include(BrandingHelper::TAGLINE)
-    expect(response.body).to include("A focused view of the assignments Bridgarr manages")
+    expect(response.body).to include("Your indexers, apps, and assignments—all tied together.")
     expect(response.body).to include("Finish setup")
     expect(response.body).to include("6 setup steps remaining.")
     expect(response.body).to include(readiness_path)
     expect(response.body).to include("Preview changes")
     expect(response.body).to include("Discover indexers")
-    expect(response.body).to include("No assignments yet")
+    expect(response.body).to include("Nothing is tied together yet")
     expect(response.body).not_to include("External services health")
     expect(response.body).not_to include("System status")
     expect(response.body).not_to include("Sync status")
@@ -50,7 +51,7 @@ RSpec.describe "Dashboard", type: :request do
     get root_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("All systems operational")
+    expect(response.body).to include("Everything is tied together")
     expect(response.body).to include("1 indexer · 1 app · 1 managed assignment")
     expect(response.body).to include("Desired state")
     expect(response.body).to include("Assignment state")
@@ -64,7 +65,7 @@ RSpec.describe "Dashboard", type: :request do
     expect(response.body).not_to include("System status")
 
     document = Nokogiri::HTML(response.body)
-    operational_banner = document.at_xpath("//h2[normalize-space()='All systems operational']/ancestor::section[1]")
+    operational_banner = document.at_xpath("//h2[normalize-space()='Everything is tied together']/ancestor::section[1]")
     in_sync_badge = document.css("span").find { |node| node.text.strip == "In sync" }
     operational_badge = document.css("a").find { |node| node.text.strip == "Operational" }
     rss_badge = document.css("span").find { |node| node.text.strip == "RSS on" }
@@ -287,7 +288,7 @@ RSpec.describe "Dashboard", type: :request do
     get root_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("A focused view of the assignments Bridgarr manages")
+    expect(response.body).to include("Your indexers, apps, and assignments—all tied together.")
     expect(response.body).to include("Needs attention")
     expect(response.body).to include("Review 1 assignment, 1 proxy failure, and latest sync run.")
     expect(response.body).to include("3 managed assignments")
