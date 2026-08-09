@@ -1,6 +1,6 @@
 <% content_for :title, "Edit assignment" %>
 
-<div class="max-w-3xl space-y-6">
+<div class="space-y-6">
   <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <p class="text-sm font-medium text-slate-500"><%= @indexer_app.indexer.name %> to <%= @indexer_app.arr_app.name %></p>
@@ -11,7 +11,8 @@
     <%= link_to "Back", back_path, class: "inline-flex items-center justify-center rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-stone-50" %>
   </div>
 
-  <%= form_with(model: @indexer_app, class: "space-y-6 rounded-md border border-stone-200 bg-white p-6 shadow-sm") do |form| %>
+  <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
+  <%= form_with(model: @indexer_app, class: "min-w-0 space-y-6 rounded-md border border-stone-200 bg-white p-6 shadow-sm") do |form| %>
     <%= hidden_field_tag :return_to, params[:return_to] if params[:return_to].present? %>
 
     <% if @indexer_app.errors.any? %>
@@ -78,12 +79,12 @@
 
       <div>
         <%= form.label :custom_categories, "Custom categories", class: "block text-sm font-medium text-slate-700" %>
-        <%= form.text_field :custom_categories, placeholder: "2000,2010,8000", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" %>
+        <%= form.text_field :custom_categories, placeholder: "Enter comma-separated IDs", class: "mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" %>
       </div>
     </div>
 
     <div class="rounded-md border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-slate-600">
-      Auto uses the target app's default Generic Torznab categories when this Jackett indexer supports them. Custom sends the IDs you enter here. None sends empty category lists for manual troubleshooting; some apps may reject it.
+      Auto uses the target app's default Generic Torznab categories that this Jackett indexer supports. Custom configures the target app with the category IDs entered above. None sends empty category lists for manual troubleshooting; some apps may reject it.
     </div>
 
     <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
@@ -91,4 +92,7 @@
       <%= form.submit "Save assignment", class: "inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-sm hover:bg-amber-400" %>
     </div>
   <% end %>
+
+    <%= render "category_catalog", assignment: @indexer_app, catalog: @category_catalog %>
+  </div>
 </div>

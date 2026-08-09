@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_09_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_09_121000) do
   create_table "arr_apps", force: :cascade do |t|
     t.string "api_key", null: false
     t.string "app_type", null: false
@@ -60,6 +60,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_09_100000) do
   create_table "indexers", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
+    t.json "jackett_category_catalog"
+    t.datetime "jackett_category_catalog_refreshed_at"
+    t.string "jackett_category_catalog_source"
     t.boolean "jackett_configured"
     t.string "jackett_id", null: false
     t.datetime "jackett_last_seen_at"

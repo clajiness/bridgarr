@@ -18,12 +18,14 @@ class IndexerAppsController < ApplicationController
   end
 
   def edit
+    @category_catalog = Jackett::CategoryCatalog.call(indexer: @indexer_app.indexer)
   end
 
   def update
     if @indexer_app.update(indexer_app_params)
       redirect_to indexer_app_redirect_path(@indexer_app), notice: "Assignment settings saved.", status: :see_other
     else
+      @category_catalog = Jackett::CategoryCatalog.cached(indexer: @indexer_app.indexer)
       render :edit, status: :unprocessable_content
     end
   end

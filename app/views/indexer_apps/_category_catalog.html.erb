@@ -1,0 +1,50 @@
+<% categories = catalog.categories %>
+<% configured_ids = assignment.category_mode_custom? ? assignment.custom_category_ids : [] %>
+<% advertised_ids = categories.pluck("id") %>
+<% unsupported_ids = catalog.refreshed_at.present? ? configured_ids - advertised_ids : [] %>
+
+<aside class="h-fit overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm xl:sticky xl:top-6" aria-labelledby="jackett-category-catalog-heading">
+  <div class="border-b border-stone-200 px-5 py-4">
+    <h2 id="jackett-category-catalog-heading" class="text-base font-semibold text-slate-950">Categories from <%= assignment.indexer.name %></h2>
+    <p class="mt-1 text-xs leading-5 text-slate-600">Jackett reports these categories for this indexer. Auto chooses compatible entries; in Custom mode, choose IDs appropriate for <%= assignment.arr_app.name %>.</p>
+
+    <% if catalog.refreshed_at.present? %>
+      <p class="mt-2 text-xs text-slate-500">Category list updated <%= format_server_timestamp(catalog.refreshed_at) %></p>
+    <% end %>
+  </div>
+
+  <% if catalog.message.present? %>
+    <div class="border-b border-stone-200 px-5 py-3 text-xs leading-5 <%= catalog.stale? ? "bg-amber-50 text-amber-900" : "bg-stone-50 text-slate-600" %>">
+      <%= catalog.message %>
+      <% if catalog.state == "unconfigured" %>
+        <%= link_to "Open Settings", settings_path, class: "ml-1 font-semibold underline hover:no-underline" %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if unsupported_ids.any? %>
+    <div class="border-b border-amber-200 bg-amber-50 px-5 py-3 text-xs leading-5 text-amber-900">
+      <p class="font-semibold"><%= pluralize(unsupported_ids.size, "configured ID") %> not in Jackett's last reported list</p>
+      <p class="mt-1 font-mono"><%= unsupported_ids.join(", ") %></p>
+    </div>
+  <% end %>
+
+  <% if categories.any? %>
+    <ul class="max-h-[46rem] divide-y divide-stone-100 overflow-y-auto" aria-label="Jackett categories">
+      <% categories.each do |category| %>
+        <% configured = configured_ids.include?(category["id"]) %>
+        <li class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm <%= class_names("bg-amber-50" => configured, "pl-8" => category["parent_id"].present?) %>">
+          <span class="min-w-0 truncate <%= category["parent_id"].present? ? "text-slate-700" : "font-medium text-slate-900" %>" title="<%= category["name"] %>"><%= category["name"] %></span>
+          <span class="flex shrink-0 items-center gap-2">
+            <% if configured %>
+              <span class="rounded-full bg-amber-200 px-2 py-0.5 text-[0.6875rem] font-semibold text-amber-950">Configured</span>
+            <% end %>
+            <code class="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-slate-700"><%= category["id"] %></code>
+          </span>
+        </li>
+      <% end %>
+    </ul>
+  <% elsif catalog.message.blank? %>
+    <p class="px-5 py-6 text-sm text-slate-600">Jackett did not advertise any categories for this indexer.</p>
+  <% end %>
+</aside>

@@ -1,6 +1,8 @@
 class Indexer < ApplicationRecord
   JACKETT_ID_FORMAT = /\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/
   JACKETT_STATES = %w[unknown unchanged renamed changed disabled missing].freeze
+  JACKETT_CATEGORY_LIMIT = 500
+  JACKETT_CATEGORY_NAME_LIMIT = 160
 
   has_many :indexer_apps, dependent: :destroy
   has_many :arr_apps, through: :indexer_apps
@@ -48,6 +50,38 @@ class Indexer < ApplicationRecord
       average_duration_ms: scoped_requests.average(:duration_ms).to_i,
       last_request: proxy_requests.recent.first
     }
+  end
+
+  def jackett_categories
+    self.class.normalize_jackett_categories(jackett_category_catalog)
+  end
+
+  def record_jackett_categories!(categories, source:, refreshed_at: Time.current)
+    normalized_categories = self.class.normalize_jackett_categories(categories)
+    update_columns(
+      jackett_category_catalog: normalized_categories,
+      jackett_category_catalog_refreshed_at: refreshed_at,
+      jackett_category_catalog_source: source
+    )
+    normalized_categories
+  end
+
+  def self.normalize_jackett_categories(categories)
+    return [] unless categories.is_a?(Array)
+
+    categories.first(JACKETT_CATEGORY_LIMIT).each_with_object({}) do |raw_category, normalized|
+      next unless raw_category.respond_to?(:stringify_keys)
+
+      category = raw_category.stringify_keys
+      id = Integer(category["id"].to_s, 10, exception: false)
+      next unless id&.positive? && !normalized.key?(id)
+
+      parent_id = Integer(category["parent_id"].to_s, 10, exception: false)
+      parent_id = nil unless parent_id&.positive?
+      name = category["name"].to_s.strip.first(JACKETT_CATEGORY_NAME_LIMIT)
+      name = "Category #{id}" if name.blank?
+      normalized[id] = { "id" => id, "name" => name, "parent_id" => parent_id }
+    end.values
   end
 
   private

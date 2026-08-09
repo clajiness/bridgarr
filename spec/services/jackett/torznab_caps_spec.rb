@@ -49,6 +49,14 @@ RSpec.describe Jackett::TorznabCaps do
 
     expect(result).to be_success
     expect(result.category_ids).to eq([ 2000, 5000, 5030, 5040 ])
+    expect(result.categories).to eq(
+      [
+        { "id" => 5000, "name" => "TV", "parent_id" => nil },
+        { "id" => 5030, "name" => "TV/SD", "parent_id" => 5000 },
+        { "id" => 5040, "name" => "TV/HD", "parent_id" => 5000 },
+        { "id" => 2000, "name" => "Movies", "parent_id" => nil }
+      ]
+    )
     expect(connection.path).to eq("/api/v2.0/indexers/eztv/results/torznab")
     expect(connection.params).to eq(t: "caps", apikey: "jackett-api-key")
   end
@@ -64,6 +72,7 @@ RSpec.describe Jackett::TorznabCaps do
     )
 
     expect(result).not_to be_success
+    expect(result.categories).to eq([])
     expect(result.message).to eq("Jackett responded, but Bridgarr could not read the Torznab caps.")
     expect(result.http_status).to eq(200)
   end
