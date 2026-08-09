@@ -1,6 +1,6 @@
 module Jackett
   class TorznabCaps
-    Result = Data.define(:success?, :category_ids, :message, :error, :http_status)
+    Result = Data.define(:success?, :category_ids, :categories, :message, :error, :http_status)
 
     def self.call(base_url:, api_key:, jackett_id:, connection: nil)
       new(base_url:, api_key:, jackett_id:, connection:).call
@@ -21,8 +21,8 @@ module Jackett
       response = http.get(torznab_path, t: "caps", apikey: api_key)
       return http_failure(response) unless response.success?
 
-      category_ids = parse_category_ids(response.body)
-      success(category_ids, response.status)
+      categories = parse_categories(response.body)
+      success(categories, response.status)
     rescue Faraday::Error => e
       failure("Could not connect to Jackett: #{e.message}")
     rescue Nokogiri::XML::SyntaxError
@@ -46,19 +46,34 @@ module Jackett
         "/api/v2.0/indexers/#{jackett_id}/results/torznab"
       end
 
-      def parse_category_ids(body)
+      def parse_categories(body)
         document = Nokogiri::XML(body) { |config| config.strict.nonet }
         raise Nokogiri::XML::SyntaxError, "missing caps root" unless document.at_xpath("/caps")
 
         document.xpath("/caps/categories//*[self::category or self::subcat]").filter_map do |category|
-          category["id"].presence&.to_i
-        end.uniq.sort
+          id = positive_integer(category["id"])
+          next unless id
+
+          parent_id = positive_integer(category.parent["id"]) if category.name == "subcat"
+          {
+            "id" => id,
+            "name" => category["name"].to_s.strip.presence || "Category #{id}",
+            "parent_id" => parent_id
+          }
+        end.uniq { |category| category["id"] }
       end
 
-      def success(category_ids, http_status)
+      def positive_integer(value)
+        parsed = Integer(value.to_s, 10, exception: false)
+        parsed if parsed&.positive?
+      end
+
+      def success(categories, http_status)
+        category_ids = categories.pluck("id").sort
         Result.new(
           success?: true,
           category_ids:,
+          categories:,
           message: "Found #{category_ids.size} Torznab categories.",
           error: nil,
           http_status:
@@ -70,7 +85,7 @@ module Jackett
       end
 
       def failure(message, http_status: nil)
-        Result.new(success?: false, category_ids: [], message:, error: message, http_status:)
+        Result.new(success?: false, category_ids: [], categories: [], message:, error: message, http_status:)
       end
   end
 end

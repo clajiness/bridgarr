@@ -60,4 +60,27 @@ RSpec.describe Indexer, type: :model do
     )
     expect(stats[:last_request].request_type).to eq("search")
   end
+
+  it "normalizes the cached Jackett category catalog" do
+    indexer = described_class.create!(name: "First Indexer", jackett_id: "first-indexer")
+
+    categories = indexer.record_jackett_categories!(
+      [
+        { id: "2000", name: " Movies ", parent_id: nil },
+        { id: 2010, name: "Movies/Foreign", parent_id: "2000" },
+        { id: 2010, name: "Duplicate", parent_id: 2000 },
+        { id: "invalid", name: "Invalid", parent_id: nil }
+      ],
+      source: "test-source"
+    )
+
+    expect(categories).to eq(
+      [
+        { "id" => 2000, "name" => "Movies", "parent_id" => nil },
+        { "id" => 2010, "name" => "Movies/Foreign", "parent_id" => 2000 }
+      ]
+    )
+    expect(indexer.reload.jackett_categories).to eq(categories)
+    expect(indexer.jackett_category_catalog_source).to eq("test-source")
+  end
 end

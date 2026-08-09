@@ -33,6 +33,56 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(response.body).to include("Main Radarr")
   end
 
+  it "shows the indexer's named Jackett categories beside custom settings" do
+    Setting.write_value(Setting::JACKETT_BASE_URL_KEY, "http://localhost:9117")
+    Setting.write_value(Setting::JACKETT_API_KEY_KEY, "jackett-api-key")
+    assignment.update!(category_mode: "custom", custom_categories: "2000,9999")
+    allow(Jackett::TorznabCaps).to receive(:call).and_return(
+      Jackett::TorznabCaps::Result.new(
+        success?: true,
+        category_ids: [ 2000, 2010 ],
+        categories: [
+          { "id" => 2000, "name" => "Movies", "parent_id" => nil },
+          { "id" => 2010, "name" => "Movies/Foreign", "parent_id" => 2000 }
+        ],
+        message: "Found 2 Torznab categories.",
+        error: nil,
+        http_status: 200
+      )
+    )
+
+    get edit_indexer_app_path(assignment)
+
+    expect(response).to have_http_status(:ok)
+    document = Nokogiri::HTML(response.body)
+    catalog = document.at_css("aside[aria-labelledby='jackett-category-catalog-heading']")
+    expect(catalog.text).to include(
+      "Categories from LimeTorrents",
+      "Movies",
+      "Movies/Foreign",
+      "Configured",
+      "1 configured ID not in Jackett's last reported list",
+      "9999"
+    )
+    expect(catalog.at_css("code").text).to eq("2000")
+    expect(document.at_css("input[name='indexer_app[custom_categories]']")["placeholder"]).to eq("Enter comma-separated IDs")
+    expect(response.body).to include("Custom configures the target app with the category IDs entered above.")
+    expect(response.body).not_to include("Custom sends the IDs you enter here.")
+  end
+
+  it "does not reject custom IDs when no Jackett category list is available" do
+    assignment.update!(category_mode: "custom", custom_categories: "2000")
+
+    get edit_indexer_app_path(assignment)
+
+    expect(response).to have_http_status(:ok)
+    catalog_text = Nokogiri::HTML(response.body)
+      .at_css("aside[aria-labelledby='jackett-category-catalog-heading']")
+      .text
+    expect(catalog_text).to include("Connect Jackett in Settings")
+    expect(catalog_text).not_to include("not in Jackett's last reported list")
+  end
+
   it "renders the centralized assignment matrix" do
     assignment
 
@@ -394,6 +444,7 @@ RSpec.describe "Indexer app assignments", type: :request do
       Jackett::TorznabCaps::Result.new(
         success?: true,
         category_ids: [ 2000 ],
+        categories: [ { "id" => 2000, "name" => "Movies", "parent_id" => nil } ],
         message: "Found 1 Torznab category.",
         error: nil,
         http_status: 200
