@@ -28,11 +28,7 @@
   <% end %>
 
   <% if @indexers.any? && @arr_apps.any? %>
-    <%= form_with url: bulk_update_indexer_apps_path, class: "space-y-4", data: { controller: "bulk-actions" } do |form| %>
-      <%= hidden_field_tag :filter, params[:filter] %>
-      <%= hidden_field_tag :page, @indexers_page.current_page %>
-      <%= hidden_field_tag :per_page, @indexers_page.per_page %>
-
+    <div class="space-y-4" data-controller="bulk-actions">
       <div class="overflow-x-auto rounded-md border border-stone-200 bg-white shadow-sm">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <thead class="bg-stone-100 text-left text-xs font-semibold uppercase tracking-normal text-slate-600">
@@ -60,7 +56,7 @@
                   <% assignment = @assignments_by_cell[[indexer.id, arr_app.id]] %>
                   <td class="px-4 py-4">
                     <div class="flex items-start gap-3">
-                      <%= check_box_tag "cells[]", "#{indexer.id}:#{arr_app.id}", false, aria: { label: "Select #{indexer.name} for #{arr_app.name}" }, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500", data: { bulk_actions_target: "cell", action: "change->bulk-actions#refresh" } %>
+                      <%= check_box_tag "cells[]", "#{indexer.id}:#{arr_app.id}", false, form: "assignment-bulk-form", aria: { label: "Select #{indexer.name} for #{arr_app.name}" }, class: "mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500", data: { bulk_actions_target: "cell", action: "change->bulk-actions#refresh" } %>
                       <div class="min-w-0 flex-1 space-y-2">
                         <% if assignment %>
                           <div class="flex flex-wrap gap-2">
@@ -79,7 +75,11 @@
                           <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
                             <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "matrix"), class: "text-slate-700 hover:text-slate-950" %>
                             <%= link_to "Preview", preview_indexer_apps_path(assignment_ids: [ assignment.id ]), class: "text-blue-700 hover:text-blue-900" %>
-                            <%= link_to "Remove", indexer_app_path(assignment), data: { turbo_method: :delete, turbo_confirm: "Remove this assignment and its managed remote indexer?" }, class: "text-red-700 hover:text-red-900" %>
+                            <%= button_to "Remove",
+                              indexer_app_path(assignment),
+                              method: :delete,
+                              class: "cursor-pointer text-red-700 hover:text-red-900",
+                              form: { class: "inline", data: { turbo_confirm: "Remove this assignment and its managed remote indexer?" } } %>
                           </div>
                         <% else %>
                           <span class="inline-flex rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-500">Unassigned</span>
@@ -94,6 +94,11 @@
           </tbody>
         </table>
       </div>
+
+      <%= form_with url: bulk_update_indexer_apps_path, id: "assignment-bulk-form", class: "space-y-4" do |form| %>
+        <%= hidden_field_tag :filter, params[:filter] %>
+        <%= hidden_field_tag :page, @indexers_page.current_page %>
+        <%= hidden_field_tag :per_page, @indexers_page.per_page %>
 
       <div class="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -165,6 +170,7 @@
         </div>
       </div>
     <% end %>
+    </div>
     <%= render "shared/pagination",
       pagination: @indexers_page,
       item_name: "indexer",

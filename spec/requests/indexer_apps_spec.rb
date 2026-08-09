@@ -99,6 +99,8 @@ RSpec.describe "Indexer app assignments", type: :request do
 
     document = Nokogiri::HTML(response.body)
     bulk_form = document.at_css('form[action="/indexer_apps/bulk_update"]')
+    expect(bulk_form["id"]).to eq("assignment-bulk-form")
+    expect(document.at_css('input[name="cells[]"]')["form"]).to eq("assignment-bulk-form")
     search_modes_panel = bulk_form.at_css('[data-bulk-action="search_modes"]')
     categories_panel = bulk_form.at_css('[data-bulk-action="categories"]')
     submit_button = bulk_form.at_css('[data-bulk-actions-target="submit"]')
@@ -106,6 +108,12 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(categories_panel.key?("hidden")).to be(true)
     expect(submit_button.name).to eq("button")
     expect(submit_button["disabled"]).to eq("disabled")
+    remove_form = document.at_css("form[action='#{indexer_app_path(assignment)}']")
+    expect(remove_form["method"]).to eq("post")
+    expect(remove_form["data-turbo-confirm"]).to eq("Remove this assignment and its managed remote indexer?")
+    expect(remove_form.at_css('input[name="_method"]')["value"]).to eq("delete")
+    expect(remove_form.at_css('button[type="submit"]').text).to eq("Remove")
+    expect(bulk_form.at_css("form[action='#{indexer_app_path(assignment)}']")).to be_nil
     expect(response.body).not_to include("manage their desired state")
   end
 
@@ -163,6 +171,17 @@ RSpec.describe "Indexer app assignments", type: :request do
       enable_interactive_search: false
     )
     expect(IndexerApp.exists?(assignment.id)).to be(true)
+  end
+
+  it "removes an unsynced assignment in one delete request" do
+    assignment_id = assignment.id
+
+    delete indexer_app_path(assignment)
+
+    expect(response).to redirect_to(indexer_apps_path)
+    expect(response).to have_http_status(:see_other)
+    expect(flash[:notice]).to include("Removed assignment LimeTorrents → Main Radarr")
+    expect(IndexerApp.exists?(assignment_id)).to be(false)
   end
 
   it "creates assignments from selected matrix cells" do
@@ -519,6 +538,49 @@ RSpec.describe "Indexer app assignments", type: :request do
     expect(document.at_css('button[name="revert_target"][value$=":categories"]')).to be_present
     expect(document.at_css('button[name="revert_target"][value$=":all"]')).to be_present
     expect(document.at_css('button[name="revert_all"][value="1"]')).to be_present
+  end
+
+  it "renders repair and forget actions as explicit POST submit buttons" do
+    assignment.update!(remote_indexer_id: 42)
+    second_indexer = Indexer.create!(name: "1337x", jackett_id: "1337x")
+    orphaned_assignment = IndexerApp.create!(arr_app:, indexer: second_indexer, remote_indexer_id: 43)
+    conflict = Sync::Plan::Item.new(
+      indexer_app: assignment,
+      state: "conflict",
+      remote_indexer_id: 42,
+      changes: [],
+      message: "Choose the matching remote indexer.",
+      desired_digest: "desired-conflict",
+      remote_digest: "remote-conflict",
+      plan_digest: "conflict-plan",
+      destructive: false
+    )
+    orphaned = Sync::Plan::Item.new(
+      indexer_app: orphaned_assignment,
+      state: "orphaned",
+      remote_indexer_id: nil,
+      changes: [],
+      message: "The associated remote indexer is missing.",
+      desired_digest: "desired-orphaned",
+      remote_digest: nil,
+      plan_digest: "orphaned-plan",
+      destructive: false
+    )
+    allow(Sync::Plan).to receive(:call).and_return(Sync::Plan::Result.new(items: [ conflict, orphaned ], generated_at: Time.current))
+
+    get preview_indexer_apps_path(assignment_ids: [ assignment.id, orphaned_assignment.id ])
+
+    document = Nokogiri::HTML(response.body)
+    apply_form = document.at_css("form[action='#{apply_plan_indexer_apps_path}']")
+    repair_button = apply_form.at_css("button[formaction='#{repair_indexer_app_path(assignment, remote_indexer_id: 42)}']")
+    forget_button = apply_form.at_css("button[formaction='#{forget_remote_indexer_app_path(orphaned_assignment)}']")
+    expect(repair_button["type"]).to eq("submit")
+    expect(repair_button["formmethod"]).to eq("post")
+    expect(forget_button["type"]).to eq("submit")
+    expect(forget_button["formmethod"]).to eq("post")
+    expect(repair_button["data-turbo-confirm"]).to include("remote indexer ID 42")
+    expect(forget_button["data-turbo-confirm"]).to include("remote indexer ID 43")
+    expect(document.at_css("[data-turbo-method]")).to be_nil
   end
 
   it "reverts one reviewed local desired-state change and returns to the same preview scope" do

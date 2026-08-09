@@ -37,7 +37,7 @@ RSpec.describe "Dashboard", type: :request do
       last_tested_at: Time.current
     )
     indexer = Indexer.create!(name: "1337x", jackett_id: "1337x", enabled: true, last_status: "ok", last_tested_at: Time.current)
-    IndexerApp.create!(
+    assignment = IndexerApp.create!(
       arr_app:,
       indexer:,
       remote_indexer_id: 42,
@@ -68,11 +68,15 @@ RSpec.describe "Dashboard", type: :request do
     in_sync_badge = document.css("span").find { |node| node.text.strip == "In sync" }
     operational_badge = document.css("a").find { |node| node.text.strip == "Operational" }
     rss_badge = document.css("span").find { |node| node.text.strip == "RSS on" }
+    sync_form = document.at_css("form[action='#{sync_indexer_app_path(assignment)}']")
 
     expect(operational_banner["class"]).to include("border-green-200", "bg-green-50")
     expect(in_sync_badge["class"]).to include("bg-green-50", "text-green-800")
     expect(operational_badge["class"]).to include("bg-green-50", "text-green-800")
     expect(rss_badge["class"]).to include("bg-blue-50", "text-blue-800")
+    expect(sync_form["method"]).to eq("post")
+    expect(sync_form.at_css('button[type="submit"]').text).to eq("Sync")
+    expect(document.at_css("[data-turbo-method]")).to be_nil
   end
 
   it "distinguishes an in-sync assignment from failed indexer health" do

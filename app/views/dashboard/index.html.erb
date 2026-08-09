@@ -102,7 +102,7 @@
                 <td class="px-4 py-4 text-right">
                   <div class="flex flex-wrap justify-end gap-x-3 gap-y-2 text-xs font-semibold">
                     <%= link_to "Preview", preview_indexer_apps_path(assignment_ids: [ assignment.id ]), class: "text-blue-700 hover:text-blue-900" %>
-                    <%= link_to "Sync", sync_indexer_app_path(assignment), data: { turbo_method: :post }, class: "text-slate-700 hover:text-slate-950" %>
+                    <%= button_to "Sync", sync_indexer_app_path(assignment), method: :post, class: "cursor-pointer text-slate-700 hover:text-slate-950", form: { class: "inline" } %>
                     <%= link_to "Settings", edit_indexer_app_path(assignment, return_to: "dashboard"), class: "text-slate-700 hover:text-slate-950" %>
                     <% if row.attention? || assignment.last_error.present? %><%= render "indexer_apps/diagnostic_button", assignment: %><% end %>
                   </div>

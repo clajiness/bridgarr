@@ -63,9 +63,17 @@
             <% end %>
             <% if item.state == "conflict" && item.remote_indexer_id.present? %>
               <% repair_confirmation = if assignment.all_search_modes_enabled?; "Associate this assignment with remote indexer ID #{item.remote_indexer_id} and sync it?"; else; "Associate this assignment with remote indexer ID #{item.remote_indexer_id}? You will return to preview before any remote change."; end %>
-              <%= link_to "Repair association", repair_indexer_app_path(assignment, remote_indexer_id: item.remote_indexer_id), class: "text-blue-700 hover:text-blue-900", data: { turbo_method: :post, turbo_confirm: repair_confirmation } %>
+              <%= button_tag "Repair association",
+                formaction: repair_indexer_app_path(assignment, remote_indexer_id: item.remote_indexer_id),
+                formmethod: :post,
+                class: "cursor-pointer text-blue-700 hover:text-blue-900",
+                data: { turbo_confirm: repair_confirmation } %>
             <% elsif item.state == "orphaned" %>
-              <%= link_to "Forget stale association", forget_remote_indexer_app_path(assignment), class: "text-blue-700 hover:text-blue-900", data: { turbo_method: :post, turbo_confirm: "Forget remote indexer ID #{assignment.remote_indexer_id}? This does not delete anything remotely." } %>
+              <%= button_tag "Forget stale association",
+                formaction: forget_remote_indexer_app_path(assignment),
+                formmethod: :post,
+                class: "cursor-pointer text-blue-700 hover:text-blue-900",
+                data: { turbo_confirm: "Forget remote indexer ID #{assignment.remote_indexer_id}? This does not delete anything remotely." } %>
             <% end %>
           </div>
         </td>
