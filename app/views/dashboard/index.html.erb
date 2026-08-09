@@ -5,7 +5,7 @@
   <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
       <h1 class="text-3xl font-semibold text-slate-950">Dashboard</h1>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">A focused view of the assignments Bridgarr manages across your applications.</p>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Your indexers, apps, and assignments—all tied together.</p>
     </div>
 
     <div class="flex flex-wrap gap-3">
@@ -120,7 +120,7 @@
     <% else %>
       <div class="px-6 py-12 text-center">
         <% if @dashboard.assignments_count.zero? %>
-          <p class="text-sm font-medium text-slate-700">No assignments yet.</p>
+          <p class="text-sm font-medium text-slate-700">Nothing is tied together yet.</p>
           <p class="mt-2 text-sm text-slate-500"><%= link_to "Open the assignment matrix", indexer_apps_path, class: "font-semibold text-slate-700 underline" %> to connect an indexer to an application.</p>
         <% else %>
           <p class="text-sm font-medium text-slate-700">No assignments match this view.</p>

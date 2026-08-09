@@ -79,10 +79,10 @@ RSpec.describe "Indexers", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Existing Indexer")
-    expect(response.body).to include("Already imported")
+    expect(response.body).to include("In Bridgarr · Up to date")
     expect(response.body).to include("New Indexer")
     expect(response.body).to include("Ready to import")
-    expect(response.body).to include("Import and create assignments")
+    expect(response.body).to include("Create or update assignments")
     expect(response.body).to include("jackett_ids[]")
     expect(response.body).not_to include("Unconfigured Indexer")
     expect(response.body).not_to include("Previously Imported")

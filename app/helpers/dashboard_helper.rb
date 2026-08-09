@@ -16,7 +16,7 @@ module DashboardHelper
       syncing: "Sync in progress",
       setup: "Finish setup",
       pending: "Health checks pending",
-      healthy: "All systems operational"
+      healthy: "Everything is tied together"
     }.fetch(dashboard_operational_state(dashboard))
   end
 
@@ -126,7 +126,7 @@ module DashboardHelper
   end
 
   def dashboard_readiness_summary(readiness)
-    return "Bridgarr is ready to manage indexers." if readiness.complete?
+    return "The stack is ready. Bridgarr can manage indexers." if readiness.complete?
 
     "#{pluralize(readiness.remaining_count, "setup step")} remaining."
   end
