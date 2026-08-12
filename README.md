@@ -547,7 +547,7 @@ GitHub Actions builds the Docker image on pull requests without publishing it.
 Pushes to `main` publish:
 
 - `main`
-- `sha-<commit>`
+- `sha-<12-character commit SHA>`
 
 Stable version tags publish semver image tags and update `latest`. For example,
 pushing Git tag `v0.9.0` publishes image tags like:
@@ -555,8 +555,10 @@ pushing Git tag `v0.9.0` publishes image tags like:
 - `latest`
 - `0.9.0`
 - `0.9`
+- `sha-<12-character commit SHA>`
 
-The image tags intentionally omit the leading `v`.
+The SHA tag always identifies the commit being built, including version-tag
+builds. The image tags intentionally omit the leading `v`.
 
 ## Development
 
