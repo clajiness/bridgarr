@@ -45,6 +45,10 @@
 
 # Ignore development files
 /.devcontainer
+/.idea
+/.ruby-lsp
+/.DS_Store
+/spec
 
 # Ignore Docker-related files
 /.dockerignore
